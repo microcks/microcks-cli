@@ -13,7 +13,7 @@ func NewHelpCommand() Command {
 // Execute implementation on helpCommand structure
 func (c *helpCommand) Execute() {
 	fmt.Println("")
-	fmt.Println("microcks-cli is a CLI  s for interacting with Microcks server APIs.")
+	fmt.Println("microcks-cli is a CLI for interacting with Microcks server APIs.")
 	fmt.Println("It allows to launch tests with minimal dependencies")
 	fmt.Println("")
 	fmt.Println("")

@@ -69,6 +69,5 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	}
 
 	accessToken := openIDResp["access_token"].(string)
-
 	return accessToken, err
 }
