@@ -132,8 +132,6 @@ func (c *testComamnd) Execute() {
 	now := nowInMilliseconds()
 	future := now + waitForMilliseconds
 
-	fmt.Println("now: " + fmt.Sprint(now) + " - future: " + fmt.Sprint(future))
-
 	var success = false
 	for nowInMilliseconds() < future {
 		testResultSummary, err := mc.GetTestResult(testResultID)
@@ -149,7 +147,7 @@ func (c *testComamnd) Execute() {
 			break
 		}
 
-		fmt.Println("MicrocksTester waiting for 2 seconds before checking again.")
+		fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
 		time.Sleep(2 * time.Second)
 	}
 
