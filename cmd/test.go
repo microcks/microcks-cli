@@ -96,7 +96,7 @@ func (c *testComamnd) Execute() {
 		fmt.Printf("Got error when invoking Keycloack client: %s", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
+	//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 
 	// Then - launch the test on Microcks Server.
 	mc := connectors.NewMicrocksClient(microcksURL, oauthToken)
@@ -107,7 +107,7 @@ func (c *testComamnd) Execute() {
 		fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Retrieve TestResult ID: %s", testResultID)
+	//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
 
 	now := nowInMilliseconds()
 	future := now + 5000
@@ -122,10 +122,13 @@ func (c *testComamnd) Execute() {
 		}
 		success = testResultSummary.Success
 		inProgress := testResultSummary.InProgress
+		fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+
 		if !inProgress {
 			break
 		}
 
+		fmt.Println("MicrocksTester waiting for 2 seconds before checking again.")
 		time.Sleep(2 * time.Second)
 	}
 

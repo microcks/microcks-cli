@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 // MicrocksClient allows interacting with Mcirocks APIs
@@ -17,15 +16,15 @@ type MicrocksClient interface {
 
 // TestResultSummary represents a simple view on Microcks TestResult
 type TestResultSummary struct {
-	ID             string    `json:"id"`
-	Version        int32     `json:"version"`
-	TestNumber     int32     `json:"testNumber"`
-	TestDate       time.Time `json:"testDate"`
-	TestedEndpoint string    `json:"testedEndpoint"`
-	ServiceID      string    `json:"serviceId"`
-	ElapsedTime    int32     `json:"elapsedTime"`
-	Success        bool      `json:"success"`
-	InProgress     bool      `json:"inProgress"`
+	ID             string `json:"id"`
+	Version        int32  `json:"version"`
+	TestNumber     int32  `json:"testNumber"`
+	TestDate       int64  `json:"testDate"`
+	TestedEndpoint string `json:"testedEndpoint"`
+	ServiceID      string `json:"serviceId"`
+	ElapsedTime    int32  `json:"elapsedTime"`
+	Success        bool   `json:"success"`
+	InProgress     bool   `json:"inProgress"`
 }
 
 type microcksClient struct {
@@ -116,5 +115,6 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	result := TestResultSummary{}
 	json.Unmarshal([]byte(body), &result)
+
 	return &result, err
 }

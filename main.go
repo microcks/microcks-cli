@@ -1,14 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/microcks/microcks-cli/cmd"
 )
 
 func main() {
-	fmt.Println("Args: " + os.Args[1])
 	var c cmd.Command
 
 	switch os.Args[1] {
