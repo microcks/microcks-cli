@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,11 +62,13 @@ func (c *testComamnd) Execute() {
 	var keycloakURL string
 	var keycloakUsername string
 	var keycloakPassword string
+	var waitFor string
 
 	testCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
 	testCmd.StringVar(&keycloakURL, "keycloakURL", "", "Keycloak Realm URL")
 	testCmd.StringVar(&keycloakUsername, "keycloakUsername", "", "Keycloak Realm ServiceAccount ")
 	testCmd.StringVar(&keycloakPassword, "keycloakPassword", "", "Keycloak Realm Account Password")
+	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
 	testCmd.Parse(os.Args[5:])
 
 	// Validate presence and values of flags.
@@ -84,6 +87,22 @@ func (c *testComamnd) Execute() {
 	if len(keycloakPassword) == 0 {
 		fmt.Println("--keycloakPassword flag is mandatory. Check Usage.")
 		os.Exit(1)
+	}
+	if &waitFor == nil || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
+		fmt.Println("--waitFor format is wrong. Applying default 5sec")
+		waitFor = "5sec"
+	}
+
+	// Compute time to wait in milliseconds.
+	var waitForMilliseconds int64 = 5000
+	if strings.HasSuffix(waitFor, "milli") {
+		waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
+	} else if strings.HasSuffix(waitFor, "sec") {
+		waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+		waitForMilliseconds = waitForMilliseconds * 1000
+	} else if strings.HasSuffix(waitFor, "min") {
+		waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+		waitForMilliseconds = waitForMilliseconds * 60 * 1000
 	}
 
 	// Now we seems to be good ...
@@ -109,11 +128,13 @@ func (c *testComamnd) Execute() {
 	}
 	//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
 
+	// Finally - wait for some time
 	now := nowInMilliseconds()
-	future := now + 5000
+	future := now + waitForMilliseconds
+
+	fmt.Println("now: " + fmt.Sprint(now) + " - future: " + fmt.Sprint(future))
 
 	var success = false
-
 	for nowInMilliseconds() < future {
 		testResultSummary, err := mc.GetTestResult(testResultID)
 		if err != nil {
