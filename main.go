@@ -9,6 +9,11 @@ import (
 func main() {
 	var c cmd.Command
 
+	if len(os.Args) == 1 {
+		cmd.NewHelpCommand().Execute()
+		os.Exit(1)
+	}
+
 	switch os.Args[1] {
 	case "version":
 		c = cmd.NewVersionCommand()
