@@ -60,14 +60,14 @@ func (c *testComamnd) Execute() {
 
 	var microcksURL string
 	var keycloakURL string
-	var keycloakUsername string
-	var keycloakPassword string
+	var keycloakClientID string
+	var keycloakClientSecret string
 	var waitFor string
 
 	testCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
 	testCmd.StringVar(&keycloakURL, "keycloakURL", "", "Keycloak Realm URL")
-	testCmd.StringVar(&keycloakUsername, "keycloakUsername", "", "Keycloak Realm ServiceAccount ")
-	testCmd.StringVar(&keycloakPassword, "keycloakPassword", "", "Keycloak Realm Account Password")
+	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
+	testCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
 	testCmd.Parse(os.Args[5:])
 
@@ -80,12 +80,12 @@ func (c *testComamnd) Execute() {
 		fmt.Println("--keycloakURL flag is mandatory. Check Usage.")
 		os.Exit(1)
 	}
-	if len(keycloakUsername) == 0 {
-		fmt.Println("--keycloakUsername flag is mandatory. Check Usage.")
+	if len(keycloakClientID) == 0 {
+		fmt.Println("--keycloakClientId flag is mandatory. Check Usage.")
 		os.Exit(1)
 	}
-	if len(keycloakPassword) == 0 {
-		fmt.Println("--keycloakPassword flag is mandatory. Check Usage.")
+	if len(keycloakClientSecret) == 0 {
+		fmt.Println("--keycloakClientSecret flag is mandatory. Check Usage.")
 		os.Exit(1)
 	}
 	if &waitFor == nil || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
@@ -107,7 +107,7 @@ func (c *testComamnd) Execute() {
 
 	// Now we seems to be good ...
 	// First - retrieve an OAuth token using Keycloak Client.
-	kc := connectors.NewKeycloakClient(keycloakURL, keycloakUsername, keycloakPassword)
+	kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
 
 	var oauthToken string
 	oauthToken, err := kc.ConnectAndGetToken()
