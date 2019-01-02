@@ -10,6 +10,8 @@ import (
 
 // MicrocksClient allows interacting with Mcirocks APIs
 type MicrocksClient interface {
+	GetKeycloakURL() (string, error)
+	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 }
@@ -35,7 +37,7 @@ type microcksClient struct {
 }
 
 // NewMicrocksClient build a new MicrocksClient implementation
-func NewMicrocksClient(apiURL string, oauthToken string) MicrocksClient {
+func NewMicrocksClient(apiURL string) MicrocksClient {
 	mc := microcksClient{}
 
 	u, err := url.Parse(apiURL)
@@ -43,9 +45,48 @@ func NewMicrocksClient(apiURL string, oauthToken string) MicrocksClient {
 		panic(err)
 	}
 	mc.APIURL = u
-	mc.OAuthToken = oauthToken
 	mc.httpClient = http.DefaultClient
 	return &mc
+}
+
+func (c *microcksClient) GetKeycloakURL() (string, error) {
+	// Ensure we have a correct URL for retrieving Keycloal configuration.
+	rel := &url.URL{Path: "keycloak/config"}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var configResp map[string]interface{}
+	if err := json.Unmarshal(body, &configResp); err != nil {
+		panic(err)
+	}
+
+	// Retrieve auth server url and realm name.
+	authServerURL := configResp["auth-server-url"].(string)
+	realmName := configResp["realm"].(string)
+
+	// Return a proper URL.
+	return authServerURL + "/realms/" + realmName + "/", nil
+}
+
+func (c *microcksClient) SetOAuthToken(oauthToken string) {
+	c.OAuthToken = oauthToken
 }
 
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string) (string, error) {

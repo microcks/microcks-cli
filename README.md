@@ -21,7 +21,7 @@ The main `test` command has abunch of arguments and flags so that you can use it
 ```
 microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
 	--microcksURL=<> --waitFor=5sec
-	--keycloakURL=<> --keycloakClientId=<> --keycloakClientSecret=<>
+	--keycloakClientId=<> --keycloakClientSecret=<>
 ```
 
 The arguments:
@@ -32,7 +32,6 @@ The arguments:
 The flags:
 * `--microcksURL` for the Microcks API endpoint,
 * `--waitFor` for the time to wait for test to finish (int + one of: milli, sec, min),
-* `--keycloakURL` for the Keycloak Realm API endpoint for Microcks,
 * `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
 * `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
 
@@ -40,7 +39,6 @@ Real life exemple command and execution:
 ```
 $ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ POSTMAN \
         --microcksURL=http://localhost:8080/api/ \
-        --keycloakURL=http://localhost:8180/auth/realms/microcks/ \
         --keycloakClientId=microcks-serviceaccount \
         --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 \
         --waitFor=3sec

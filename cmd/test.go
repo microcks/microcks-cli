@@ -65,7 +65,6 @@ func (c *testComamnd) Execute() {
 	var waitFor string
 
 	testCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
-	testCmd.StringVar(&keycloakURL, "keycloakURL", "", "Keycloak Realm URL")
 	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
 	testCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
@@ -74,10 +73,6 @@ func (c *testComamnd) Execute() {
 	// Validate presence and values of flags.
 	if len(microcksURL) == 0 {
 		fmt.Println("--microcksURL flag is mandatory. Check Usage.")
-		os.Exit(1)
-	}
-	if len(keycloakURL) == 0 {
-		fmt.Println("--keycloakURL flag is mandatory. Check Usage.")
 		os.Exit(1)
 	}
 	if len(keycloakClientID) == 0 {
@@ -106,11 +101,19 @@ func (c *testComamnd) Execute() {
 	}
 
 	// Now we seems to be good ...
-	// First - retrieve an OAuth token using Keycloak Client.
+	// First - retrieve the Keycloak URL from Microcks configuration.
+	mc := connectors.NewMicrocksClient(microcksURL)
+	keycloakURL, err := mc.GetKeycloakURL()
+	if err != nil {
+		fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+		os.Exit(1)
+	}
+
+	// Second - retrieve an OAuth token using Keycloak Client.
 	kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
 
 	var oauthToken string
-	oauthToken, err := kc.ConnectAndGetToken()
+	oauthToken, err = kc.ConnectAndGetToken()
 	if err != nil {
 		fmt.Printf("Got error when invoking Keycloack client: %s", err)
 		os.Exit(1)
@@ -118,7 +121,7 @@ func (c *testComamnd) Execute() {
 	//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 
 	// Then - launch the test on Microcks Server.
-	mc := connectors.NewMicrocksClient(microcksURL, oauthToken)
+	mc.SetOAuthToken(oauthToken)
 
 	var testResultID string
 	testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType)
