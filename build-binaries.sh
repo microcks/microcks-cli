@@ -20,7 +20,7 @@ do
         output_name+='.exe'
     fi  
 
-    env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name $package
+    env GOOS=$GOOS GOARCH=$GOARCH go build -o ./build/_output/$output_name $package
     if [ $? -ne 0 ]; then
         echo 'An error has occurred! Aborting the script execution...'
         exit 1
