@@ -121,11 +121,17 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
 
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for creating test", req, false)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for creating test", resp, true)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -154,11 +160,17 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
 
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for getting status", req, false)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for getting status test", resp, true)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

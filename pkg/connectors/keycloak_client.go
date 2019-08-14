@@ -63,11 +63,17 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Basic "+credential)
 
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Keycloak for getting token", req, false)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Keycloak for getting token", resp, true)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

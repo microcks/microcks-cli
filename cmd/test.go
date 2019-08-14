@@ -66,6 +66,7 @@ func (c *testComamnd) Execute() {
 	var waitFor string
 	var insecureTLS bool
 	var caCertPaths string
+	var verbose bool
 
 	testCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
 	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
@@ -73,6 +74,7 @@ func (c *testComamnd) Execute() {
 	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
 	testCmd.BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
 	testCmd.StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
+	testCmd.BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
 	testCmd.Parse(os.Args[5:])
 
 	// Validate presence and values of flags.
@@ -93,14 +95,15 @@ func (c *testComamnd) Execute() {
 		waitFor = "5sec"
 	}
 
-	// Collect optinal HTTPS transport flags.
-	if &insecureTLS == nil || !insecureTLS {
-		config.InsecureTLS = false
-	} else {
+	// Collect optional HTTPS transport flags.
+	if insecureTLS {
 		config.InsecureTLS = true
 	}
 	if len(caCertPaths) > 0 {
 		config.CaCertPaths = caCertPaths
+	}
+	if verbose {
+		config.Verbose = true
 	}
 
 	// Compute time to wait in milliseconds.
