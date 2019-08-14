@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -14,7 +15,7 @@ import (
 type MicrocksClient interface {
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
-	CreateTestResult(serviceID string, testEndpoint string, runnerType string) (string, error)
+	CreateTestResult(serviceID string, testEndpoint string, runnerType string, operationsHeaders string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 }
 
@@ -29,6 +30,12 @@ type TestResultSummary struct {
 	ElapsedTime    int32  `json:"elapsedTime"`
 	Success        bool   `json:"success"`
 	InProgress     bool   `json:"inProgress"`
+}
+
+// HeaderDTO represents an operation header passed for Test
+type HeaderDTO struct {
+	Name   string `json:"name"`
+	Values string `json:"values"`
 }
 
 type microcksClient struct {
@@ -100,7 +107,7 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.OAuthToken = oauthToken
 }
 
-func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string) (string, error) {
+func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, operationsHeaders string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
@@ -110,6 +117,10 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	input += ("\"serviceId\": \"" + serviceID + "\", ")
 	input += ("\"testEndpoint\": \"" + testEndpoint + "\", ")
 	input += ("\"runnerType\": \"" + runnerType + "\"")
+	if len(operationsHeaders) > 0 && ensureValid(operationsHeaders) {
+		input += (", \"operationsHeaders\": " + operationsHeaders)
+	}
+
 	input += "}"
 
 	req, err := http.NewRequest("POST", u.String(), strings.NewReader(input))
@@ -122,7 +133,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
 
 	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for creating test", req, false)
+	config.DumpRequestIfRequired("Microcks for creating test", req, true)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -181,4 +192,15 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	json.Unmarshal([]byte(body), &result)
 
 	return &result, err
+}
+
+func ensureValid(operationsHeaders string) bool {
+	// Unmarshal using a generic interface
+	var headers = map[string][]HeaderDTO{}
+	err := json.Unmarshal([]byte(operationsHeaders), &headers)
+	if err != nil {
+		fmt.Println("Error parsing JSON in operationsHeaders: ", err)
+		return false
+	}
+	return true
 }

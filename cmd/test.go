@@ -64,6 +64,7 @@ func (c *testComamnd) Execute() {
 	var keycloakClientID string
 	var keycloakClientSecret string
 	var waitFor string
+	var operationsHeaders string
 	var insecureTLS bool
 	var caCertPaths string
 	var verbose bool
@@ -72,6 +73,7 @@ func (c *testComamnd) Execute() {
 	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
 	testCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
+	testCmd.StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
 	testCmd.StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
 	testCmd.BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
@@ -142,7 +144,7 @@ func (c *testComamnd) Execute() {
 	mc.SetOAuthToken(oauthToken)
 
 	var testResultID string
-	testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType)
+	testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType, operationsHeaders)
 	if err != nil {
 		fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 		os.Exit(1)
