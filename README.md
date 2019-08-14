@@ -6,7 +6,7 @@ It allows to launch tests with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.2.0-SNAPSHOT`. [![Build Status](https://travis-ci.org/microcks/microcks-cli.png?branch=master)](https://travis-ci.org/microcks/microcks-cli)
+Current development version is `0.3.0-SNAPSHOT`. [![Build Status](https://travis-ci.org/microcks/microcks-cli.png?branch=master)](https://travis-ci.org/microcks/microcks-cli)
 
 ## Usage instructions
 
@@ -77,7 +77,7 @@ Binary releases for Linux, MacOS or Windows platform are available on the GitHub
 
 ### Container image
 
-The `microcks-cli` is now available as a container image as version `0.2.0`. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is now on Docker Hub [here](https://cloud.docker.com/u/microcks/repository/docker/microcks/microcks-cli).
+The `microcks-cli` is now available as a container image as version `0.2.0`. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is now on Docker Hub [here](https://hub.docker.com/r/microcks/microcks-cli).
 
 Below a sample on how using the image without getting the CLI binary:
 
