@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/microcks/microcks-cli/pkg/config"
 )
 
 // KeycloakClient defines methods for cinteracting with Keycloak
@@ -33,7 +35,16 @@ func NewKeycloakClient(realmURL string, username string, password string) Keyclo
 	kc.BaseURL = u
 	kc.Username = username
 	kc.Password = password
-	kc.httpClient = http.DefaultClient
+
+	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+		tlsConfig := config.CreateTLSConfig()
+		tr := &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		kc.httpClient = &http.Client{Transport: tr}
+	} else {
+		kc.httpClient = http.DefaultClient
+	}
 	return &kc
 }
 

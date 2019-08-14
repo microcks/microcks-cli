@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 )
 
@@ -63,11 +64,15 @@ func (c *testComamnd) Execute() {
 	var keycloakClientID string
 	var keycloakClientSecret string
 	var waitFor string
+	var insecureTLS bool
+	var caCertPaths string
 
 	testCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
 	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
 	testCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
+	testCmd.BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
+	testCmd.StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
 	testCmd.Parse(os.Args[5:])
 
 	// Validate presence and values of flags.
@@ -86,6 +91,16 @@ func (c *testComamnd) Execute() {
 	if &waitFor == nil || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
 		fmt.Println("--waitFor format is wrong. Applying default 5sec")
 		waitFor = "5sec"
+	}
+
+	// Collect optinal HTTPS transport flags.
+	if &insecureTLS == nil || !insecureTLS {
+		config.InsecureTLS = false
+	} else {
+		config.InsecureTLS = true
+	}
+	if len(caCertPaths) > 0 {
+		config.CaCertPaths = caCertPaths
 	}
 
 	// Compute time to wait in milliseconds.

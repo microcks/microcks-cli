@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/microcks/microcks-cli/pkg/config"
 )
 
 // MicrocksClient allows interacting with Mcirocks APIs
@@ -45,7 +47,16 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 		panic(err)
 	}
 	mc.APIURL = u
-	mc.httpClient = http.DefaultClient
+
+	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+		tlsConfig := config.CreateTLSConfig()
+		tr := &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		mc.httpClient = &http.Client{Transport: tr}
+	} else {
+		mc.httpClient = http.DefaultClient
+	}
 	return &mc
 }
 
