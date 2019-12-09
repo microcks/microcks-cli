@@ -1,0 +1,59 @@
+apiVersion: tekton.dev/v1alpha1
+kind: Task
+metadata:
+  name: microcks-test-customcerts
+spec:
+  inputs:
+    params:
+      - name: apiNameAndVersion
+        type: string
+        description: "<apiName:apiVersion>: Service to test reference. Exemple: 'Beer Catalog API:0.9'"
+        default: "Beer Catalog API:0.9"
+      - name: testEndpoint
+        type: string
+        description: "URL where is deployed implementation to test"
+      - name: runner
+        type: string
+        description: "Test strategy (one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA)"
+        default: HTTP
+      - name: microcksURL
+        type: string
+        description: "Microcks instance API endpoint"
+      - name: keycloakClientId
+        type: string
+        description: "Keycloak Realm Service Account ClientId"
+        default: microcks-serviceaccount
+      - name: keycloakClientSecret
+        type: string
+        description: "Keycloak Realm Service Account ClientSecret"
+        default: 7deb71e8-8c80-4376-95ad-00a399ee3ca1
+      - name: waitFor
+        type: string
+        description: "Time to wait for test to finish (int + one of: milli, sec, min)"
+        default: 5sec
+      - name: operationsHeaders
+        type: string
+        description: "JSON that override some operations headers for the tests to launch"
+        default: ""
+      - name: caCertsSecret
+        type: string
+        description: "Paths to additional certificates CRT files to add to trusted roots ones"
+  steps:
+    - name: microcks-test
+      image: microcks/microcks-cli:latest
+      volumeMounts:
+        - name: microcks-test-customcerts
+          mountPath: /var/run/secrets/customcerts
+      command:
+        - /usr/bin/bash
+      args:
+        - '-c'
+        - >-
+          microcks-cli test '$(inputs.params.apiNameAndVersion)' $(inputs.params.testEndpoint) $(inputs.params.runner) \
+            --microcksURL=$(inputs.params.microcksURL) --waitFor=$(inputs.params.waitFor) \
+            --keycloakClientId=$(inputs.params.keycloakClientId) --keycloakClientSecret=$(inputs.params.keycloakClientSecret) \
+            --caCerts=/var/run/secrets/customcerts/ca.crt --operationsHeaders='$(inputs.params.operationsHeaders)'
+  volumes:
+    - name: microcks-test-customcerts
+      secret:
+        secretName: $(inputs.params.caCertsSecret)
