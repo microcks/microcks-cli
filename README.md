@@ -73,7 +73,7 @@ Here's below an example of using some of this flags:
 
 ### Binary
 
-Binary releases for Linux, MacOS or Windows platform are available on the GitHub [releases page](https://github.com/microcks/microcks-cli/releases). Just download the binary corresponding to your system and put the binar into the `PATH` somewhere ;-)
+Binary releases for Linux, MacOS or Windows platform are available on the GitHub [releases page](https://github.com/microcks/microcks-cli/releases). Just download the binary corresponding to your system and put the binary into the `PATH` somewhere ;-)
 
 ### Container image
 
