@@ -17,7 +17,7 @@ where `[command]` can be one of the following:
 * `help` to display usage informations,
 * `test` to launch new test on Microcks server.
 
-The main `test` command has abunch of arguments and flags so that you can use it that way:
+The main `test` command has a bunch of arguments and flags so that you can use it that way:
 ```
 microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
 	--microcksURL=<> --waitFor=5sec
@@ -27,7 +27,7 @@ microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
 The arguments:
 * `<apiName:apiVersion>` : Service to test reference. Exemple: `'Beer Catalog API:0.9'`
 * `<testEndpoint>` : URL where is deployed implementation to test
-* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`)")
+* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`)")
 
 The flags:
 * `--microcksURL` for the Microcks API endpoint,
@@ -54,6 +54,7 @@ The `test` command provides additional flags for advanced usages and options:
 * `--verbose` allows to dump on standard output all the HTTP requests and responses,
 * `--insecure` allows to interact with Microcks and Keycloak instances through HTTPS without checking certificates issuer CA,
 * `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
+* `--secretName='<Secret Name>'` is an optional flag specifying the name of a Secret to use for connecting endpoint
 * `--operationsHeaders=<JSON>` allows to override some operations headers for the tests to launch.
 
 Overriden test operations headers is a JSON strings where 1st level keys are operation name (eg. `GET /beer`) or `globals` for header applying to all the operations of the API. Headers are specified as an array of objects defining `key` and `values` properties.

@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	runnerChoices   = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true}
+	runnerChoices   = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true}
 	timeUnitChoices = map[string]bool{"milli": true, "sec": true, "min": true}
 )
 
@@ -64,6 +64,7 @@ func (c *testComamnd) Execute() {
 	var keycloakClientID string
 	var keycloakClientSecret string
 	var waitFor string
+	var secretName string
 	var operationsHeaders string
 	var insecureTLS bool
 	var caCertPaths string
@@ -73,6 +74,7 @@ func (c *testComamnd) Execute() {
 	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
 	testCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
+	testCmd.StringVar(&secretName, "secretName", "", "Secret to use for connecting test endpoint")
 	testCmd.StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
 	testCmd.StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
@@ -144,7 +146,7 @@ func (c *testComamnd) Execute() {
 	mc.SetOAuthToken(oauthToken)
 
 	var testResultID string
-	testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType, operationsHeaders)
+	testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, operationsHeaders)
 	if err != nil {
 		fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 		os.Exit(1)
@@ -152,8 +154,9 @@ func (c *testComamnd) Execute() {
 	//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
 
 	// Finally - wait for some time
+	// Add 500ms to wait time as it's now representing the server timeout.
 	now := nowInMilliseconds()
-	future := now + waitForMilliseconds
+	future := now + waitForMilliseconds + 500
 
 	var success = false
 	for nowInMilliseconds() < future {

@@ -6,16 +6,17 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 )
 
-// MicrocksClient allows interacting with Mcirocks APIs
+// MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
-	CreateTestResult(serviceID string, testEndpoint string, runnerType string, operationsHeaders string) (string, error)
+	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, soperationsHeaders string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 }
 
@@ -107,7 +108,7 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.OAuthToken = oauthToken
 }
 
-func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, operationsHeaders string) (string, error) {
+func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, operationsHeaders string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
@@ -116,7 +117,11 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	var input = "{"
 	input += ("\"serviceId\": \"" + serviceID + "\", ")
 	input += ("\"testEndpoint\": \"" + testEndpoint + "\", ")
-	input += ("\"runnerType\": \"" + runnerType + "\"")
+	input += ("\"runnerType\": \"" + runnerType + "\", ")
+	input += ("\"timeout\":  " + strconv.FormatInt(timeout, 10))
+	if len(secretName) > 0 {
+		input += (", \"secretName\": \"" + secretName + "\"")
+	}
 	if len(operationsHeaders) > 0 && ensureValid(operationsHeaders) {
 		input += (", \"operationsHeaders\": " + operationsHeaders)
 	}
