@@ -37,7 +37,7 @@ spec:
         default: ""
   steps:
     - name: microcks-test
-      image: microcks/microcks-cli:latest
+      image: quay.io/microcks/microcks-cli:0.3.0
       command:
         - /usr/bin/bash
       args:
