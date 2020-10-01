@@ -1,4 +1,4 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1alpha1
 kind: PipelineRun
 metadata:
   name: microcks-pipelinerun-beer-catalog

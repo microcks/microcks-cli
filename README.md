@@ -6,7 +6,7 @@ It allows to launch tests with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.3.0-SNAPSHOT`. [![Build Status](https://travis-ci.org/microcks/microcks-cli.png?branch=master)](https://travis-ci.org/microcks/microcks-cli)
+Current development version is `0.4.0-SNAPSHOT`. [![Build Status](https://travis-ci.org/microcks/microcks-cli.png?branch=master)](https://travis-ci.org/microcks/microcks-cli)
 
 ## Usage instructions
 
@@ -83,5 +83,12 @@ The `microcks-cli` is now available as a container image as version `0.2.0`. So 
 Below a sample on how using the image without getting the CLI binary:
 
 ```
-$ docker run -it microcks/microcks-cli:latest microcks-cli test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
+$ docker run -it quay.io/microcks/microcks-cli:latest microcks-cli test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
 ```
+
+> Previous versions of the `microcks-cli` container image (< `0.3.0`) where hosted on Docker Hub and you can retrieve them using `microcks/microcks:0.2.0` version for example.
+
+
+## Tekton tasks
+
+This repository also contains different [Tekton](https://tekton.dev/) tasks definition and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.
