@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	runnerChoices   = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true}
+	runnerChoices   = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true, "GRPC_PROTOBUF": true}
 	timeUnitChoices = map[string]bool{"milli": true, "sec": true, "min": true}
 )
 
@@ -25,7 +25,7 @@ func NewTestCommand() Command {
 	return new(testComamnd)
 }
 
-// Execute implementation onf testCommand structure
+// Execute implementation of testCommand structure
 func (c *testComamnd) Execute() {
 
 	// Parse subcommand args first.
@@ -52,7 +52,7 @@ func (c *testComamnd) Execute() {
 		os.Exit(1)
 	}
 	if _, validChoice := runnerChoices[runnerType]; !validChoice {
-		fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA")
+		fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF")
 		os.Exit(1)
 	}
 
