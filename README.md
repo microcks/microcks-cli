@@ -1,8 +1,9 @@
 # microcks-cli
-Simple CLI for interacting with Microcks server APIs.
-It allows to launch tests with minimal dependencies.
 
- [![Join the chat at https://gitter.im/microcks/microcks-cli](https://badges.gitter.im/microcks/microcks-cli.svg)](https://gitter.im/microcks/microcks-cli?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+Simple CLI for interacting with Microcks server APIs.
+It allows to launch tests or import API artifacts with minimal dependencies.
+
+ [![Join the chat on Zulip](https://img.shields.io/badge/chat-on_zulip-pink.svg?color=ff69b4&style=for-the-badge&logo=zulip)](https://microcksio.zulipchat.com/)
 
 ## Build Status
 
@@ -16,8 +17,11 @@ where `[command]` can be one of the following:
 * `version` to check this CLI version,
 * `help` to display usage informations,
 * `test` to launch new test on Microcks server.
+* `import` to import API artifacts on Microcks server.
 
-The main `test` command has a bunch of arguments and flags so that you can use it that way:
+### Test command
+
+The `test` command has a bunch of arguments and flags so that you can use it that way:
 ```
 microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
 	--microcksURL=<> --waitFor=5sec
@@ -25,9 +29,9 @@ microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
 ```
 
 The arguments:
-* `<apiName:apiVersion>` : Service to test reference. Exemple: `'Beer Catalog API:0.9'`
+* `<apiName:apiVersion>` : Service to test reference. Example: `'Beer Catalog API:0.9'`
 * `<testEndpoint>` : URL where is deployed implementation to test
-* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`)")
+* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`, `GRPC_PROTOBUF`)")
 
 The flags:
 * `--microcksURL` for the Microcks API endpoint,
@@ -35,7 +39,7 @@ The flags:
 * `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
 * `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
 
-Real life exemple command and execution:
+Real life example command and execution:
 ```
 $ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ POSTMAN \
         --microcksURL=http://localhost:8080/api/ \
@@ -48,7 +52,7 @@ MicrocksTester waiting for 2 seconds before checking again.
 MicrocksClient got status for test "5c1781cf6310d94f8169384e" - success: true, inProgress: false
 ```
 
-### Advanced options
+#### Advanced options
 
 The `test` command provides additional flags for advanced usages and options:
 * `--verbose` allows to dump on standard output all the HTTP requests and responses,
@@ -69,6 +73,41 @@ Here's below an example of using some of this flags:
         --insecure --verbose  --waitFor=3sec \
         --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
 ```
+
+### Import command
+
+The `import` command has one argument and common flags with `test` command. You can use it that way:
+```
+microcks-cli import <specificationFile1[:primary],specificationFile2[:primary]>
+	--microcksURL=<>
+	--keycloakClientId=<> --keycloakClientSecret=<>
+```
+
+The arguments:
+* `<specificationFile1[:primary],specificationFile2[:primary]>` : Comma separated list of API specs to import with flag telling if it's a primary artifact. Example: `'specs/my-openapi.yaml:true,specs/my-postmancollection.json:false'`
+
+The flags:
+* `--microcksURL` for the Microcks API endpoint,
+* `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
+* `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
+
+Real life example command and execution:
+```
+$ ./microcks-cli import 'samples/weather-forecast-openapi.yml:true,samples/weather-forecast-postman.json:false' \
+        --microcksURL=http://localhost:8080/api/ \
+        --keycloakClientId=microcks-serviceaccount \
+        --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1
+Microcks has discovered 'WeatherForecast API:1.1.0'
+Microcks has discovered 'WeatherForecast API:1.1.0'
+```
+
+#### Advanced options
+
+The `import` command provides additional flags for advanced usages and options:
+* `--verbose` allows to dump on standard output all the HTTP requests and responses,
+* `--insecure` allows to interact with Microcks and Keycloak instances through HTTPS without checking certificates issuer CA,
+* `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
+
 
 ## Installation
 

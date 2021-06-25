@@ -1,0 +1,40 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: microcks-import
+spec:
+  params:
+    - name: specificationFilesList
+      type: string
+      description: "<specificationFile1[:primary],specificationFile2[:primary]>: Comma separated list of API specs to import with flag telling if it's a primary artifact. Example: ''specs/my-openapi.yaml:true,specs/my-postmancollection.json:false''"
+      default: "'specs/my-openapi.yaml:true,specs/my-postmancollection.json:false'"
+    - name: microcksURL
+      type: string
+      description: "Microcks instance API endpoint"
+    - name: keycloakSecret
+      type: string
+      description: "Keycloak Realm Service Account ClientSecret"
+      default: microcks-keycloak-client-secret
+  steps:
+    - name: microcks-test
+      image: quay.io/microcks/microcks-cli:0.4.0
+      command:
+        - /usr/bin/bash
+      args:
+        - '-c'
+        - >-
+          microcks-cli import '$(params.specificationFilesList)' \
+            --microcksURL=$(params.microcksURL) \
+            --keycloakClientId=$KEYCLOAK_CLIENT_ID --keycloakClientSecret=$KEYCLOAK_CLIENT_SECRET \
+            --insecure'
+      env:
+        - name: KEYCLOAK_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: $(params.keycloakSecret)
+              key: clientId
+        - name: KEYCLOAK_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: $(params.keycloakSecret)
+              key: clientSecret

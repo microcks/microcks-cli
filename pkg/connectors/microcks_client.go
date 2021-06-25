@@ -1,11 +1,16 @@
 package connectors
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -16,8 +21,9 @@ import (
 type MicrocksClient interface {
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
-	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, soperationsHeaders string) (string, error)
+	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, operationsHeaders string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
+	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -197,6 +203,65 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	json.Unmarshal([]byte(body), &result)
 
 	return &result, err
+}
+
+func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
+	// Ensure file exists on fs.
+	file, err := os.Open(specificationFilePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// Create a multipart request body, reading the file.
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filepath.Base(specificationFilePath))
+	if err != nil {
+		return "", err
+	}
+	_, err = io.Copy(part, file)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Add the mainArtifact flag to request.
+	_ = writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact))
+
+	err = writer.Close()
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure we have a correct URL.
+	rel := &url.URL{Path: "artifact/upload"}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("POST", u.String(), body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
+
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return string(respBody), err
 }
 
 func ensureValid(operationsHeaders string) bool {

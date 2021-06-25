@@ -21,6 +21,8 @@ func main() {
 		c = cmd.NewHelpCommand()
 	case "test":
 		c = cmd.NewTestCommand()
+	case "import":
+		c = cmd.NewImportCommand()
 	default:
 		cmd.NewHelpCommand().Execute()
 		os.Exit(1)
