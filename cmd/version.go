@@ -12,5 +12,5 @@ func NewVersionCommand() Command {
 
 // Execute implementation on versionCommand structure
 func (c *versionCommand) Execute() {
-	fmt.Println("0.4.0")
+	fmt.Println("0.4.1")
 }

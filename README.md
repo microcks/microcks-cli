@@ -7,7 +7,7 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.4.0-SNAPSHOT`. [![Build Status](https://travis-ci.com/microcks/microcks-cli.png?branch=master)](https://travis-ci.com/microcks/microcks-cli)
+Current development version is `0.4.1-SNAPSHOT`. [![Build Status](https://travis-ci.com/microcks/microcks-cli.png?branch=master)](https://travis-ci.com/microcks/microcks-cli)
 
 ## Usage instructions
 
