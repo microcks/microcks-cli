@@ -1,0 +1,29 @@
+name: build-verify-package
+on: [push]
+jobs:
+  build-verify-package:
+    runs-on: ubuntu-latest
+    environment: Build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.17.1'
+
+      - name: Build Go packages
+        run: |
+          ./build-binaries.sh github.com/microcks/microcks-cli
+
+      - name: Package container image for cli
+        if: github.repository_owner == 'microcks'
+        run: |
+          docker build -f build/Dockerfile -t quay.io/microcks/microcks-cli:nightly .
+
+      - name: Login and push to Quay.io Registry
+        if: github.repository_owner == 'microcks'
+        run: |
+          echo ${{ secrets.QUAY_PASSWORD }} | docker login -u ${{ secrets.QUAY_USERNAME }} --password-stdin quay.io
+          docker push quay.io/microcks/microcks-cli:nightly
