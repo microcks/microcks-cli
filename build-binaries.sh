@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Execute with ./build-binaries.sh github.com/microcks/microcks-cli
 
 package=$1
 if [[ -z "$package" ]]; then

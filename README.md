@@ -7,13 +7,14 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.4.1-SNAPSHOT`. [![Build Status](https://travis-ci.com/microcks/microcks-cli.png?branch=master)](https://travis-ci.com/microcks/microcks-cli)
+Current development version is `0.5.0-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/microcks/microcks-cli/build-verify-package?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 
 ## Usage instructions
 
 Usage is simply `microcks-cli [command]`
 
 where `[command]` can be one of the following:
+
 * `version` to check this CLI version,
 * `help` to display usage informations,
 * `test` to launch new test on Microcks server.
@@ -22,24 +23,28 @@ where `[command]` can be one of the following:
 ### Test command
 
 The `test` command has a bunch of arguments and flags so that you can use it that way:
+
 ```
 microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
-	--microcksURL=<> --waitFor=5sec
-	--keycloakClientId=<> --keycloakClientSecret=<>
+        --microcksURL=<> --waitFor=5sec
+        --keycloakClientId=<> --keycloakClientSecret=<>
 ```
 
 The arguments:
+
 * `<apiName:apiVersion>` : Service to test reference. Example: `'Beer Catalog API:0.9'`
 * `<testEndpoint>` : URL where is deployed implementation to test
-* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`, `GRPC_PROTOBUF`)")
+* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`, `GRPC_PROTOBUF`, `GRAPHQL_SCHEMA`)")
 
 The flags:
+
 * `--microcksURL` for the Microcks API endpoint,
 * `--waitFor` for the time to wait for test to finish (int + one of: milli, sec, min),
 * `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
 * `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
 
 Real life example command and execution:
+
 ```
 $ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ POSTMAN \
         --microcksURL=http://localhost:8080/api/ \
@@ -55,6 +60,7 @@ MicrocksClient got status for test "5c1781cf6310d94f8169384e" - success: true, i
 #### Advanced options
 
 The `test` command provides additional flags for advanced usages and options:
+
 * `--verbose` allows to dump on standard output all the HTTP requests and responses,
 * `--insecure` allows to interact with Microcks and Keycloak instances through HTTPS without checking certificates issuer CA,
 * `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
@@ -77,6 +83,7 @@ Here's below an example of using some of this flags:
 ### Import command
 
 The `import` command has one argument and common flags with `test` command. You can use it that way:
+
 ```
 microcks-cli import <specificationFile1[:primary],specificationFile2[:primary]>
 	--microcksURL=<>
@@ -84,14 +91,17 @@ microcks-cli import <specificationFile1[:primary],specificationFile2[:primary]>
 ```
 
 The arguments:
+
 * `<specificationFile1[:primary],specificationFile2[:primary]>` : Comma separated list of API specs to import with flag telling if it's a primary artifact. Example: `'specs/my-openapi.yaml:true,specs/my-postmancollection.json:false'`
 
 The flags:
+
 * `--microcksURL` for the Microcks API endpoint,
 * `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
 * `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
 
 Real life example command and execution:
+
 ```
 $ ./microcks-cli import 'samples/weather-forecast-openapi.yml:true,samples/weather-forecast-postman.json:false' \
         --microcksURL=http://localhost:8080/api/ \
@@ -104,6 +114,7 @@ Microcks has discovered 'WeatherForecast API:1.1.0'
 #### Advanced options
 
 The `import` command provides additional flags for advanced usages and options:
+
 * `--verbose` allows to dump on standard output all the HTTP requests and responses,
 * `--insecure` allows to interact with Microcks and Keycloak instances through HTTPS without checking certificates issuer CA,
 * `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
