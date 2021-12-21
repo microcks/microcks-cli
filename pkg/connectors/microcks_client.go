@@ -56,6 +56,10 @@ type microcksClient struct {
 func NewMicrocksClient(apiURL string) MicrocksClient {
 	mc := microcksClient{}
 
+	if !strings.HasSuffix(apiURL, "/") {
+		apiURL += "/"
+	}
+
 	u, err := url.Parse(apiURL)
 	if err != nil {
 		panic(err)
