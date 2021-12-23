@@ -34,7 +34,7 @@ The arguments:
 
 * `<apiName:apiVersion>` : Service to test reference. Example: `'Beer Catalog API:0.9'`
 * `<testEndpoint>` : URL where is deployed implementation to test
-* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`, `GRPC_PROTOBUF`, `GRAPHQL_SCHEMA`)")
+* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`, `GRPC_PROTOBUF`, `GRAPHQL_SCHEMA`)
 
 The flags:
 
