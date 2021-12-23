@@ -13,7 +13,7 @@ spec:
       description: "URL where is deployed implementation to test"
     - name: runner
       type: string
-      description: "Test strategy (one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA)"
+      description: "Test strategy (one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA)"
       default: HTTP
     - name: microcksURL
       type: string
@@ -39,7 +39,7 @@ spec:
       description: "Paths to additional certificates CRT files to add to trusted roots ones"
   steps:
     - name: microcks-test
-      image: quay.io/microcks/microcks-cli:0.3.0
+      image: quay.io/microcks/microcks-cli:0.5.0
       volumeMounts:
         - name: microcks-test-customcerts
           mountPath: /var/run/secrets/customcerts

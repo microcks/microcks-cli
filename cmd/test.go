@@ -52,7 +52,7 @@ func (c *testComamnd) Execute() {
 		os.Exit(1)
 	}
 	if _, validChoice := runnerChoices[runnerType]; !validChoice {
-		fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF")
+		fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 		os.Exit(1)
 	}
 
