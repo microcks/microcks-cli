@@ -154,9 +154,9 @@ func (c *testComamnd) Execute() {
 	//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
 
 	// Finally - wait for some time
-	// Add 500ms to wait time as it's now representing the server timeout.
+	// Add 2000ms to wait time as it's now representing the server timeout.
 	now := nowInMilliseconds()
-	future := now + waitForMilliseconds + 500
+	future := now + waitForMilliseconds + 2000
 
 	var success = false
 	for nowInMilliseconds() < future {
