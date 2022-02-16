@@ -177,6 +177,8 @@ func (c *testComamnd) Execute() {
 		time.Sleep(2 * time.Second)
 	}
 
+	fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", strings.Split(microcksURL, "/api")[0], testResultID)
+
 	if !success {
 		os.Exit(1)
 	}
