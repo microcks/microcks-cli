@@ -7,7 +7,7 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.5.1-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/microcks/microcks-cli/build-verify-package?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
+Current development version is `0.5.2-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/microcks/microcks-cli/build-verify-package?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 
 ## Usage instructions
 
