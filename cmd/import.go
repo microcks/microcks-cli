@@ -74,8 +74,6 @@ func (c *importComamnd) Execute() {
 		config.Verbose = true
 	}
 
-	//
-
 	// Now we seems to be good ...
 	// First - retrieve the Keycloak URL from Microcks configuration.
 	mc := connectors.NewMicrocksClient(microcksURL)
@@ -85,14 +83,16 @@ func (c *importComamnd) Execute() {
 		os.Exit(1)
 	}
 
-	// Second - retrieve an OAuth token using Keycloak Client.
-	kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
+	var oauthToken string = "unauthentifed-token"
+	if keycloakURL != "null" {
+		//  If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
+		kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
 
-	var oauthToken string
-	oauthToken, err = kc.ConnectAndGetToken()
-	if err != nil {
-		fmt.Printf("Got error when invoking Keycloack client: %s", err)
-		os.Exit(1)
+		oauthToken, err = kc.ConnectAndGetToken()
+		if err != nil {
+			fmt.Printf("Got error when invoking Keycloack client: %s", err)
+			os.Exit(1)
+		}
 	}
 
 	// Then - for each specificationFile, upload the artifact on Microcks Server.

@@ -33,7 +33,7 @@ func (c *helpCommand) Execute() {
 	fmt.Println("Args: ")
 	fmt.Println("  <apiName:apiVersion>   Exemple: 'Beer Catalog API:0.9'")
 	fmt.Println("  <testEndpoint>         URL where is deployed implementation to test")
-	fmt.Println("  <runner>               Test strategy (one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA)")
+	fmt.Println("  <runner>               Test strategy (one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA)")
 	fmt.Println("")
 	fmt.Println("Flags: ")
 	fmt.Println("  --microcksURL          Microcks API endpoint")

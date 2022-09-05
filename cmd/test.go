@@ -131,16 +131,18 @@ func (c *testComamnd) Execute() {
 		os.Exit(1)
 	}
 
-	// Second - retrieve an OAuth token using Keycloak Client.
-	kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
+	var oauthToken string = "unauthentifed-token"
+	if keycloakURL != "null" {
+		// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
+		kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
 
-	var oauthToken string
-	oauthToken, err = kc.ConnectAndGetToken()
-	if err != nil {
-		fmt.Printf("Got error when invoking Keycloack client: %s", err)
-		os.Exit(1)
+		oauthToken, err = kc.ConnectAndGetToken()
+		if err != nil {
+			fmt.Printf("Got error when invoking Keycloack client: %s", err)
+			os.Exit(1)
+		}
+		//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 	}
-	//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 
 	// Then - launch the test on Microcks Server.
 	mc.SetOAuthToken(oauthToken)
@@ -153,10 +155,12 @@ func (c *testComamnd) Execute() {
 	}
 	//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
 
-	// Finally - wait for some time
-	// Add 5000ms to wait time as it's now representing the server timeout.
+	// Finally - wait before checking and loop for some time
+	time.Sleep(1 * time.Second)
+
+	// Add 10.000ms to wait time as it's now representing the server timeout.
 	now := nowInMilliseconds()
-	future := now + waitForMilliseconds + 5000
+	future := now + waitForMilliseconds + 10000
 
 	var success = false
 	for nowInMilliseconds() < future {
