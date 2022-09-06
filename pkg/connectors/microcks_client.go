@@ -107,11 +107,15 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 	}
 
 	// Retrieve auth server url and realm name.
+	enabled := configResp["enabled"].(bool)
 	authServerURL := configResp["auth-server-url"].(string)
 	realmName := configResp["realm"].(string)
 
-	// Return a proper URL.
-	return authServerURL + "/realms/" + realmName + "/", nil
+	// Return a proper URL or 'null' if Keycloak is disables.
+	if enabled {
+		return authServerURL + "/realms/" + realmName + "/", nil
+	}
+	return "null", nil
 }
 
 func (c *microcksClient) SetOAuthToken(oauthToken string) {
