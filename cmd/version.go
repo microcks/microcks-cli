@@ -1,6 +1,10 @@
 package cmd
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/microcks/microcks-cli/version"
+)
 
 type versionCommand struct {
 }
@@ -12,5 +16,5 @@ func NewVersionCommand() Command {
 
 // Execute implementation on versionCommand structure
 func (c *versionCommand) Execute() {
-	fmt.Println("0.5.1")
+	fmt.Println(version.Version)
 }

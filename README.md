@@ -7,7 +7,7 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.5.2-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/microcks/microcks-cli/build-verify-package?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
+Current development version is `0.5.3-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/microcks/microcks-cli/build-verify-package?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 
 ## Usage instructions
 
@@ -128,15 +128,13 @@ Binary releases for Linux, MacOS or Windows platform are available on the GitHub
 
 ### Container image
 
-The `microcks-cli` is now available as a container image as version `0.2.0`. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is now on Docker Hub [here](https://hub.docker.com/r/microcks/microcks-cli).
+The `microcks-cli` is available as a container image. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is on Quay.io [here](https://quay.io/repository/microcks/microcks-cli).
 
 Below a sample on how using the image without getting the CLI binary:
 
 ```
 $ docker run -it quay.io/microcks/microcks-cli:latest microcks-cli test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
 ```
-
-> Previous versions of the `microcks-cli` container image (< `0.3.0`) where hosted on Docker Hub and you can retrieve them using `microcks/microcks:0.2.0` version for example.
 
 
 ## Tekton tasks
