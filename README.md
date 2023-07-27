@@ -3,7 +3,7 @@
 Simple CLI for interacting with Microcks server APIs.
 It allows to launch tests or import API artifacts with minimal dependencies.
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?branch=main&logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 [![Container](https://img.shields.io/badge/dynamic/json?color=blue&logo=docker&style=for-the-badge&label=Quay.io&query=tags[0].name&url=https://quay.io/api/v1/repository/microcks/microcks-cli/tag/?limit=10&page=1&onlyActiveTags=true)](https://quay.io/repository/microcks/microcks-cli?tab=tags)
 [![License](https://img.shields.io/github/license/microcks/microcks-cli?style=for-the-badge&logo=apache)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Project Chat](https://img.shields.io/badge/chat-on_zulip-pink.svg?color=ff69b4&style=for-the-badge&logo=zulip)](https://microcksio.zulipchat.com/)
@@ -11,7 +11,7 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.5.3-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?branch=1.8.x&logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
+Current development version is `0.5.3-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 
 ## Usage instructions
 
