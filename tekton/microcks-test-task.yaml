@@ -30,13 +30,17 @@ spec:
       type: string
       description: "Time to wait for test to finish (int + one of: milli, sec, min)"
       default: 5sec
+    - name: filteredOperations
+      type: string
+      description: "JSON array of the operations' names to consider during the tests"
+      default: ""
     - name: operationsHeaders
       type: string
       description: "JSON that override some operations headers for the tests to launch"
       default: ""
   steps:
     - name: microcks-test
-      image: quay.io/microcks/microcks-cli:0.5.1
+      image: quay.io/microcks/microcks-cli:0.5.3
       command:
         - /usr/bin/bash
       args:
@@ -45,4 +49,4 @@ spec:
           microcks-cli test '$(params.apiNameAndVersion)' $(params.testEndpoint) $(params.runner) \
             --microcksURL=$(params.microcksURL) --waitFor=$(params.waitFor) \
             --keycloakClientId=$(params.keycloakClientId) --keycloakClientSecret=$(params.keycloakClientSecret) \
-            --insecure --operationsHeaders='$(params.operationsHeaders)'
+            --insecure --filteredOperations='$(params.filteredOperations)' --operationsHeaders='$(params.operationsHeaders)'

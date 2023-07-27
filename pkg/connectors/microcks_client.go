@@ -21,7 +21,7 @@ import (
 type MicrocksClient interface {
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
-	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, operationsHeaders string) (string, error)
+	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 }
@@ -122,7 +122,7 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.OAuthToken = oauthToken
 }
 
-func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, operationsHeaders string) (string, error) {
+func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
@@ -136,7 +136,10 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	if len(secretName) > 0 {
 		input += (", \"secretName\": \"" + secretName + "\"")
 	}
-	if len(operationsHeaders) > 0 && ensureValid(operationsHeaders) {
+	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
+		input += (", \"filteredOperations\": " + filteredOperations)
+	}
+	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
 		input += (", \"operationsHeaders\": " + operationsHeaders)
 	}
 
@@ -272,7 +275,18 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	return string(respBody), err
 }
 
-func ensureValid(operationsHeaders string) bool {
+func ensureValidOperationsList(filteredOperations string) bool {
+	// Unmarshal using a generic interface
+	var list = []string{}
+	err := json.Unmarshal([]byte(filteredOperations), &list)
+	if err != nil {
+		fmt.Println("Error parsing JSON in filteredOperations: ", err)
+		return false
+	}
+	return true
+}
+
+func ensureValidOperationsHeaders(operationsHeaders string) bool {
 	// Unmarshal using a generic interface
 	var headers = map[string][]HeaderDTO{}
 	err := json.Unmarshal([]byte(operationsHeaders), &headers)
