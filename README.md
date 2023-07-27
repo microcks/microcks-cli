@@ -1,13 +1,17 @@
-# microcks-cli
+# Microcks CLI
 
 Simple CLI for interacting with Microcks server APIs.
 It allows to launch tests or import API artifacts with minimal dependencies.
 
- [![Join the chat on Zulip](https://img.shields.io/badge/chat-on_zulip-pink.svg?color=ff69b4&style=for-the-badge&logo=zulip)](https://microcksio.zulipchat.com/)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?branch=main&logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
+[![Container](https://img.shields.io/badge/dynamic/json?color=blue&logo=docker&style=for-the-badge&label=Quay.io&query=tags[0].name&url=https://quay.io/api/v1/repository/microcks/microcks-cli/tag/?limit=10&page=1&onlyActiveTags=true)](https://quay.io/repository/microcks/microcks-cli?tab=tags)
+[![License](https://img.shields.io/github/license/microcks/microcks-cli?style=for-the-badge&logo=apache)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Project Chat](https://img.shields.io/badge/chat-on_zulip-pink.svg?color=ff69b4&style=for-the-badge&logo=zulip)](https://microcksio.zulipchat.com/)
+
 
 ## Build Status
 
-Current development version is `0.5.3-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/microcks/microcks-cli/build-verify-package?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
+Current development version is `0.5.3-SNAPSHOT`. [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?branch=1.8.x&logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 
 ## Usage instructions
 
@@ -71,13 +75,16 @@ Overriden test operations headers is a JSON strings where 1st level keys are ope
 
 Here's below an example of using some of this flags:
 
-```
-./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ POSTMAN \                           
+```sh
+$ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ POSTMAN \                           
         --microcksURL=http://localhost:8080/api/ \
         --keycloakClientId=microcks-serviceaccount \
         --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 \
         --insecure --verbose  --waitFor=3sec \
         --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
+
+MicrocksClient got status for test "64c25f7ddec62569f9a0ed95" - success: true, inProgress: false 
+Full TestResult details are available here: http://localhost:8080/#/tests/64c25f7ddec62569f9a0ed95 
 ```
 
 ### Import command
@@ -102,7 +109,7 @@ The flags:
 
 Real life example command and execution:
 
-```
+```sh
 $ ./microcks-cli import 'samples/weather-forecast-openapi.yml:true,samples/weather-forecast-postman.json:false' \
         --microcksURL=http://localhost:8080/api/ \
         --keycloakClientId=microcks-serviceaccount \
