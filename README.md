@@ -87,7 +87,7 @@ $ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ OPEN_API
         --keycloakClientId=microcks-serviceaccount \
         --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 \
         --insecure --verbose  --waitFor=3sec \
-        --filterOperations='["GET /beer", "GET /beer/{name}"]' \
+        --filteredOperations='["GET /beer", "GET /beer/{name}"]' \
         --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
 
 MicrocksClient got status for test "64c25f7ddec62569f9a0ed95" - success: true, inProgress: false 
