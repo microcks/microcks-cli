@@ -1,6 +1,6 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2-750.1696515534
 
-MAINTAINER Laurent Broudoux <laurent.broudoux@gmail.com>
+MAINTAINER Laurent Broudoux <laurent@microcks.io>
 
 ENV CLI=/usr/local/bin/microcks-cli \
     USER_UID=1001 \
