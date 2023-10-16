@@ -32,11 +32,15 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 )
 
+var (
+	grantTypeChoices = map[string]bool{"PASSWORD": true, "CLIENT_CREDENTIALS": true, "REFRESH_TOKEN": true}
+)
+
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
-	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string) (string, error)
+	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 }
@@ -58,6 +62,18 @@ type TestResultSummary struct {
 type HeaderDTO struct {
 	Name   string `json:"name"`
 	Values string `json:"values"`
+}
+
+// OAuth2ClientContext represents a test request OAuth2 client context
+type OAuth2ClientContext struct {
+	ClientId     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	TokenURI     string `json:"tokenUri"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	RefreshToken string `json:"refreshToken"`
+	GrantType    string `json:"grantType"`
+	Scopes       string `json:"scopes"`
 }
 
 type microcksClient struct {
@@ -105,11 +121,17 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	req.Header.Set("Accept", "application/json")
 
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for getting Keycloak config", req, true)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	// Dump request if verbose required.
+	config.DumpResponseIfRequired("Microcks for getting Keycloak config", resp, true)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -137,7 +159,7 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.OAuthToken = oauthToken
 }
 
-func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string) (string, error) {
+func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
@@ -156,6 +178,9 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	}
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
 		input += (", \"operationsHeaders\": " + operationsHeaders)
+	}
+	if len(oAuth2Context) > 0 && ensureValieOAuth2Context(oAuth2Context) {
+		input += (", \"oAuth2Context\": " + oAuth2Context)
 	}
 
 	input += "}"
@@ -307,6 +332,20 @@ func ensureValidOperationsHeaders(operationsHeaders string) bool {
 	err := json.Unmarshal([]byte(operationsHeaders), &headers)
 	if err != nil {
 		fmt.Println("Error parsing JSON in operationsHeaders: ", err)
+		return false
+	}
+	return true
+}
+
+func ensureValieOAuth2Context(oAuth2Context string) bool {
+	var oContext = OAuth2ClientContext{}
+	err := json.Unmarshal([]byte(oAuth2Context), &oContext)
+	if err != nil {
+		fmt.Println("Error parsing JSON in oAuth2Context: ", err)
+		return false
+	}
+	if !grantTypeChoices[oContext.GrantType] {
+		fmt.Println("grantType in oAuth2Context is not supported. OAuth2 is turned off.")
 		return false
 	}
 	return true

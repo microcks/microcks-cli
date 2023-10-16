@@ -75,7 +75,8 @@ The `test` command provides additional flags for advanced usages and options:
 * `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
 * `--secretName='<Secret Name>'` is an optional flag specifying the name of a Secret to use for connecting endpoint,
 * `--filteredOperations=<JSON>` allows to filter a list of operations to launch a test for,
-* `--operationsHeaders=<JSON>` allows to override some operations headers for the tests to launch.
+* `--operationsHeaders=<JSON>` allows to override some operations headers for the tests to launch,
+* `--oAuth2Context=<JSON>` allows specification of an OAuth2 grant flow to execute before launching the test (starts with Microcks version `1.8.0`).
 
 Overriden test operations headers is a JSON strings where 1st level keys are operation name (eg. `GET /beer`) or `globals` for header applying to all the operations of the API. Headers are specified as an array of objects defining `key` and `values` properties.
 
@@ -88,7 +89,8 @@ $ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ OPEN_API
         --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 \
         --insecure --verbose  --waitFor=3sec \
         --filteredOperations='["GET /beer", "GET /beer/{name}"]' \
-        --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
+        --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}' \
+        --oAuth2Context='{"clientId": "microcks-test", "clientSecret": "ab54d329-e435-41ae-a900-ec6b3fe15c54", "tokenUri": "https://idp.acme.org/realms/my-app/protocol/openid-connect/token", "grantType": "CLIENT_CREDENTIALS"}'
 
 MicrocksClient got status for test "64c25f7ddec62569f9a0ed95" - success: true, inProgress: false 
 Full TestResult details are available here: http://localhost:8080/#/tests/64c25f7ddec62569f9a0ed95 
