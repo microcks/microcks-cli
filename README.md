@@ -11,7 +11,7 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Current development version is `0.5.3`. [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions).
+Current development version is `0.5.5`. [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions).
 
 It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
 
