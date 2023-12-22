@@ -8,7 +8,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o microcks-cli github.com/microcks/microcks-cli
     
 # Build image
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2-750.1696515534
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3-1475
 
 MAINTAINER Laurent Broudoux <laurent@microcks.io>
 
