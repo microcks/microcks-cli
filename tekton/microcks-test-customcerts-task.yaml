@@ -43,7 +43,7 @@ spec:
       description: "Paths to additional certificates CRT files to add to trusted roots ones"
   steps:
     - name: microcks-test
-      image: quay.io/microcks/microcks-cli:0.5.3
+      image: quay.io/microcks/microcks-cli:0.5.4
       volumeMounts:
         - name: microcks-test-customcerts
           mountPath: /var/run/secrets/customcerts
