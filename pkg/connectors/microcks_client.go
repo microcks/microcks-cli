@@ -18,6 +18,7 @@ package connectors
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -310,6 +311,11 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
+	}
+
+	// Raise exception if not created.
+	if resp.StatusCode != 201 {
+		return "", errors.New(string(respBody))
 	}
 
 	return string(respBody), err
