@@ -17,7 +17,7 @@ spec:
       default: microcks-keycloak-client-secret
   steps:
     - name: microcks-test
-      image: quay.io/microcks/microcks-cli:0.5.4
+      image: quay.io/microcks/microcks-cli:0.5.5
       command:
         - /usr/bin/bash
       args:
