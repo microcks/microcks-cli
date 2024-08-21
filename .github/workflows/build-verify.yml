@@ -6,12 +6,14 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - 'README*'
+      - 'CODE_OF_CONDUCT*'
   pull_request:
     paths-ignore:
       - '.github/**'
       - '.gitignore'
       - 'LICENSE'
       - 'README*'
+      - 'CODE_OF_CONDUCT*'
       
 jobs:
   build-verify-package:
