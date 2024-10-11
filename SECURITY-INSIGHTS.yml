@@ -1,0 +1,56 @@
+header:
+  schema-version: 1.0.0
+  last-updated: '2024-10-11'
+  last-reviewed: '2024-10-11'
+  expiration-date: '2025-10-11T01:00:00.000Z'
+  project-url: https://github.com/microcks/microcks-cli
+  project-release: '0.5.5'
+  changelog: https://github.com/microcks/microcks-cli/blob/master/CHANGELOG.md
+  license: https://github.com/microcks/microcks-cli/blob/master/LICENSE
+project-lifecycle:
+  status: active
+  roadmap: https://github.com/microcks/microcks-cli/blob/master/ROADMAP.md
+  bug-fixes-only: false
+  core-maintainers:
+    - github:lbroudoux
+    - github:yada
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  code-of-conduct: https://github.com/microcks/.github/blob/master/CODE_OF_CONDUCT.md
+  contributing-policy: https://github.com/microcks/.github/blob/master/CONTRIBUTING.md
+documentation:
+  - https://microcks.io
+distribution-points:
+  - https://microcks.io
+  - https://github.com/microcks/microcks-cli
+  - https://quay.io/microcks
+security-artifacts:
+  threat-model:
+    threat-model-created: false
+security-testing:
+  - tool-type: sca
+    tool-name: Dependabot
+    tool-version: latest
+    integration:
+      ad-hoc: true
+      ci: false
+      before-release: false
+    comment: |
+      Dependabot is enabled for this repo on a weekly scheduled basis.
+security-contacts:
+  - type: email
+    value: security@microcks.io
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  security-policy: https://github.com/microcks/microcks-cli/security/policy
+  email-contact: security@microcks.io
+  comment: |
+    To report a security issue for one of the libraries owned by the Microcks community, write an email with a detailed description of the issue to security@microcks.io.
+dependencies:
+  third-party-packages: true
+  dependencies-lists:
+    - https://github.com/microcks/microcks-cli/network/dependencies
+    - https://app.fossa.com/projects/git%2Bgithub.com%2Fmicrocks%2Fmicrocks-cli/refs/branch/master/7865334ada168d16fd80d1c195afe1b7ba6c098a/browse/dependencies
+  env-dependencies-policy:
+    policy-url: https://github.com/microcks/microcks-cli/blob/master/DEPENDENCY_POLICY.md
