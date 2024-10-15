@@ -17,7 +17,7 @@ LABEL maintainer="Laurent Broudoux <laurent@microcks.io>" \
       org.opencontainers.image.description="Microcks is Open Source cloud-native native tool for API Mocking and Testing" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.documentation="https://github.com/microcks/microcks-cli" \
-      io.artifacthub.package.readme-url="https://raw.githubusercontent.com/microcks/microcks-cli/main/README.md"
+      io.artifacthub.package.readme-url="https://raw.githubusercontent.com/microcks/microcks-cli/master/README.md"
 
 ENV CLI=/usr/local/bin/microcks-cli \
     USER_UID=1001 \
