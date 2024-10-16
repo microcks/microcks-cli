@@ -13,9 +13,9 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Latest release is `0.5.5`.
+Latest release is `0.5.6`.
 
-Current development version is `0.5.6`.
+Current development version is `0.5.7`.
 
 It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
 
