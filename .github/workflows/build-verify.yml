@@ -12,7 +12,10 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - '*.md'
-permissions: read-all      
+permissions: 
+  contents: read
+  id-token: write # needed for signing the images with GitHub OIDC Token
+
 jobs:
   build-verify-package:
     runs-on: ubuntu-latest
@@ -48,6 +51,9 @@ jobs:
             echo "PACKAGE_IMAGE=false" >> "$GITHUB_ENV"
           fi
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.7.0
+
       - name: Set up QEMU
         if: github.repository_owner == 'microcks' && env.PACKAGE_IMAGE == 'true'
         uses: docker/setup-qemu-action@v2
@@ -64,14 +70,29 @@ jobs:
           docker buildx inspect $BUILDER || docker buildx create --name=$BUILDER --driver=docker-container --driver-opt=network=host
 
       - name: Build and push container image for cli
+        id: build-and-push
+        uses: docker/build-push-action@v4.0.0
         if: github.repository_owner == 'microcks' && env.PACKAGE_IMAGE == 'true'
+        with:
+          context: .
+          sbom: true
+          push: true
+          platforms: linux/amd64,linux/arm64
+          builder: buildx-multi-arch
+          file: build/Dockerfile
+          labels: |
+            org.opencontainers.image.revision=${GITHUB_SHA}
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+          tags: quay.io/microcks/microcks-cli:${{env.IMAGE_TAG}}
+
+      - name: Sign the image with GitHub OIDC Token
+        env:
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          TAGS: quay.io/microcks/microcks-cli:${{env.IMAGE_TAG}}
+          COSIGN_EXPERIMENTAL: "true"
         run: |
-          docker buildx build --push \
-            --platform=linux/amd64,linux/arm64 \
-            --builder=buildx-multi-arch \
-            --provenance=false \
-            --build-arg TAG=$IMAGE_TAG \
-            --file build/Dockerfile \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.created=${{ steps.date.outputs.date }}" \
-            --tag=quay.io/microcks/microcks-cli:$IMAGE_TAG .
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
