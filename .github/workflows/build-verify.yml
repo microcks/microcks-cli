@@ -78,6 +78,7 @@ jobs:
           context: .
           sbom: true
           push: true
+          provenance: mode=max
           platforms: linux/amd64,linux/arm64
           builder: buildx-multi-arch
           file: build/Dockerfile
