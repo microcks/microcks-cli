@@ -118,7 +118,7 @@ func (c *importComamnd) Execute() {
 		mainArtifact := true
 
 		// Check if mainArtifact flag is provided.
-		if strings.Contains(f, ":") {
+		if strings.Contains(f, ":") && !(strings.HasPrefix(f, "http://") || strings.HasPrefix(f, "https://")) {
 			pathAndMainArtifact := strings.Split(f, ":")
 			f = pathAndMainArtifact[0]
 			mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])

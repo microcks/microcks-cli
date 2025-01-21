@@ -257,18 +257,65 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	return &result, err
 }
 
-func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
-	// Ensure file exists on fs.
-	file, err := os.Open(specificationFilePath)
-	if err != nil {
-		return "", err
+func (c *microcksClient) UploadArtifact(specificationFile string, mainArtifact bool) (string, error) {
+	var file *os.File
+	var err error
+
+	if strings.HasPrefix(specificationFile, "http://") || strings.HasPrefix(specificationFile, "https://") {
+
+		resp, err := http.Get(specificationFile)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("failed to download file, status: %s", resp.Status)
+		}
+
+		// Retrive file name
+		fileName := specificationFile[strings.LastIndex(specificationFile, "/")+1 : strings.LastIndex(specificationFile, ".")]
+		//Retrive extension
+		extension := specificationFile[strings.LastIndex(specificationFile, "."):]
+
+		// Get the directory to save the temporary file
+		currentDirectory, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+
+		// Create a temporary file
+		file, err = os.CreateTemp(currentDirectory, fileName+"-*"+extension)
+		if err != nil {
+			return "", err
+		}
+		specificationFile = file.Name()
+		defer os.Remove(file.Name()) // Clean up the temp file after upload
+
+		// Write the response body to the temp file
+		_, err = io.Copy(file, resp.Body)
+		if err != nil {
+			return "", err
+		}
+
+		// Rewind the file pointer
+		_, err = file.Seek(0, io.SeekStart)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// Ensure file exists on fs.
+		file, err = os.Open(specificationFile)
+		if err != nil {
+			return "", err
+		}
 	}
 	defer file.Close()
 
 	// Create a multipart request body, reading the file.
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", filepath.Base(specificationFilePath))
+	part, err := writer.CreateFormFile("file", filepath.Base(specificationFile))
 	if err != nil {
 		return "", err
 	}
@@ -308,7 +355,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
