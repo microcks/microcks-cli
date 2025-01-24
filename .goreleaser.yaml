@@ -1,0 +1,23 @@
+version: 2
+
+builds:
+  - main: ./main.go
+    binary: microcks-cli
+    env:
+      - CGO_ENABLED=0
+
+release:
+  prerelease: auto
+
+universal_binaries:
+  - replace: true
+
+brews:
+  - name: microcks-cli
+    homepage: https://github.com/microcks/microcks-cli
+    repository:
+      owner: microcks
+      name: homebrew-tap
+
+checksum:
+  name_template: "checksums.txt"
