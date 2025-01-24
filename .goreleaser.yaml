@@ -19,5 +19,8 @@ brews:
       owner: microcks
       name: homebrew-tap
 
+sboms:
+  - artifacts: archive
+
 checksum:
   name_template: "checksums.txt"
