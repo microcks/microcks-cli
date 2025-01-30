@@ -40,6 +40,7 @@ func (c *helpCommand) Execute() {
 	fmt.Println("  help        display this help message")
 	fmt.Println("  test        launch new test on Microcks server")
 	fmt.Println("  import      import API artifacts on Microcks server")
+	fmt.Println("  import-url  import API artifacts from URL on Microcks server")
 	fmt.Println("")
 	fmt.Println("Use: microcks-cli test <apiName:apiVersion> <testEndpoint> <runner> \\")
 	fmt.Println("   --microcksURL=<> --waitFor=5sec \\")
