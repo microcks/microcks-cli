@@ -44,6 +44,7 @@ type MicrocksClient interface {
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
+	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
