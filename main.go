@@ -23,6 +23,8 @@ func main() {
 		c = cmd.NewTestCommand()
 	case "import":
 		c = cmd.NewImportCommand()
+	case "import-url":
+		c = cmd.NewImportURLCommand()
 	default:
 		cmd.NewHelpCommand().Execute()
 		os.Exit(1)

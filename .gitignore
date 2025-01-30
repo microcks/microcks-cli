@@ -13,3 +13,6 @@
 
 # Ouput of the build-binaries script
 build/_output
+
+# .DS_Store file of MacOS
+.DS_Store

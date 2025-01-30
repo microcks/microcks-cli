@@ -44,6 +44,7 @@ type MicrocksClient interface {
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
+	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -308,7 +309,61 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Raise exception if not created.
+	if resp.StatusCode != 201 {
+		return "", errors.New(string(respBody))
+	}
+
+	return string(respBody), err
+}
+
+func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error) {
+
+	// create Multipart Form to add fields
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add all the form fields
+	writer.WriteField("url", artifactURL)
+	writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact))
+	if secret != "" {
+		writer.WriteField("secret", secret)
+	}
+
+	err := writer.Close()
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure we have a correct URL.
+	rel := &url.URL{Path: "artifact/download"}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("POST", u.String(), body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
+
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
+
+	respBody, err := io.ReadAll(req.Body)
 	if err != nil {
 		panic(err.Error())
 	}
