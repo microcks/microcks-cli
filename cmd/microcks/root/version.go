@@ -13,23 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cmd
+
+package root
 
 import (
 	"fmt"
 
-	"github.com/microcks/microcks-cli/version"
+	"github.com/microcks/microcks-cli/cmd/microcks/internal/version"
+	"github.com/spf13/cobra"
 )
 
-type versionCommand struct {
-}
 
-// NewVersionCommand build a new VersionCommand implementation
-func NewVersionCommand() Command {
-	return new(versionCommand)
-}
-
-// Execute implementation on versionCommand structure
-func (c *versionCommand) Execute() {
-	fmt.Println(version.Version)
+func versionCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Check this CLI version",
+		Long: `Get the version of the Microcks CLI.`,
+		Example: ` microcks version`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Printf("Microcks CLI version: %s\n", version.Version)
+			return nil
+		},
+	}
+	return cmd
 }

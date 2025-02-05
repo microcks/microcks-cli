@@ -13,9 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cmd
+package root 
 
-// Command define single method interface
-type Command interface {
-	Execute()
+import "github.com/spf13/cobra"
+
+
+func RootCmd() *cobra.Command {
+	root := &cobra.Command{
+		Use:   "microcks",
+		Short: "Microcks CLI",
+		Long:  `Microcks CLI is a command line interface for Microcks.`,
+		Example: `
+  # Start the Microcks CLI
+  microcks`,
+  	}
+
+	root.AddCommand(
+		importCmd,
+		testCmd,
+	)
+	
+
+	return root
+
 }
