@@ -1,32 +1,61 @@
 name: release
-
 on:
-  push:
-    tags:
-      - "*"
-
-permissions:
-  contents: write
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to release'
+        required: true
+      version:
+        description: 'Release version'
+        required: true
 
 jobs:
   goreleaser:
+    name: Release
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: write
+      deployments: write
+      id-token: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4
         with:
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
           fetch-depth: 0
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Set up Go
         uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a #v5.2.0
         with:
-          go-version: "1.21.3"
+          go-version-file: ./go.mod
+          cache-dependency-path: ./go.sum
+
+      - name: Place a Git tag and push it
+        run: |
+          git config user.name "microcks-bot"
+          git config user.email "info@microcks.io"
+          git tag ${{ github.event.inputs.version }}
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Import GPG key
+        id: import-gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GORELEASER_GPG_SECRET_KEY }}
+          passphrase: ${{ secrets.GORELEASER_GPG_PASSPHRASE }}
+
+      - name: Install Syft for GoReleaser
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Publish Homebrew package with Goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: "${{ env.GITHUB_REF_NAME }}"
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.PUBLISHER_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import-gpg.outputs.fingerprint }}
