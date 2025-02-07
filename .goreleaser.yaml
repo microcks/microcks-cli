@@ -1,0 +1,38 @@
+version: 2
+
+builds:
+  - main: ./main.go
+    binary: microcks-cli
+    env:
+      - CGO_ENABLED=0
+
+release:
+  prerelease: auto
+
+universal_binaries:
+  - replace: true
+
+signs:
+  - artifacts: checksum
+    cmd: gpg2
+    args:
+      - "--batch"
+      - "-u"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+brews:
+  - name: microcks-cli
+    homepage: https://github.com/microcks/microcks-cli
+    repository:
+      owner: microcks
+      name: homebrew-tap
+
+sboms:
+  - artifacts: archive
+
+checksum:
+  name_template: "checksums.txt"
