@@ -44,6 +44,8 @@ jobs:
           sudo chmod +x /usr/local/bin/nancy
 
       - name: Run Nancy
+        env:
+          OSSINDEX_API_TOKEN: ""
         run: |
           nancy sleuth
 
