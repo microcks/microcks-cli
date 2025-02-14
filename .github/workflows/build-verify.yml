@@ -38,6 +38,14 @@ jobs:
         run: |
           ./build-binaries.sh github.com/microcks/microcks-cli
 
+      - name: Install Nancy
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/sonatype-nexus-community/nancy/main/scripts/install-latest.sh | sh
+
+      - name: Run Nancy
+        run: |
+          nancy sleuth
+
       - name: Set environment for branch
         run: |
           set -x
