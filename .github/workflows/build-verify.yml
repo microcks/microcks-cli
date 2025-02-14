@@ -41,6 +41,7 @@ jobs:
       - name: Install Nancy
         run: |
           curl -sSfL https://raw.githubusercontent.com/sonatype-nexus-community/nancy/main/scripts/install-latest.sh | sh
+          sudo mv nancy /usr/local/bin/
 
       - name: Run Nancy
         run: |
