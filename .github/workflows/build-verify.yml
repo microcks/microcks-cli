@@ -14,7 +14,7 @@ on:
       - '*.md'
 permissions:
   contents: read
-  id-token: write # needed for signing the images with GitHub OIDC Token
+  id-token: write 
 
 jobs:
   build-verify-package:
