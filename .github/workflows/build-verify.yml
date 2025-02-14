@@ -23,7 +23,6 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        #run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H:%M:%S')"
         run: echo "date=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
       - name: Checkout Code
@@ -40,8 +39,7 @@ jobs:
 
       - name: Install Nancy
         run: |
-          curl -sSfL https://raw.githubusercontent.com/sonatype-nexus-community/nancy/main/scripts/install-latest.sh | sh
-          sudo mv nancy /usr/local/bin/
+          go install github.com/sonatype-nexus-community/nancy/cmd/nancy@latest
 
       - name: Run Nancy
         run: |
@@ -56,7 +54,7 @@ jobs:
           elif [[ $GITHUB_REF == "refs/tags/$GITHUB_REF_NAME" ]]; then
             echo "IMAGE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
             echo "PACKAGE_IMAGE=true" >> "$GITHUB_ENV"
-          else
+          else:
             echo "PACKAGE_IMAGE=false" >> "$GITHUB_ENV"
           fi
 
