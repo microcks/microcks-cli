@@ -45,7 +45,7 @@ jobs:
 
       - name: Run Nancy
         env:
-          OSSINDEX_API_TOKEN: ""
+          NANCY_SKIP_OSSINDEX: "true"
         run: |
           nancy sleuth
 
