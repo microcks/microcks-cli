@@ -39,7 +39,9 @@ jobs:
 
       - name: Install Nancy
         run: |
-          go install github.com/sonatype-nexus-community/nancy@latest
+          NANCY_VERSION=v0.1.17
+          curl -sSfL https://github.com/sonatype-nexus-community/nancy/releases/download/${NANCY_VERSION}/nancy-linux.amd64-${NANCY_VERSION} | sudo tee /usr/local/bin/nancy > /dev/null
+          sudo chmod +x /usr/local/bin/nancy
 
       - name: Run Nancy
         run: |
@@ -54,7 +56,7 @@ jobs:
           elif [[ $GITHUB_REF == "refs/tags/$GITHUB_REF_NAME" ]]; then
             echo "IMAGE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
             echo "PACKAGE_IMAGE=true" >> "$GITHUB_ENV"
-          else:
+          else
             echo "PACKAGE_IMAGE=false" >> "$GITHUB_ENV"
           fi
 
