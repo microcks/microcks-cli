@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Nancy
         run: |
-          go install github.com/sonatype-nexus-community/nancy/cmd/nancy@latest
+          go install github.com/sonatype-nexus-community/nancy@latest
 
       - name: Run Nancy
         run: |
