@@ -2,7 +2,7 @@ name: build-verify-package
 on:
   push:
     paths-ignore:
-      #- '.github/**'
+      - '.github/**'
       - '.gitignore'
       - 'LICENSE'
       - '*.md'
@@ -40,13 +40,11 @@ jobs:
       - name: Install Nancy
         run: |
           NANCY_VERSION=v0.0.44
-          curl -sSfL https://github.com/sonatype-nexus-community/nancy/releases/download/${NANCY_VERSION}/nancy-darwin.amd64-${NANCY_VERSION} -o nancy
+          curl -sSfL https://github.com/sonatype-nexus-community/nancy/releases/download/${NANCY_VERSION}/nancy-linux.amd64-${NANCY_VERSION} -o nancy
           chmod +x nancy
           sudo mv nancy /usr/local/bin/nancy
 
       - name: Run Nancy
-        env:
-          NANCY_SKIP_OSSINDEX: "true"
         run: |
           export PATH=$PATH:/usr/local/bin
           nancy sleuth
@@ -100,21 +98,14 @@ jobs:
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
           tags: quay.io/microcks/microcks-cli:${{env.IMAGE_TAG}},docker.io/microcks/microcks-cli:${{env.IMAGE_TAG}}
 
-      - name: Get Image Digest
-        id: get-digest
-        if: github.repository_owner == 'microcks' && env.PACKAGE_IMAGE == 'true'
-        run: |
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' quay.io/microcks/microcks-cli:${{env.IMAGE_TAG}} | cut -d'@' -f2)
-          echo "DIGEST=$DIGEST" >> $GITHUB_OUTPUT
-
       - name: Sign the image with GitHub OIDC Token
         env:
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
           TAGS: quay.io/microcks/microcks-cli:${{env.IMAGE_TAG}} docker.io/microcks/microcks-cli:${{env.IMAGE_TAG}}
           COSIGN_EXPERIMENTAL: "true"
-        if: github.repository_owner == 'microcks' && env.PACKAGE_IMAGE == 'true'
         run: |
           images=""
           for tag in ${TAGS}; do
-            images+="${tag}@${{ steps.get-digest.outputs.DIGEST }} "
+            images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
