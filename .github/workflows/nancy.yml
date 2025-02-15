@@ -1,0 +1,67 @@
+name: Nancy
+
+permissions: 
+  issues: write
+  contents: read
+
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # Run every day at midnight
+
+
+jobs:
+  nancy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Write Go List
+        run: go list -json -deps ./... > deps.json
+      - name: Nancy Scan
+        uses: sonatype-nexus-community/nancy-github-action@v1
+        with:
+          output_format: json
+          output_file: nancy-output.json
+      - name: Process Nancy Scan Results
+        id: process-results
+        run : |
+         if [ -s nancy-output.json ]; then
+            echo "Vulnerabilities found by Nancy, creating an issue"
+            echo "results=found" >> $GITHUB_ENV
+          else
+            echo "No vulnerabilities found by Nancy"
+            echo "results=not-found" >> $GITHUB_ENV
+          fi
+      - name: Upload Nancy Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: nancy-output.json
+          path: nancy-output.json
+          if-no-files-found: error
+  
+  open-github-issue:
+    runs-on: ubuntu-latest
+    needs: nancy-scan
+    permissions:
+      issues: write
+    if: ${{ env.results == 'found' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download Nancy Scan Results
+        uses: actions/download-artifact@v4
+        with:
+          name: nancy-output.json
+      - name: Set scan results
+        id: set-scan-results
+        run: echo "results=$(cat nancy-output.json)" >> $GITHUB_ENV
+      - uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESULTS: ${{ steps.set-scan-results.outputs.results }}
+        with:
+          title: Vulnerabilities found by Nancy
+          body: ${{ env.RESULTS }}
+          
