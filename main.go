@@ -13,6 +13,11 @@ func main() {
 		cmd.NewHelpCommand().Execute()
 		os.Exit(1)
 	}
+ //  start and stop command using cobra by preventing overwriting of the previous command
+  if os.Args[1] == "start" || os.Args[1] == "stop" {
+    cmd.Execute()
+    return
+  }
 
 	switch os.Args[1] {
 	case "version":
