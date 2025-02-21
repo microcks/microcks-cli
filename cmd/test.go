@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -25,6 +24,7 @@ import (
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+   "github.com/spf13/cobra"
 )
 
 var (
@@ -32,73 +32,43 @@ var (
 	timeUnitChoices = map[string]bool{"milli": true, "sec": true, "min": true}
 )
 
-type testComamnd struct {
-}
+var testCmd = &cobra.Command{
+	Use:   "test <apiName:apiVersion> <testEndpoint> <runner>",
+	Short: "Execute a test on a Microcks server",
+	Args:  cobra.ExactArgs(3),
+	Run: func(cmd *cobra.Command, args []string) {
+		serviceRef, testEndpoint, runnerType := args[0], args[1], args[2]
 
-// NewTestCommand build a new TestCommand implementation
-func NewTestCommand() Command {
-	return new(testComamnd)
-}
-
-// Execute implementation of testCommand structure
-func (c *testComamnd) Execute() {
-
-	// Parse subcommand args first.
-	if len(os.Args) < 4 {
-		fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-		os.Exit(1)
-	}
-
-	serviceRef := os.Args[2]
-	testEndpoint := os.Args[3]
-	runnerType := os.Args[4]
-
-	// Validate presence and values of args.
-	if &serviceRef == nil || strings.HasPrefix(serviceRef, "-") {
-		fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-		os.Exit(1)
-	}
-	if &testEndpoint == nil || strings.HasPrefix(testEndpoint, "-") {
-		fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-		os.Exit(1)
-	}
-	if &runnerType == nil || strings.HasPrefix(runnerType, "-") {
-		fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-		os.Exit(1)
-	}
-	if _, validChoice := runnerChoices[runnerType]; !validChoice {
-		fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
-		os.Exit(1)
-	}
+// Validate presence and values of args.
+if strings.HasPrefix(serviceRef, "-") || serviceRef == "" {
+			fmt.Println("test command requires <apiName:apiVersion> <testEndpoint> <runner> args")
+			os.Exit(1)
+		}
+		if strings.HasPrefix(testEndpoint, "-") || testEndpoint == "" {
+			fmt.Println("test command requires <apiName:apiVersion> <testEndpoint> <runner> args")
+			os.Exit(1)
+		}
+		if strings.HasPrefix(runnerType, "-") || runnerType == "" {
+			fmt.Println("test command requires <apiName:apiVersion> <testEndpoint> <runner> args")
+			os.Exit(1)
+		}
+		if _, validChoice := runnerChoices[runnerType]; !validChoice {
+			fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
+			os.Exit(1)
+		}
 
 	// Then parse flags.
-	testCmd := flag.NewFlagSet("test", flag.ExitOnError)
-
-	var microcksURL string
-	var keycloakURL string
-	var keycloakClientID string
-	var keycloakClientSecret string
-	var waitFor string
-	var secretName string
-	var filteredOperations string
-	var operationsHeaders string
-	var oAuth2Context string
-	var insecureTLS bool
-	var caCertPaths string
-	var verbose bool
-
-	testCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
-	testCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
-	testCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
-	testCmd.StringVar(&waitFor, "waitFor", "5sec", "Time to wait for test to finish")
-	testCmd.StringVar(&secretName, "secretName", "", "Secret to use for connecting test endpoint")
-	testCmd.StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
-	testCmd.StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
-	testCmd.StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
-	testCmd.BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
-	testCmd.StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
-	testCmd.BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
-	testCmd.Parse(os.Args[5:])
+    microcksURL, _ := cmd.Flags().GetString("microcksURL")
+		keycloakClientID, _ := cmd.Flags().GetString("keycloakClientId")
+		keycloakClientSecret, _ := cmd.Flags().GetString("keycloakClientSecret")
+		waitFor, _ := cmd.Flags().GetString("waitFor")
+		secretName, _ := cmd.Flags().GetString("secretName")
+		filteredOperations, _ := cmd.Flags().GetString("filteredOperations")
+		operationsHeaders, _ := cmd.Flags().GetString("operationsHeaders")
+		oAuth2Context, _ := cmd.Flags().GetString("oAuth2Context")
+		insecureTLS, _ := cmd.Flags().GetBool("insecure")
+		caCertPaths, _ := cmd.Flags().GetString("caCerts")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
 	// Validate presence and values of flags.
 	if len(microcksURL) == 0 {
@@ -205,8 +175,24 @@ func (c *testComamnd) Execute() {
 	if !success {
 		os.Exit(1)
 	}
+},
 }
 
 func nowInMilliseconds() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
+    return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+func init() {
+	rootCmd.AddCommand(testCmd)
+	testCmd.Flags().String("microcksURL", "", "Microcks API URL (required)")
+	testCmd.Flags().String("keycloakClientId", "", "Keycloak Client ID (required)")
+	testCmd.Flags().String("keycloakClientSecret", "", "Keycloak Client Secret (required)")
+	testCmd.Flags().String("waitFor", "5sec", "Time to wait for test completion")
+	testCmd.Flags().String("secretName", "", "Secret for connecting to the test endpoint")
+	testCmd.Flags().String("filteredOperations", "", "List of operations to test")
+	testCmd.Flags().String("operationsHeaders", "", "Override operations headers as JSON")
+	testCmd.Flags().String("oAuth2Context", "", "OAuth2 client context as JSON")
+	testCmd.Flags().Bool("insecure", false, "Allow insecure HTTPS connections")
+	testCmd.Flags().String("caCerts", "", "Comma-separated paths to CA certificates")
+	testCmd.Flags().Bool("verbose", false, "Enable verbose output")
 }
