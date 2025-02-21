@@ -33,8 +33,20 @@ var (
 )
 
 var testCmd = &cobra.Command{
-	Use:   "test <apiName:apiVersion> <testEndpoint> <runner>",
-	Short: "Execute a test on a Microcks server",
+Use:   "test <apiName:apiVersion> <testEndpoint> <runner>",
+	Short: "Launch new test on Microcks server",
+	Long: `Launch new test on Microcks server.
+
+Args:
+  <apiName:apiVersion>   Exemple: 'Beer Catalog API:0.9'
+  <testEndpoint>         URL where is deployed implementation to test
+  <runner>               Test strategy (one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA)
+
+Flags:
+  --microcksURL          Microcks API endpoint
+  --waitFor        	 Time to wait for test to finish (int + one of: milli, sec, min)
+  --keycloakClientId     Keycloak Realm Service Account ClientId
+  --keycloakClientSecret Keycloak Realm Service Account ClientSecret`,
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		serviceRef, testEndpoint, runnerType := args[0], args[1], args[2]
