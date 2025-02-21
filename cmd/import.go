@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -24,70 +23,41 @@ import (
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+ "github.com/spf13/cobra"
+ "github.com/spf13/viper"
 )
 
-type importComamnd struct {
-}
+var importCmd = &cobra.Command{
+	Use:   "import <specificationFile1[:primary],specificationFile2[:primary]>",
+	Short: "Import API specifications into Microcks",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		specificationFiles := args[0]
 
-// NewImportCommand build a new ImportCommand implementation
-func NewImportCommand() Command {
-	return new(importComamnd)
-}
+    microcksURL := viper.GetString("microcksURL")
+		keycloakClientID := viper.GetString("keycloakClientId")
+		keycloakClientSecret := viper.GetString("keycloakClientSecret")
+		insecureTLS := viper.GetBool("insecure")
+		caCertPaths := viper.GetString("caCerts")
+		verbose := viper.GetBool("verbose")
 
-// Execute implementation of importComamnd structure
-func (c *importComamnd) Execute() {
-
-	// Parse subcommand args first.
-	if len(os.Args) < 2 {
-		fmt.Println("import command require <specificationFile1[:primary],specificationFile2[:primary]> args")
-		os.Exit(1)
-	}
-
-	specificationFiles := os.Args[2]
-
-	// Then parse flags.
-	importCmd := flag.NewFlagSet("import", flag.ExitOnError)
-
-	var microcksURL string
-	var keycloakURL string
-	var keycloakClientID string
-	var keycloakClientSecret string
-	var insecureTLS bool
-	var caCertPaths string
-	var verbose bool
-
-	importCmd.StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
-	importCmd.StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
-	importCmd.StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
-	importCmd.BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
-	importCmd.StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
-	importCmd.BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
-	importCmd.Parse(os.Args[3:])
-
-	// Validate presence and values of flags.
-	if len(microcksURL) == 0 {
-		fmt.Println("--microcksURL flag is mandatory. Check Usage.")
-		os.Exit(1)
-	}
-	if len(keycloakClientID) == 0 {
-		fmt.Println("--keycloakClientId flag is mandatory. Check Usage.")
-		os.Exit(1)
-	}
-	if len(keycloakClientSecret) == 0 {
-		fmt.Println("--keycloakClientSecret flag is mandatory. Check Usage.")
-		os.Exit(1)
-	}
+    if microcksURL == "" {
+			fmt.Println("--microcksURL flag is mandatory. Check Usage.")
+			os.Exit(1)
+		}
+		if keycloakClientID == "" {
+			fmt.Println("--keycloakClientId flag is mandatory. Check Usage.")
+			os.Exit(1)
+		}
+		if keycloakClientSecret == "" {
+			fmt.Println("--keycloakClientSecret flag is mandatory. Check Usage.")
+			os.Exit(1)
+		}
 
 	// Collect optional HTTPS transport flags.
-	if insecureTLS {
-		config.InsecureTLS = true
-	}
-	if len(caCertPaths) > 0 {
+	config.InsecureTLS = insecureTLS
 		config.CaCertPaths = caCertPaths
-	}
-	if verbose {
-		config.Verbose = true
-	}
+		config.Verbose = verbose
 
 	// Now we seems to be good ...
 	// First - retrieve the Keycloak URL from Microcks configuration.
@@ -98,14 +68,14 @@ func (c *importComamnd) Execute() {
 		os.Exit(1)
 	}
 
-	var oauthToken string = "unauthentifed-token"
+  oauthToken := "unauthentifed-token"
 	if keycloakURL != "null" {
 		//  If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 		kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
 
 		oauthToken, err = kc.ConnectAndGetToken()
 		if err != nil {
-			fmt.Printf("Got error when invoking Keycloack client: %s", err)
+			fmt.Printf("Got error when invoking Keycloak client: %s", err)
 			os.Exit(1)
 		}
 	}
@@ -130,9 +100,29 @@ func (c *importComamnd) Execute() {
 		// Try uploading this artifact.
 		msg, err := mc.UploadArtifact(f, mainArtifact)
 		if err != nil {
-			fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
+			fmt.Printf("Got error when invoking Microcks client importing Artifact: %s\n", err)
 			os.Exit(1)
 		}
 		fmt.Printf("Microcks has discovered '%s'\n", msg)
 	}
+},
+}
+
+func init() {
+	rootCmd.AddCommand(importCmd)
+
+	importCmd.PersistentFlags().String("microcksURL", "", "Microcks API URL")
+	importCmd.PersistentFlags().String("keycloakClientId", "", "Keycloak Client ID")
+	importCmd.PersistentFlags().String("keycloakClientSecret", "", "Keycloak Client Secret")
+	importCmd.PersistentFlags().Bool("insecure", false, "Allow insecure HTTPS connections")
+	importCmd.PersistentFlags().String("caCerts", "", "Comma-separated paths of CA cert files")
+	importCmd.PersistentFlags().Bool("verbose", false, "Enable verbose logging")
+
+	// Bind flags to Viper
+	viper.BindPFlag("microcksURL", importCmd.PersistentFlags().Lookup("microcksURL"))
+	viper.BindPFlag("keycloakClientId", importCmd.PersistentFlags().Lookup("keycloakClientId"))
+	viper.BindPFlag("keycloakClientSecret", importCmd.PersistentFlags().Lookup("keycloakClientSecret"))
+	viper.BindPFlag("insecure", importCmd.PersistentFlags().Lookup("insecure"))
+	viper.BindPFlag("caCerts", importCmd.PersistentFlags().Lookup("caCerts"))
+	viper.BindPFlag("verbose", importCmd.PersistentFlags().Lookup("verbose"))
 }
