@@ -28,9 +28,18 @@ import (
 )
 
 var importCmd = &cobra.Command{
-	Use:   "import <specificationFile1[:primary],specificationFile2[:primary]>",
-	Short: "Import API specifications into Microcks",
-	Args:  cobra.ExactArgs(1),
+Use:   "import <specificationFile1[:primary],specificationFile2[:primary]>",
+	Short: "Import API artifacts on Microcks server",
+	Long: `Import API artifacts into Microcks server.
+
+Args:
+  <specificationFile1[:primary],specificationFile2[:primary]>   Exemple: 'specs/my-openapi.yaml:true,specs/my-postmancollection.json:false'
+
+Flags:
+  --microcksURL          Microcks API endpoint (URL to the Microcks server)
+  --keycloakClientId     Keycloak Realm Service Account ClientId
+  --keycloakClientSecret Keycloak Realm Service Account ClientSecret`,
+  Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		specificationFiles := args[0]
 

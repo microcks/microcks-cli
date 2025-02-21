@@ -1,7 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
@@ -10,20 +6,17 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
+  )
 
 var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "microcks-cli",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+Use:   "microcks-cli",
+	Short: "microcks-cli is a CLI for interacting with Microcks server APIs.",
+	Long: `microcks-cli is a CLI tool to interact with Microcks server APIs.
+It allows launching tests and importing API artifacts with minimal dependencies.`,
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
