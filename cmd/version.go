@@ -19,17 +19,17 @@ import (
 	"fmt"
 
 	"github.com/microcks/microcks-cli/version"
+  "github.com/spf13/cobra"
 )
 
-type versionCommand struct {
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version of microcks-cli",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version.Version)
+	},
 }
 
-// NewVersionCommand build a new VersionCommand implementation
-func NewVersionCommand() Command {
-	return new(versionCommand)
-}
-
-// Execute implementation on versionCommand structure
-func (c *versionCommand) Execute() {
-	fmt.Println(version.Version)
+func init() {
+	rootCmd.AddCommand(versionCmd)
 }
