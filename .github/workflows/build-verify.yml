@@ -52,7 +52,7 @@ jobs:
           fi
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.7.0
+        uses: sigstore/cosign-installer@v3.8.1
 
       - name: Set up QEMU
         if: github.repository_owner == 'microcks' && env.PACKAGE_IMAGE == 'true'
