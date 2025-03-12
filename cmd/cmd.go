@@ -15,7 +15,35 @@
  */
 package cmd
 
-// Command define single method interface
-type Command interface {
-	Execute()
+import (
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+)
+
+var rootCmd = &cobra.Command{
+	Use:   "microcks-cli",
+	Short: "A CLI tool for Microcks",
+	Long: `microcks-cli is a CLI for interacting with Microcks server APIs.
+	It allows to launch tests or import API artifacts with minimal dependencies.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.HelpFunc()(cmd, args)
+	},
+	CompletionOptions: cobra.CompletionOptions{
+		HiddenDefaultCmd: true,
+	},
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(NewImportCommand())
+	rootCmd.AddCommand(NewVersionCommand())
+	rootCmd.AddCommand(NewTestCommand())
+	rootCmd.AddCommand(NewImportURLCommand())
 }
