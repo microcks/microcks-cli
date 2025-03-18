@@ -41,26 +41,12 @@ func NewImportCommand() *cobra.Command {
 		Long:  `import API artifacts on Microcks server`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
-			if len(os.Args) < 2 {
+			if len(args) == 0 {
 				fmt.Println("import command require <specificationFile1[:primary],specificationFile2[:primary]> args")
 				os.Exit(1)
 			}
 
-			specificationFiles := os.Args[2]
-
-			// Validate presence and values of flags.
-			if len(microcksURL) == 0 {
-				fmt.Println("--microcksURL flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
-			if len(keycloakClientID) == 0 {
-				fmt.Println("--keycloakClientId flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
-			if len(keycloakClientSecret) == 0 {
-				fmt.Println("--keycloakClientSecret flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
+			specificationFiles := args[0]
 
 			// Collect optional HTTPS transport flags.
 			if insecureTLS {
@@ -128,5 +114,11 @@ func NewImportCommand() *cobra.Command {
 	importCmd.Flags().BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
 	importCmd.Flags().StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
 	importCmd.Flags().BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
+
+	//Marking flags 'required'
+	importCmd.MarkFlagRequired("microcksURL")
+	importCmd.MarkFlagRequired("keycloakClientId")
+	importCmd.MarkFlagRequired("keycloakClientSecret")
+
 	return importCmd
 }
