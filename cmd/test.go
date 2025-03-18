@@ -81,18 +81,6 @@ func NewTestCommand() *cobra.Command {
 			}
 
 			// Validate presence and values of flags.
-			if len(microcksURL) == 0 {
-				fmt.Println("--microcksURL flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
-			if len(keycloakClientID) == 0 {
-				fmt.Println("--keycloakClientId flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
-			if len(keycloakClientSecret) == 0 {
-				fmt.Println("--keycloakClientSecret flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
 			if &waitFor == nil || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
 				fmt.Println("--waitFor format is wrong. Applying default 5sec")
 				waitFor = "5sec"
@@ -199,6 +187,11 @@ func NewTestCommand() *cobra.Command {
 	testCmd.Flags().BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
 	testCmd.Flags().StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
 	testCmd.Flags().BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
+
+	//Marking flags 'required'
+	testCmd.MarkFlagRequired("microcksURL")
+	testCmd.MarkFlagRequired("keycloakClientId")
+	testCmd.MarkFlagRequired("keycloakClientSecret")
 
 	return testCmd
 }

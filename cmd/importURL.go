@@ -27,20 +27,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// import (
-// 	"flag"
-// 	"fmt"
-// 	"os"
-// 	"strconv"
-// 	"strings"
-
-// 	"github.com/microcks/microcks-cli/pkg/config"
-// 	"github.com/microcks/microcks-cli/pkg/connectors"
-// )
-
-// type importURLCommand struct {
-// }
-
 func NewImportURLCommand() *cobra.Command {
 	var (
 		microcksURL          string
@@ -56,26 +42,12 @@ func NewImportURLCommand() *cobra.Command {
 		Long:  `import API artifacts from URL on Microcks server`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
-			if len(os.Args) < 2 {
+			if len(args) == 0 {
 				fmt.Println("import-url command require <specificationFile1URL[:primary],specificationFile2URL[:primary]> args")
 				os.Exit(1)
 			}
 
 			specificationFiles := os.Args[2]
-
-			// Validate presence and values of flags.
-			if len(microcksURL) == 0 {
-				fmt.Println("--microcksURL flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
-			if len(keycloakClientID) == 0 {
-				fmt.Println("--keycloakClientId flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
-			if len(keycloakClientSecret) == 0 {
-				fmt.Println("--keycloakClientSecret flag is mandatory. Check Usage.")
-				os.Exit(1)
-			}
 
 			// Collect optional HTTPS transport flags.
 			if insecureTLS {
@@ -150,6 +122,11 @@ func NewImportURLCommand() *cobra.Command {
 	importURLCmd.Flags().BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
 	importURLCmd.Flags().StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
 	importURLCmd.Flags().BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
+
+	//Marking flags 'required'
+	importURLCmd.MarkFlagRequired("microcksURL")
+	importURLCmd.MarkFlagRequired("keycloakClientId")
+	importURLCmd.MarkFlagRequired("keycloakClientSecret")
 
 	return importURLCmd
 }
