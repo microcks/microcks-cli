@@ -28,8 +28,7 @@ import (
 )
 
 var (
-	runnerChoices   = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true, "GRPC_PROTOBUF": true, "GRAPHQL_SCHEMA": true}
-	timeUnitChoices = map[string]bool{"milli": true, "sec": true, "min": true}
+	runnerChoices = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true, "GRPC_PROTOBUF": true, "GRAPHQL_SCHEMA": true}
 )
 
 func NewTestCommand() *cobra.Command {
@@ -58,20 +57,20 @@ func NewTestCommand() *cobra.Command {
 				os.Exit(1)
 			}
 
-			serviceRef := os.Args[2]
-			testEndpoint := os.Args[3]
-			runnerType := os.Args[4]
+			serviceRef := args[0]
+			testEndpoint := args[1]
+			runnerType := args[2]
 
 			// Validate presence and values of args.
-			if &serviceRef == nil || strings.HasPrefix(serviceRef, "-") {
+			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
 				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
-			if &testEndpoint == nil || strings.HasPrefix(testEndpoint, "-") {
+			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
 				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
-			if &runnerType == nil || strings.HasPrefix(runnerType, "-") {
+			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
 				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
@@ -81,7 +80,7 @@ func NewTestCommand() *cobra.Command {
 			}
 
 			// Validate presence and values of flags.
-			if &waitFor == nil || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
+			if len(waitFor) == 0 || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
 				fmt.Println("--waitFor format is wrong. Applying default 5sec")
 				waitFor = "5sec"
 			}
