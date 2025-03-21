@@ -2,7 +2,7 @@ name: build-verify-package
 on:
   push:
     paths-ignore:
-      #- '.github/**'
+      - '.github/**'
       - '.gitignore'
       - 'LICENSE'
       - '*.md'
@@ -12,9 +12,9 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - '*.md'
-permissions: 
+permissions:
   contents: read
-  id-token: write # needed for signing the images with GitHub OIDC Token
+  id-token: write 
 
 jobs:
   build-verify-package:
@@ -23,7 +23,6 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        #run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H:%M:%S')"
         run: echo "date=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
       - name: Checkout Code
@@ -37,6 +36,10 @@ jobs:
       - name: Build Go packages
         run: |
           ./build-binaries.sh github.com/microcks/microcks-cli
+
+      - name: Run Nancy
+        run: |
+          go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
 
       - name: Set environment for branch
         run: |
