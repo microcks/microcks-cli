@@ -47,7 +47,7 @@ func NewImportURLCommand() *cobra.Command {
 				os.Exit(1)
 			}
 
-			specificationFiles := os.Args[2]
+			specificationFiles := args[0]
 
 			// Collect optional HTTPS transport flags.
 			if insecureTLS {

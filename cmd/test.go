@@ -80,9 +80,8 @@ func NewTestCommand() *cobra.Command {
 			}
 
 			// Validate presence and values of flags.
-			if len(waitFor) == 0 || (!strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min")) {
+			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
 				fmt.Println("--waitFor format is wrong. Applying default 5sec")
-				waitFor = "5sec"
 			}
 
 			// Collect optional HTTPS transport flags.
