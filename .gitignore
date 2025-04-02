@@ -12,7 +12,7 @@
 *.out
 
 # Ouput of the build-binaries script
-build/_output
+build/dist
 
 # .DS_Store file of MacOS
 .DS_Store
