@@ -13,9 +13,9 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Latest release is `0.5.7`.
+Latest release is `0.5.8`.
 
-Current development version is `0.5.8`.
+Current development version is `0.5.9`.
 It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
 
 #### Fossa license and security scans
