@@ -46,4 +46,6 @@ func init() {
 	rootCmd.AddCommand(NewVersionCommand())
 	rootCmd.AddCommand(NewTestCommand())
 	rootCmd.AddCommand(NewImportURLCommand())
+	rootCmd.AddCommand(NewStartCommand())
+	rootCmd.AddCommand(NewStopCommand())
 }
