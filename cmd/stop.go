@@ -24,7 +24,14 @@ func NewStopCommand() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 
-			stopContainer(cfg.Instance.ContainerID)
+			cli, err := createClient(cfg.Instance.Driver)
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			stopContainer(cfg.Instance.ContainerID, cli)
 
 			cfg.Instance.Status = "Stopped"
 
@@ -36,6 +43,7 @@ func NewStopCommand() *cobra.Command {
 					Port        string "yaml:\"port\""
 					ContainerID string "yaml:\"containerID\""
 					AutoRemove  bool   "yaml:\"autoRemove\""
+					Driver      string "yaml:\"driver\""
 				}{}
 			}
 
@@ -52,13 +60,8 @@ func NewStopCommand() *cobra.Command {
 	return stopCmd
 }
 
-func stopContainer(containerId string) {
+func stopContainer(containerId string, cli *client.Client) {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		panic(err)
-	}
-	defer cli.Close()
 
 	fmt.Print("Stopping container ", containerId, "... ")
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully

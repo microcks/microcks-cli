@@ -48,6 +48,7 @@ type Config struct {
 		Port        string `yaml:"port"`
 		ContainerID string `yaml:"containerID"`
 		AutoRemove  bool   `yaml:"autoRemove"`
+		Driver      string `yaml:"driver"`
 	} `yaml:"instance"`
 }
 
@@ -120,12 +121,14 @@ func defaultConfig() *Config {
 			Port        string `yaml:"port"`
 			ContainerID string `yaml:"containerID"`
 			AutoRemove  bool   `yaml:"autoRemove"`
+			Driver      string `yaml:"driver"`
 		}{
 			Name:       "microcks",
 			Image:      "",
 			Status:     "",
 			Port:       "",
 			AutoRemove: false,
+			Driver:     "docker",
 		},
 	}
 }
