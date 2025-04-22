@@ -23,7 +23,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "microcks-cli",
+	Use:   "microcks",
 	Short: "A CLI tool for Microcks",
 	Long: `microcks-cli is a CLI for interacting with Microcks server APIs.
 	It allows to launch tests or import API artifacts with minimal dependencies.`,
@@ -46,4 +46,6 @@ func init() {
 	rootCmd.AddCommand(NewVersionCommand())
 	rootCmd.AddCommand(NewTestCommand())
 	rootCmd.AddCommand(NewImportURLCommand())
+	rootCmd.AddCommand(NewStartCommand())
+	rootCmd.AddCommand(NewStopCommand())
 }

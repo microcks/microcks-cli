@@ -22,7 +22,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"os"
+	"path/filepath"
 	strings "strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -32,7 +36,21 @@ var (
 	CaCertPaths string
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
+
+	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
 )
+
+type Config struct {
+	Instance struct {
+		Name        string `yaml:"name"`
+		Image       string `yaml:"image"`
+		Status      string `yaml:"status"`
+		Port        string `yaml:"port"`
+		ContainerID string `yaml:"containerID"`
+		AutoRemove  bool   `yaml:"autoRemove"`
+		Driver      string `yaml:"driver"`
+	} `yaml:"instance"`
+}
 
 // CreateTLSConfig wraps the creation of tls.Config object for use with HTTP Client for example.
 func CreateTLSConfig() *tls.Config {
@@ -90,4 +108,65 @@ func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
 			fmt.Println("")
 		}
 	}
+}
+
+//Functions related to configs
+
+func defaultConfig() *Config {
+	return &Config{
+		Instance: struct {
+			Name        string `yaml:"name"`
+			Image       string `yaml:"image"`
+			Status      string `yaml:"status"`
+			Port        string `yaml:"port"`
+			ContainerID string `yaml:"containerID"`
+			AutoRemove  bool   `yaml:"autoRemove"`
+			Driver      string `yaml:"driver"`
+		}{
+			Name:       "microcks",
+			Image:      "",
+			Status:     "",
+			Port:       "",
+			AutoRemove: false,
+			Driver:     "docker",
+		},
+	}
+}
+
+func EnsureConfig(path string) (*Config, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		fmt.Println("Config not found. Initializing default config.")
+		cfg := defaultConfig()
+		err := SaveConfig(path, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default config: %w", err)
+		}
+		return cfg, nil
+	}
+	return LoadConfig(path)
+}
+
+func LoadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg Config
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func SaveConfig(path string, cfg *Config) error {
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
