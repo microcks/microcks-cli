@@ -16,3 +16,6 @@ build/dist
 
 # .DS_Store file of MacOS
 .DS_Store
+
+# test data files
+**/testdata/**
