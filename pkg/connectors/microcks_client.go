@@ -39,6 +39,7 @@ var (
 
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
+	HttpClient() *http.Client
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
@@ -89,8 +90,8 @@ type microcksClient struct {
 func NewMicrocksClient(apiURL string) MicrocksClient {
 	mc := microcksClient{}
 
-	if !strings.HasSuffix(apiURL, "/") {
-		apiURL += "/"
+	if !strings.HasSuffix(apiURL, "/api/") {
+		apiURL += "/api/"
 	}
 
 	u, err := url.Parse(apiURL)
@@ -109,6 +110,10 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 		mc.httpClient = http.DefaultClient
 	}
 	return &mc
+}
+
+func (mc *microcksClient) HttpClient() *http.Client {
+	return mc.httpClient
 }
 
 func (c *microcksClient) GetKeycloakURL() (string, error) {
