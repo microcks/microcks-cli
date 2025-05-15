@@ -26,7 +26,7 @@ import (
 	"golang.org/x/term"
 )
 
-func NewLoginCommand() *cobra.Command {
+func NewLoginCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var (
 		ctxName          string
 		username         string
@@ -82,6 +82,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			var authToken = ""
 			var refreshToken = ""
 
+			//Initialze Auth struct
+			authCfg := config.Auth{
+				Server:       server,
+				ClientId:     "",
+				ClientSecret: "",
+			}
+
 			configFile, err := config.DefaultLocalConfigPath()
 			errors.CheckError(err)
 			localConfig, err := config.ReadLocalConfig(configFile)
@@ -110,6 +117,8 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					}
 					//Perform login and retrive tokens
 					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					authCfg.ClientId = clientID
+					authCfg.ClientSecret = clientSecret
 				} else {
 					httpClient := mc.HttpClient()
 					ctx = oidc.ClientContext(ctx, httpClient)
@@ -117,6 +126,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					oauth2conf, err := kc.GetOIDCConfig()
 					errors.CheckError(err)
 					authToken, refreshToken = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					authCfg.ClientId = "microcks-app-js"
 				}
 
 				parser := jwt.NewParser(jwt.WithoutClaimsValidation())
@@ -136,6 +146,8 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					KeycloackEnable: true,
 				})
 			}
+
+			localConfig.UpserAuth(authCfg)
 
 			localConfig.UpsertUser(config.User{
 				Name:         server,
@@ -203,6 +215,8 @@ func oauth2login(
 	// Authorization redirect callback from OAuth2 auth flow.
 	// Handles both implicit and authorization code flow
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Callback: %s\n", r.URL)
+
 		if formErr := r.FormValue("error"); formErr != "" {
 			handleErr(w, fmt.Sprintf("%s: %s", formErr, r.FormValue("error_description")))
 			return
@@ -262,6 +276,7 @@ func oauth2login(
 	time.Sleep(1 * time.Second)
 	ssoAuthFlow(url, ssoLaunchBrowser)
 	go func() {
+		log.Printf("Listen: %s\n", srv.Addr)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("Temporary HTTP server failed: %s", err)
 		}
@@ -270,21 +285,22 @@ func oauth2login(
 	if errMsg != "" {
 		log.Fatal(errMsg)
 	}
-
+	fmt.Printf("Authentication successful\n")
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
-
+	log.Printf("Token: %s\n", tokenString)
+	log.Printf("Refresh Token: %s\n", refreshToken)
 	return tokenString, refreshToken
 }
 
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
 	if ssoLaunchBrowser {
-		log.Printf("Opening system default browser for authentication\n")
+		fmt.Printf("Opening system default browser for authentication\n")
 		err := open.Start(url)
 		errors.CheckError(err)
 	} else {
-		log.Printf("To authenticate, copy-and-paste the following URL into your preferred browser: %s\n", url)
+		fmt.Printf("To authenticate, copy-and-paste the following URL into your preferred browser: %s\n", url)
 	}
 }
 
