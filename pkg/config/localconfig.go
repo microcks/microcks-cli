@@ -14,6 +14,7 @@ type LocalConfig struct {
 	Servers        []Server     `yaml:"servers"`
 	Users          []User       `yaml:"users"`
 	Instances      []Instance   `yaml:"instances"`
+	Auths          []Auth       `yaml:"auths"`
 }
 
 type ContextRef struct {
@@ -51,6 +52,12 @@ type Instance struct {
 	ContainerID string `yaml:"containerID"`
 	AutoRemove  bool   `yaml:"autoRemove"`
 	Driver      string `yaml:"driver"`
+}
+
+type Auth struct {
+	Server       string
+	ClientId     string
+	ClientSecret string
 }
 
 // ReadLocalConfig loads up the local configuration file. Returns nil if config does not exist
@@ -292,4 +299,35 @@ func (l *LocalConfig) RemoveInstance(instanceName string) bool {
 
 func (l *LocalConfig) IsEmpty() bool {
 	return len(l.Servers) == 0
+}
+
+func (l *LocalConfig) GetAuth(server string) (*Auth, error) {
+	for _, a := range l.Auths {
+		if a.Server == server {
+			return &a, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Auth for '%s' is undifined\n", server)
+}
+
+func (l *LocalConfig) UpserAuth(auth Auth) {
+	for i, a := range l.Auths {
+		if a.Server == auth.Server {
+			l.Auths[i] = auth
+			return
+		}
+	}
+
+	l.Auths = append(l.Auths, auth)
+}
+
+func (l *LocalConfig) RemoveAuth(server string) bool {
+	for i, a := range l.Auths {
+		if a.Server == server {
+			l.Auths = append(l.Auths[:i], l.Auths[i+1:]...)
+			return true
+		}
+	}
+	return false
 }

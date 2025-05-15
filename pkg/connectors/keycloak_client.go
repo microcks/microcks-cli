@@ -16,19 +16,24 @@
 package connectors
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/config"
+	"golang.org/x/oauth2"
 )
 
 // KeycloakClient defines methods for cinteracting with Keycloak
 type KeycloakClient interface {
 	ConnectAndGetToken() (string, error)
+	ConnectAndGetTokenAndRefreshToken(string, string) (string, string, error)
+	GetOIDCConfig() (*oauth2.Config, error)
 }
 
 type keycloakClient struct {
@@ -102,4 +107,83 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	accessToken := openIDResp["access_token"].(string)
 	return accessToken, err
+}
+
+func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
+	rel := &url.URL{Path: ".well-known/openid-configuration"}
+	u := c.BaseURL.ResolveReference(rel)
+
+	// Create HTTP request
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var openIDResp map[string]interface{}
+	if err := json.Unmarshal(body, &openIDResp); err != nil {
+		panic(err)
+	}
+
+	authURL := openIDResp["authorization_endpoint"].(string)
+	tokenURL := openIDResp["token_endpoint"].(string)
+
+	return &oauth2.Config{
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authURL,
+			TokenURL: tokenURL,
+		},
+	}, nil
+}
+
+func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password string) (string, string, error) {
+
+	rel := &url.URL{Path: "protocol/openid-connect/token"}
+	u := c.BaseURL.ResolveReference(rel)
+
+	data := url.Values{}
+	data.Set("client_id", c.Username)
+	data.Set("client_secret", c.Password)
+	data.Set("username", username)
+	data.Set("password", password)
+	data.Set("grant_type", "password")
+	// Create HTTP request
+	req, err := http.NewRequest("POST", u.String(), bytes.NewBufferString(data.Encode()))
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var openIDResp map[string]interface{}
+	if err := json.Unmarshal(body, &openIDResp); err != nil {
+		panic(err)
+	}
+
+	authToken := openIDResp["access_token"].(string)
+	refershToken := openIDResp["refresh_token"].(string)
+
+	return authToken, refershToken, nil
 }
