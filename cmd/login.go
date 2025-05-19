@@ -88,7 +88,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				ClientId:     "",
 				ClientSecret: "",
 			}
-
+      
 			configFile, err := config.DefaultLocalConfigPath()
 			errors.CheckError(err)
 			localConfig, err := config.ReadLocalConfig(configFile)
