@@ -8,6 +8,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.14.1
 	github.com/docker/docker v28.0.4+incompatible
 	github.com/docker/go-connections v0.5.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/spf13/cobra v1.9.1
