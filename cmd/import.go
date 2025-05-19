@@ -26,15 +26,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewImportCommand() *cobra.Command {
-	var (
-		microcksURL          string
-		keycloakClientID     string
-		keycloakClientSecret string
-		insecureTLS          bool
-		caCertPaths          string
-		verbose              bool
-	)
+func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var importCmd = &cobra.Command{
 		Use:   "import",
 		Short: "import API artifacts on Microcks server",
@@ -48,40 +40,26 @@ func NewImportCommand() *cobra.Command {
 
 			specificationFiles := args[0]
 
-			// Collect optional HTTPS transport flags.
-			if insecureTLS {
-				config.InsecureTLS = true
-			}
-			if len(caCertPaths) > 0 {
-				config.CaCertPaths = caCertPaths
-			}
-			if verbose {
-				config.Verbose = true
-			}
+			config.InsecureTLS = globalClientOpts.InsecureTLS
+			config.CaCertPaths = globalClientOpts.CaCertPaths
+			config.Verbose = globalClientOpts.Verbose
 
-			// Now we seems to be good ...
-			// First - retrieve the Keycloak URL from Microcks configuration.
-			mc := connectors.NewMicrocksClient(microcksURL)
-			keycloakURL, err := mc.GetKeycloakURL()
+			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			if err != nil {
-				fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
-				os.Exit(1)
+				fmt.Println(err)
+				return
 			}
 
-			var oauthToken string = "unauthentifed-token"
-			if keycloakURL != "null" {
-				//  If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-				kc := connectors.NewKeycloakClient(keycloakURL, keycloakClientID, keycloakClientSecret)
-
-				oauthToken, err = kc.ConnectAndGetToken()
-				if err != nil {
-					fmt.Printf("Got error when invoking Keycloack client: %s", err)
-					os.Exit(1)
-				}
+			if localConfig == nil {
+				fmt.Println("Please login to perform opertion...")
+				return
 			}
 
-			// Then - for each specificationFile, upload the artifact on Microcks Server.
-			mc.SetOAuthToken(oauthToken)
+			mc, err := connectors.NewClient(*globalClientOpts)
+			if err != nil {
+				fmt.Printf("error %v", err)
+				return
+			}
 
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
@@ -108,17 +86,6 @@ func NewImportCommand() *cobra.Command {
 
 		},
 	}
-	importCmd.Flags().StringVar(&microcksURL, "microcksURL", "", "Microcks API URL")
-	importCmd.Flags().StringVar(&keycloakClientID, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
-	importCmd.Flags().StringVar(&keycloakClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
-	importCmd.Flags().BoolVar(&insecureTLS, "insecure", false, "Whether to accept insecure HTTPS connection")
-	importCmd.Flags().StringVar(&caCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
-	importCmd.Flags().BoolVar(&verbose, "verbose", false, "Produce dumps of HTTP exchanges")
-
-	//Marking flags 'required'
-	importCmd.MarkFlagRequired("microcksURL")
-	importCmd.MarkFlagRequired("keycloakClientId")
-	importCmd.MarkFlagRequired("keycloakClientSecret")
 
 	return importCmd
 }
