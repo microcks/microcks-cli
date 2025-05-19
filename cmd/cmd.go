@@ -38,7 +38,6 @@ func NewCommad() *cobra.Command {
 		},
 	}
 
-func init() {
 	command.AddCommand(NewImportCommand(&clientOpts))
 	command.AddCommand(NewVersionCommand())
 	command.AddCommand(NewTestCommand())
