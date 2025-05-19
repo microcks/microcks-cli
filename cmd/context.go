@@ -63,7 +63,7 @@ microcks context httP://localhost:8080 --delete`,
 		},
 	}
 
-	ctxCmd.Flags().BoolVar(&delete, "delete", false, "Delete a context")
+	ctxCmd.Flags().BoolVarP(&delete, "delete", "d", false, "Delete a context")
 
 	return ctxCmd
 }
