@@ -72,7 +72,6 @@ func (wm *WatchManager) Reload() error {
 	}
 
 	wm.watchEntries = newFiles
-	fmt.Println(wm.watchEntries)
 	return nil
 }
 

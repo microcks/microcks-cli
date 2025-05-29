@@ -105,9 +105,6 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 						Context:      []string{globalClientOpts.Context},
 						MainArtifact: mainArtifact,
 					})
-
-					fmt.Println(watchCfg.Entries)
-
 					//write watch file
 					err = config.WriteLocalWatchConfig(*watchCfg, watchFile)
 					errors.CheckError(err)

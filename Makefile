@@ -3,6 +3,7 @@ CURRENT_DIR=$(shell pwd)
 DIST_DIR=${CURRENT_DIR}/build/dist
 CLI_NAME=microcks
 BIN_NAME=microcks
+WATCHER_NAME=watcher
 
 HOST_OS=$(shell go env GOOS)
 HOST_ARCH=$(shell go env GOARCH)
