@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"log"
 
-	containertypes "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	"github.com/microcks/microcks-cli/pkg/config"
+	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -19,54 +18,60 @@ func NewStopCommand() *cobra.Command {
 		Long:  "stop microcks instance",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			cfg, err := config.LoadConfig(config.ConfigPath)
-			if err != nil {
-				log.Fatalf("Failed to load config: %v", err)
-			}
+			configFile, err := config.DefaultLocalConfigPath()
+			errors.CheckError(err)
+			localConfig, err := config.ReadLocalConfig(configFile)
+			errors.CheckError(err)
 
-			cli, err := createClient(cfg.Instance.Driver)
-
-			if err != nil {
-				fmt.Println(err)
+			if localConfig == nil {
+				fmt.Println("Config not found, nothing to stop")
 				return
 			}
 
-			stopContainer(cfg.Instance.ContainerID, cli)
+			ctx, err := localConfig.ResolveContext("")
+			errors.CheckError(err)
+			instance := ctx.Instance
 
-			cfg.Instance.Status = "Stopped"
-
-			if cfg.Instance.AutoRemove {
-				cfg.Instance = struct {
-					Name        string "yaml:\"name\""
-					Image       string "yaml:\"image\""
-					Status      string "yaml:\"status\""
-					Port        string "yaml:\"port\""
-					ContainerID string "yaml:\"containerID\""
-					AutoRemove  bool   "yaml:\"autoRemove\""
-					Driver      string "yaml:\"driver\""
-				}{}
+			if instance.Name == "" {
+				fmt.Println("No instance is associated with this context")
+				return
 			}
 
-			err = config.SaveConfig(config.ConfigPath, cfg)
+			containerClient, err := connectors.NewContainerClient(instance.Driver)
+			errors.CheckError(err)
+			defer containerClient.CloseClient()
 
+			err = containerClient.StopContainer(instance.ContainerID)
 			if err != nil {
-				log.Fatalf("Failed to save config: %v", err)
+				log.Fatalf("Failed to stop a container: %v", err)
+				return
 			}
+			log.Printf("Instance %s stopped successfully", instance.Name)
 
-			fmt.Println("Microcks stopped successfully...")
+			// update configs
+
+			if instance.AutoRemove {
+				_, ok := localConfig.RemoveContext(ctx.Name)
+				if !ok {
+					log.Fatalf("Context %s does not exist", ctx.Name)
+					return
+				}
+				_ = localConfig.RemoveServer(ctx.Server.Server)
+				_ = localConfig.RemoveUser(ctx.User.Name)
+				_ = localConfig.RemoveAuth(ctx.Server.Server)
+				_ = localConfig.RemoveInstance(instance.Name)
+
+				localConfig.CurrentContext = ""
+				log.Printf("Instance %s removed successfully", instance.Name)
+			} else {
+				instance.Status = "Exited"
+				localConfig.UpsertInstance(instance)
+				log.Printf("Instance %s status update to Exited", instance.Name)
+			}
+			err = config.WriteLocalConfig(*localConfig, configFile)
+			errors.CheckError(err)
 		},
 	}
 
 	return stopCmd
-}
-
-func stopContainer(containerId string, cli *client.Client) {
-	ctx := context.Background()
-
-	fmt.Print("Stopping container ", containerId, "... ")
-	noWaitTimeout := 0 // to not wait for the container to exit gracefully
-	if err := cli.ContainerStop(ctx, containerId, containertypes.StopOptions{Timeout: &noWaitTimeout}); err != nil {
-		panic(err)
-	}
-	fmt.Println("Success")
 }
