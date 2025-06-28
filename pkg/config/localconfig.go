@@ -308,7 +308,7 @@ func (l *LocalConfig) GetAuth(server string) (*Auth, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Auth for '%s' is undifined\n", server)
+	return nil, fmt.Errorf("Auth for '%s' is undifined", server)
 }
 
 func (l *LocalConfig) UpserAuth(auth Auth) {

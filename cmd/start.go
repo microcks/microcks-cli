@@ -1,25 +1,17 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"io"
 	"log"
-	"os"
-	"os/exec"
-	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
 	"github.com/microcks/microcks-cli/pkg/config"
+	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func NewStartCommand() *cobra.Command {
 	var (
-		hostIP     string = "0.0.0.0"
 		name       string
 		hostPort   string
 		imageName  string
@@ -41,61 +33,113 @@ microcks start --driver [driver you wnat either 'docker' or 'podman']
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.EnsureConfig(config.ConfigPath)
 
-			if err != nil {
-				log.Fatalf("Error loading config: %v", err)
+			configFile, err := config.DefaultLocalConfigPath()
+			errors.CheckError(err)
+			localConfig, err := config.ReadLocalConfig(configFile)
+			errors.CheckError(err)
+
+			if localConfig == nil {
+				localConfig = &config.LocalConfig{}
 			}
 
-			cfg.Instance.Driver = driver
+			instance, _ := localConfig.GetInstance(name)
+			if instance == nil {
+				instance = &config.Instance{}
+			}
 
-			cli, err := createClient(cfg.Instance.Driver)
-
-			if err != nil {
-				fmt.Println(err)
+			if instance.Status == "Running" {
+				fmt.Printf("Microcks instance with name %s is already running", name)
 				return
 			}
 
-			defer cli.Close()
-
-			if cfg.Instance.Status == "Running" {
-				fmt.Println("Microcks is already running.")
+			switch instance.Status {
+			case "Running":
+				fmt.Printf("Microcks instance with name %s is already running", name)
 				return
-			}
+			case "Exited":
+				containerClient, err := connectors.NewContainerClient(instance.Driver)
+				errors.CheckError(err)
+				defer containerClient.CloseClient()
 
-			if cfg.Instance.Status == "Stopped" || cfg.Instance.Status == "Created" {
-				if err := startContainer(cfg.Instance.ContainerID, cli); err != nil {
-					fmt.Errorf("failed to start container: %v", err)
+				if err := containerClient.StartContainer(instance.ContainerID); err != nil {
+					log.Fatalf("failed to start container: %v", err)
+					return
 				}
-				fmt.Println("Microcks started successfully...")
-				return
+				instance.Status = "Running"
+			default:
+				containerClient, err := connectors.NewContainerClient(driver)
+				errors.CheckError(err)
+				defer containerClient.CloseClient()
+
+				containerId, err := containerClient.CreateContainer(connectors.ContainerOpts{
+					Image:      imageName,
+					Port:       hostPort,
+					Name:       name,
+					AutoRemove: autoRemove,
+				})
+				if err != nil {
+					log.Fatalf("Failed to create a container: %v", err)
+					return
+				}
+
+				if err := containerClient.StartContainer(containerId); err != nil {
+					log.Fatalf("failed to start container: %v", err)
+					return
+				}
+
+				instance.ContainerID = containerId
+				instance.AutoRemove = autoRemove
+				instance.Name = name
+				instance.Image = imageName
+				instance.Port = hostPort
+				instance.Status = "Running"
+				instance.Driver = driver
 			}
 
-			cfg.Instance.Name = name
-			cfg.Instance.Image = imageName
-			cfg.Instance.Port = hostPort
-			cfg.Instance.AutoRemove = autoRemove
+			//Store config and change context
+			localConfig.UpsertInstance(config.Instance{
+				ContainerID: instance.ContainerID,
+				Name:        instance.Name,
+				Image:       instance.Image,
+				Port:        instance.Port,
+				Status:      instance.Status,
+				Driver:      instance.Driver,
+				AutoRemove:  instance.AutoRemove,
+			})
 
-			containerID, err := createContainer(cfg, hostIP, cli)
+			server := fmt.Sprintf("http://localhost:%s", instance.Port)
 
-			if err != nil {
-				log.Fatalf("Failed to create a container: %v", err)
-				return
-			}
-			cfg.Instance.ContainerID = containerID
-			cfg.Instance.Status = "Created"
+			localConfig.UpsertServer(config.Server{
+				Name:            name,
+				Server:          server,
+				InsecureTLS:     true,
+				KeycloackEnable: false,
+			})
 
-			if err := startContainer(cfg.Instance.ContainerID, cli); err != nil {
-				fmt.Errorf("failed to start container: %v", err)
-				return
-			}
-			cfg.Instance.Status = "Running"
-			err = config.SaveConfig(config.ConfigPath, cfg)
+			localConfig.UpserAuth(config.Auth{
+				Server:       server,
+				ClientId:     "",
+				ClientSecret: "",
+			})
 
-			if err != nil {
-				log.Fatalf("Failed to save config: %v", err)
-				return
-			}
+			localConfig.UpsertUser(config.User{
+				Name:         server,
+				AuthToken:    "",
+				RefreshToken: "",
+			})
+
+			localConfig.CurrentContext = server
+			localConfig.UpserContext(config.ContextRef{
+				Name:     server,
+				Server:   server,
+				User:     server,
+				Instance: instance.Name,
+			})
+
+			// Save configs to config file
+			err = config.WriteLocalConfig(*localConfig, configFile)
+			errors.CheckError(err)
 
 			fmt.Printf("Microcks started successfully...")
 		},
@@ -106,76 +150,4 @@ microcks start --name [name of you container/instance]`,
 	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of dokcer to automatically remove the container when it exits")
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
 	return startCmd
-}
-
-func createClient(driver string) (*client.Client, error) {
-
-	if driver != "docker" {
-		out, err := exec.Command("podman", "machine", "inspect", "--format", "{{.ConnectionInfo.PodmanSocket.Path}}").Output()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		err = os.Setenv("DOCKER_HOST", "unix://"+strings.TrimSpace(string(out)))
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
-
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-
-	if err != nil {
-		return nil, err
-	}
-
-	return cli, nil
-}
-
-func createContainer(cfg *config.Config, hostIP string, cli *client.Client) (string, error) {
-	ctx := context.Background()
-
-	// Define exposed port and bindings
-	exposedPort, _ := nat.NewPort("tcp", "8080")
-	portBindings := nat.PortMap{
-		exposedPort: []nat.PortBinding{
-			{
-				HostIP:   hostIP,
-				HostPort: cfg.Instance.Port,
-			},
-		},
-	}
-
-	out, err := cli.ImagePull(ctx, cfg.Instance.Image, image.PullOptions{})
-	if err != nil {
-		return "", err
-	}
-	defer out.Close()
-	io.Copy(os.Stdout, out)
-
-	resp, err := cli.ContainerCreate(
-		ctx,
-		&container.Config{
-			Image:        cfg.Instance.Image,
-			ExposedPorts: nat.PortSet{exposedPort: struct{}{}},
-		},
-		&container.HostConfig{
-			PortBindings: portBindings,
-			AutoRemove:   cfg.Instance.AutoRemove,
-		}, nil, nil, cfg.Instance.Name)
-
-	if err != nil {
-		return "", err
-	}
-
-	return resp.ID, nil
-}
-
-func startContainer(cotainerID string, cli *client.Client) error {
-	ctx := context.Background()
-
-	if err := cli.ContainerStart(ctx, cotainerID, container.StartOptions{}); err != nil {
-		panic(err)
-	}
-
-	return nil
 }
