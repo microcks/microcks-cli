@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"slices"
 
 	configUtil "github.com/microcks/microcks-cli/pkg/util"
 )
@@ -58,6 +59,16 @@ type Auth struct {
 	Server       string
 	ClientId     string
 	ClientSecret string
+}
+
+type WatchConfig struct {
+	Entries []WatchEntry `yaml:"entries"`
+}
+
+type WatchEntry struct {
+	FilePath     string   `yaml:"filePath"`
+	Context      []string `yaml:"context"`
+	MainArtifact bool     `yaml:"mainartifact"`
 }
 
 // ReadLocalConfig loads up the local configuration file. Returns nil if config does not exist
@@ -121,6 +132,14 @@ func DefaultLocalConfigPath() (string, error) {
 		return "", err
 	}
 	return path.Join(dir, "config"), nil
+}
+
+func DefaultLocalWatchPath() (string, error) {
+	dir, err := DefaultConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dir, "watch"), nil
 }
 
 func ValidateLocalConfig(config LocalConfig) error {
@@ -330,4 +349,46 @@ func (l *LocalConfig) RemoveAuth(server string) bool {
 		}
 	}
 	return false
+}
+
+func (w *WatchConfig) UpsertEntry(entry WatchEntry) {
+	for i, e := range w.Entries {
+		if e.FilePath == entry.FilePath {
+			contexts := w.Entries[i].Context
+			if !slices.Contains(contexts, entry.Context[0]) {
+				entry.Context = append(entry.Context, contexts...)
+			}
+			w.Entries[i] = entry
+			return
+		}
+	}
+	w.Entries = append(w.Entries, entry)
+}
+
+func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
+	var err error
+	var config WatchConfig
+
+	// check file permission only when microcks config exists
+	if fi, err := os.Stat(path); err == nil {
+		err = getFilePermission(fi)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = configUtil.UnmarshalLocalFile(path, &config)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	return &config, nil
+}
+
+func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
+	err := os.MkdirAll(path.Dir(cfgPath), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	return configUtil.MarshalLocalYAMLFile(cfgPath, &config)
 }

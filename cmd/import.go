@@ -23,10 +23,13 @@ import (
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var watch bool
+
 	var importCmd = &cobra.Command{
 		Use:   "import",
 		Short: "import API artifacts on Microcks server",
@@ -35,6 +38,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			// Parse subcommand args first.
 			if len(args) == 0 {
 				fmt.Println("import command require <specificationFile1[:primary],specificationFile2[:primary]> args")
+				cmd.HelpFunc()(cmd, args)
 				os.Exit(1)
 			}
 
@@ -53,6 +57,10 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			if localConfig == nil {
 				fmt.Println("Please login to perform opertion...")
 				return
+			}
+
+			if globalClientOpts.Context == "" {
+				globalClientOpts.Context = localConfig.CurrentContext
 			}
 
 			mc, err := connectors.NewClient(*globalClientOpts)
@@ -82,10 +90,30 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					os.Exit(1)
 				}
 				fmt.Printf("Microcks has discovered '%s'\n", msg)
+
+				if watch {
+					watchFile, err := config.DefaultLocalWatchPath()
+					errors.CheckError(err)
+					watchCfg, err := config.ReadLocalWatchConfig(watchFile)
+					errors.CheckError(err)
+					if watchCfg == nil {
+						watchCfg = &config.WatchConfig{}
+					}
+
+					watchCfg.UpsertEntry(config.WatchEntry{
+						FilePath:     f,
+						Context:      []string{globalClientOpts.Context},
+						MainArtifact: mainArtifact,
+					})
+					//write watch file
+					err = config.WriteLocalWatchConfig(*watchCfg, watchFile)
+					errors.CheckError(err)
+				}
 			}
 
 		},
 	}
 
+	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change	")
 	return importCmd
 }
