@@ -88,7 +88,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				ClientId:     "",
 				ClientSecret: "",
 			}
-      
+
 			configFile, err := config.DefaultLocalConfigPath()
 			errors.CheckError(err)
 			localConfig, err := config.ReadLocalConfig(configFile)
@@ -174,7 +174,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 	loginCmd.Flags().StringVar(&password, "password", "", "The password of an account to authenticate")
 	loginCmd.Flags().BoolVar(&sso, "sso", false, "Perform SSO login")
 	loginCmd.Flags().BoolVar(&ssoLaunchBrowser, "sso-launch-browser", true, "Automatically launch the system default browser when performing SSO login")
-	loginCmd.Flags().IntVar(&ssoProt, "sso-port", 8085, "Port to run local OAuth2 login application")
+	loginCmd.Flags().IntVar(&ssoProt, "sso-port", 58085, "Port to run local OAuth2 login application")
 
 	return loginCmd
 }
