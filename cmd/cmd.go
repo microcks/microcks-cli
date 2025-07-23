@@ -46,6 +46,7 @@ func NewCommad() *cobra.Command {
 	command.AddCommand(NewStopCommand())
 	command.AddCommand(NewContextCommand())
 	command.AddCommand(NewLoginCommand(&clientOpts))
+	command.AddCommand(NewLogoutCommand(&clientOpts))
 
 	defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
 	errors.CheckError(err)
