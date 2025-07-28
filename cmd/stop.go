@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewStopCommand() *cobra.Command {
+func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 	var stopCmd = &cobra.Command{
 		Use:   "stop",
@@ -18,8 +18,7 @@ func NewStopCommand() *cobra.Command {
 		Long:  "stop microcks instance",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			configFile, err := config.DefaultLocalConfigPath()
-			errors.CheckError(err)
+			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
 			errors.CheckError(err)
 

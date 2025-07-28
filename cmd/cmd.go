@@ -40,11 +40,11 @@ func NewCommad() *cobra.Command {
 
 	command.AddCommand(NewImportCommand(&clientOpts))
 	command.AddCommand(NewVersionCommand())
-	command.AddCommand(NewTestCommand())
-	command.AddCommand(NewImportURLCommand())
-	command.AddCommand(NewStartCommand())
-	command.AddCommand(NewStopCommand())
-	command.AddCommand(NewContextCommand())
+	command.AddCommand(NewTestCommand(&clientOpts))
+	command.AddCommand(NewImportURLCommand(&clientOpts))
+	command.AddCommand(NewStartCommand(&clientOpts))
+	command.AddCommand(NewStopCommand(&clientOpts))
+	command.AddCommand(NewContextCommand(&clientOpts))
 	command.AddCommand(NewLoginCommand(&clientOpts))
 	command.AddCommand(NewLogoutCommand(&clientOpts))
 
