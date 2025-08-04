@@ -96,34 +96,67 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				waitForMilliseconds = waitForMilliseconds * 60 * 1000
 			}
 
-			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-			if err != nil {
-				fmt.Println(err)
-				return
+			var mc connectors.MicrocksClient
+			var serverAddr string
+
+			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
+
+				// create client with server address
+				serverAddr = globalClientOpts.ServerAddr
+				mc = connectors.NewMicrocksClient(serverAddr)
+
+				keycloakURL, err := mc.GetKeycloakURL()
+				if err != nil {
+					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					os.Exit(1)
+				}
+
+				var oauthToken string = "unauthentifed-token"
+				if keycloakURL != "null" {
+					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
+					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+
+					oauthToken, err = kc.ConnectAndGetToken()
+					if err != nil {
+						fmt.Printf("Got error when invoking Keycloack client: %s", err)
+						os.Exit(1)
+					}
+					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
+				}
+
+				// Then - launch the test on Microcks Server.
+				mc.SetOAuthToken(oauthToken)
+
+			} else {
+				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+
+				if localConfig == nil {
+					fmt.Println("Please login to perform opertion...")
+					return
+				}
+
+				if globalClientOpts.Context == "" {
+					globalClientOpts.Context = localConfig.CurrentContext
+				}
+
+				mc, err = connectors.NewClient(*globalClientOpts)
+				if err != nil {
+					fmt.Printf("error %v", err)
+					return
+				}
+
+				ctx, err := localConfig.ResolveContext(globalClientOpts.Context)
+				errors.CheckError(err)
+
+				serverAddr = ctx.Server.Server
 			}
-
-			if localConfig == nil {
-				fmt.Println("Please login to perform opertion...")
-				return
-			}
-
-			if globalClientOpts.Context == "" {
-				globalClientOpts.Context = localConfig.CurrentContext
-			}
-
-			mc, err := connectors.NewClient(*globalClientOpts)
-			if err != nil {
-				fmt.Printf("error %v", err)
-				return
-			}
-
-			ctx, err := localConfig.ResolveContext(globalClientOpts.Context)
-			errors.CheckError(err)
-
-			serverAddr := ctx.Server.Server
 
 			var testResultID string
-			testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
 				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 				os.Exit(1)
