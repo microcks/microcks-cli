@@ -1,56 +1,43 @@
-# Import Command
+## `microcks import` – Import API Artifacts into Microcks
+Uploads one or more API spec files (e.g., OpenAPI, AsyncAPI, Postman) to the Microcks server and optionally watches them for changes.
 
-The `import` command in Microcks CLI is used to upload and register API specification artifacts (like OpenAPI, AsyncAPI, Postman collections, etc.) into a Microcks server.
-
-📝 Description
-
-The `import` command enables developers to push one or multiple API artifacts to a Microcks instance. It supports secure authentication via Keycloak and allows custom TLS configurations for secure communication.
-
-📌 Usage
+### Usage
 ```bash
-microcks import <specificationFile1[:primary]>,<specificationFile2[:primary]> \
-  --microcksURL <microcks-api-url> \
-  --keycloakClientId <client-id> \
-  --keycloakClientSecret <client-secret> \
-  [--insecure] \
-  [--caCerts <cert-paths>] \
-  [--verbose]
+microcks import <specFile1[:main]>,<specFile2[:main]> [flags]
 ```
-Arguments
-- `<specificationFile[:primary]>`:
-A comma-separated list of specification file paths to import.
-Optionally, each file can be suffixed with `:true` or `:false` to indicate whether it's the primary artifact.
 
-| Flag                    | Type    | Required | Description                                                                 |
-|-------------------------|---------|----------|-----------------------------------------------------------------------------|
-| `--microcksURL`         | string  | ✅        | The URL of the Microcks API endpoint.                                      |
-| `--keycloakClientId`    | string  | ✅        | The Keycloak Service Account Client ID for OAuth2 authentication.          |
-| `--keycloakClientSecret`| string  | ✅        | The Keycloak Service Account Client Secret for authentication.             |
-| `--insecure`            | bool    | ❌        | Allow insecure TLS connections (e.g., self-signed certs).                  |
-| `--caCerts`             | string  | ❌        | Comma-separated paths to additional CA certificate files (PEM format).     |
-| `--verbose`             | bool    | ❌        | Enable verbose mode to dump HTTP requests and responses to the console.    |
+### Examples
+```bash
+# Import a single artifact (marked as main)
+microcks import ./api.yaml
 
-🧪 Examples
-- Basic Import
-```bash
-microcks import my-api.yaml \
-  --microcksURL http://localhost:8080/api \
-  --keycloakClientId my-client \
-  --keycloakClientSecret my-secret
+# Specify mainArtifact flag for each file
+microcks import ./api.yaml:false,./schema.json:true
+
+# Import and watch file for changes
+microcks import ./api.yaml --watch
+
+# Import specification to microcks without logining to microcks
+microck import ./api.yaml \
+    --micrcoksURL <microcks-url> \ 
+    --keycloakClientId <client-id> \
+    --keycloakClientSecret <client-secret> 
 ```
-- Import Multiple Files with Primary Indicator
-```bash
-microcks import openapi.yaml:true,postman.json:false \
-  --microcksURL https://microcks.example.com/api \
-  --keycloakClientId my-client \
-  --keycloakClientSecret my-secret
-```
-- Using Custom TLS CA Certificates and Verbose Logging
-```bash
-microcks-cli import spec.yaml \
-  --microcksURL https://microcks.example.com/api \
-  --keycloakClientId my-client \
-  --keycloakClientSecret my-secret \
-  --caCerts /etc/ssl/certs/ca1.crt,/etc/ssl/certs/ca2.crt \
-  --verbose
-```
+
+### Options
+| Flag        | Description                                         |
+| ----------- | --------------------------------------------------- |
+| `-h, --help`| help for import                                     |
+| `--watch`   | Watch the file(s) and auto-reimport them on changes |
+
+### Options Inherited from Parent Commands
+| Flag                     | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `--config`               | Path to Microcks config file                |
+| `--microcks-context`     | Name of the Microcks context to use         |
+| `--verbose`              | Produce dumps of HTTP exchanges             |
+| `--insecure-tls`         | Allow insecure HTTPS connections            |
+| `--caCerts`              | Comma-separated paths of CA cert files      |
+| `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
+| `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
+| `--microcksURL`          | Microcks API URL                            |
