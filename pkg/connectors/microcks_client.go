@@ -149,7 +149,16 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		c.Verbose = opts.Verbose
 	}
 
-	c.httpClient = &http.Client{}
+	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+		tlsConfig := config.CreateTLSConfig()
+		tr := &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		c.httpClient = &http.Client{Transport: tr}
+	} else {
+		c.httpClient = http.DefaultClient
+	}
+
 	if localCfg != nil {
 		err = c.refreshAuthToken(localCfg, ctxName, opts.ConfigPath)
 		if err != nil {

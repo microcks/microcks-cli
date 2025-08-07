@@ -67,6 +67,10 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				os.Exit(1)
 			}
 
+			config.InsecureTLS = globalClientOpts.InsecureTLS
+			config.CaCertPaths = globalClientOpts.CaCertPaths
+			config.Verbose = globalClientOpts.Verbose
+
 			server = args[0]
 			mc := connectors.NewMicrocksClient(server)
 			keycloakUrl, err := mc.GetKeycloakURL()
