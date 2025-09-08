@@ -1,34 +1,48 @@
-# Start Command
+## `microcks start` – Start a Local Microcks Instance
+Starts a Microcks instance using Docker or Podman and configures it as the current CLI context.
 
-The `start` command allows you to launch a Microcks instance using a container runtime like Docker or Podman. It either starts a new container or resumes a previously created one based on saved configuration.
-
-📌 Usage
+### Usage
 ```bash
 microcks start [flags]
 ```
 
-🚩 Flags
-| Flag       | Description                                        | Required | Default                                        |
-| ---------- | -------------------------------------------------- | -------- | ---------------------------------------------- |
-| `--name`   | Name of the Microcks container/instance            | No       | `microcks`                                     |
-| `--port`   | Host port to expose Microcks                       | No       | `8585`                                         |
-| `--image`  | Image to use for creating the container            | No       | `quay.io/microcks/microcks-uber:latest-native` |
-| `--rm`     | Auto-remove container on exit (like `docker --rm`) | No       | `false`                                        |
-| `--driver` | Container runtime to use (`docker` or `podman`)    | No       | `docker`                                       |
-
-
-🧪 Examples
-
-Start Microcks with default settings:
-```sh
+### Example
+```bash
+# Start a Microcks instance
 microcks start
-```
-Start Microcks on port 9090 using Podman:
-```sh
-microcks start --port 9090 --driver podman
+
+# Define your port (by default 8585)
+microcks start --port [Port you want]
+
+# Define your driver (by default docker)
+microcks start --driver [driver you wnat either 'docker' or 'podman']
+
+# Define name of your microcks container/instance
+microcks start --name [name of you container/instance]
+
+# Auto remove the container on exit
+microcks start --rm
 ```
 
-Start with a custom container name and image:
-```sh
-microcks start --name dev-microcks --image custom/microcks:latest
-```
+### Options
+| Flag        | Description                                                                      |
+| ----------- | -------------------------------------------------------------------------------- |
+| `-h, --help`| help for start                                                                   |
+| `--name`    | Name for the Microcks instance (default: `microcks`)                             |
+| `--port`    | Host port to expose Microcks (default: `8585`)                                   |
+| `--image`   | Container image to use (default: `quay.io/microcks/microcks-uber:latest-native`) |
+| `--rm`      | Auto-remove the container when it exits (like Docker `--rm`)                     |
+| `--driver`  | Container driver to use (`docker` or `podman`, default: `docker`)                |
+
+### Options Inherited from Parent Commands
+| Flag                     | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `--config`               | Path to Microcks config file                |
+| `--microcks-context`     | Name of the Microcks context to use         |
+| `--verbose`              | Produce dumps of HTTP exchanges             |
+| `--insecure-tls`         | Allow insecure HTTPS connections            |
+| `--caCerts`              | Comma-separated paths of CA cert files      |
+| `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
+| `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
+| `--microcksURL`          | Microcks API URL                            |
+
