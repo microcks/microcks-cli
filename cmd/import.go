@@ -48,31 +48,60 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			config.CaCertPaths = globalClientOpts.CaCertPaths
 			config.Verbose = globalClientOpts.Verbose
 
-			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+			var mc connectors.MicrocksClient
 
-			if localConfig == nil {
-				fmt.Println("Please login to perform opertion...")
-				return
-			}
+			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
+				// create client with server address
+				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
 
-			if globalClientOpts.Context == "" {
-				globalClientOpts.Context = localConfig.CurrentContext
-			}
+				keycloakURL, err := mc.GetKeycloakURL()
+				if err != nil {
+					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					os.Exit(1)
+				}
 
-			mc, err := connectors.NewClient(*globalClientOpts)
-			if err != nil {
-				fmt.Printf("error %v", err)
-				return
-			}
+				var oauthToken string = "unauthentifed-token"
+				if keycloakURL != "null" {
+					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
+					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
+					oauthToken, err = kc.ConnectAndGetToken()
+					if err != nil {
+						fmt.Printf("Got error when invoking Keycloack client: %s", err)
+						os.Exit(1)
+					}
+					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
+				}
+
+				//Set Auth token
+				mc.SetOAuthToken(oauthToken)
+			} else {
+
+				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+
+				if localConfig == nil {
+					fmt.Println("Please login to perform opertion...")
+					return
+				}
+
+				if globalClientOpts.Context == "" {
+					globalClientOpts.Context = localConfig.CurrentContext
+				}
+
+				mc, err = connectors.NewClient(*globalClientOpts)
+				if err != nil {
+					fmt.Printf("error %v", err)
+					return
+				}
+			}
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
 				mainArtifact := true
-
+				var err error
 				// Check if mainArtifact flag is provided.
 				if strings.Contains(f, ":") {
 					pathAndMainArtifact := strings.Split(f, ":")

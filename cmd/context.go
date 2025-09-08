@@ -8,11 +8,12 @@ import (
 	"text/tabwriter"
 
 	"github.com/microcks/microcks-cli/pkg/config"
+	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-func NewContextCommand() *cobra.Command {
+func NewContextCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var delete bool
 	ctxCmd := &cobra.Command{
 		Use:     "context [CONTEXT]",
@@ -27,24 +28,21 @@ microcks context httP://localhost:8080
 # Delete Microcks context
 microcks context httP://localhost:8080 --delete`,
 		Run: func(cmd *cobra.Command, args []string) {
-			var cfgFile string
-			configPath, err := config.DefaultLocalConfigPath()
-			errors.CheckError(err)
-			cfgFile = configPath
-			localCfg, err := config.ReadLocalConfig(cfgFile)
+			configPath := globalClientOpts.ConfigPath
+			localCfg, err := config.ReadLocalConfig(configPath)
 			errors.CheckError(err)
 			if delete {
 				if len(args) == 0 {
 					cmd.HelpFunc()(cmd, args)
 					os.Exit(1)
 				}
-				err := deleteContext(args[0], cfgFile)
+				err := deleteContext(args[0], configPath)
 				errors.CheckError(err)
 				return
 			}
 
 			if len(args) == 0 {
-				printMicrocksContexts(cfgFile)
+				printMicrocksContexts(configPath)
 				return
 			}
 

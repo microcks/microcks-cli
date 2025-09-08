@@ -40,11 +40,11 @@ func NewCommad() *cobra.Command {
 
 	command.AddCommand(NewImportCommand(&clientOpts))
 	command.AddCommand(NewVersionCommand())
-	command.AddCommand(NewTestCommand())
-	command.AddCommand(NewImportURLCommand())
-	command.AddCommand(NewStartCommand())
-	command.AddCommand(NewStopCommand())
-	command.AddCommand(NewContextCommand())
+	command.AddCommand(NewTestCommand(&clientOpts))
+	command.AddCommand(NewImportURLCommand(&clientOpts))
+	command.AddCommand(NewStartCommand(&clientOpts))
+	command.AddCommand(NewStopCommand(&clientOpts))
+	command.AddCommand(NewContextCommand(&clientOpts))
 	command.AddCommand(NewLoginCommand(&clientOpts))
 	command.AddCommand(NewLogoutCommand(&clientOpts))
 
@@ -55,5 +55,10 @@ func NewCommad() *cobra.Command {
 	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
 	command.PersistentFlags().BoolVar(&clientOpts.InsecureTLS, "insecure-tls", false, "Whether to accept insecure HTTPS connection")
 	command.PersistentFlags().StringVar(&clientOpts.CaCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
+	command.PersistentFlags().StringVar(&clientOpts.ClientId, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
+	command.PersistentFlags().StringVar(&clientOpts.ClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
+	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL")
+	command.MarkFlagsRequiredTogether("keycloakClientId", "microcksURL", "keycloakClientSecret")
+
 	return command
 }

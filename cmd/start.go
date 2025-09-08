@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewStartCommand() *cobra.Command {
+func NewStartCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var (
 		name       string
 		hostPort   string
@@ -34,8 +34,7 @@ microcks start --driver [driver you wnat either 'docker' or 'podman']
 microcks start --name [name of you container/instance]`,
 		Run: func(cmd *cobra.Command, args []string) {
 
-			configFile, err := config.DefaultLocalConfigPath()
-			errors.CheckError(err)
+			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
 			errors.CheckError(err)
 
