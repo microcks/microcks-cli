@@ -1,0 +1,805 @@
+---
+openapi: 3.0.3
+info:
+  title: E-Commerce Platform API
+  version: 2.0.0
+  description: A comprehensive e-commerce platform API with product management, user management, orders, and payment processing
+  contact:
+    name: API Team
+    url: https://api.example.com
+    email: api@example.com
+  license:
+    name: MIT License
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://api.example.com/v2
+    description: Production server
+  - url: https://staging-api.example.com/v2
+    description: Staging server
+paths:
+  /products:
+    get:
+      operationId: GetProducts
+      summary: Get all products with pagination and filtering
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of products per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: category
+          in: query
+          description: Filter by category
+          required: false
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          description: Minimum price filter
+          required: false
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          description: Maximum price filter
+          required: false
+          schema:
+            type: number
+        - name: sortBy
+          in: query
+          description: Sort field
+          required: false
+          schema:
+            type: string
+            enum: [name, price, rating, createdAt]
+        - name: sortOrder
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductList"
+              examples:
+                success:
+                  summary: Successful response
+                  value:
+                    products:
+                      - id: "prod_001"
+                        name: "Wireless Bluetooth Headphones"
+                        description: "High-quality wireless headphones with noise cancellation"
+                        price: 199.99
+                        category: "Electronics"
+                        brand: "TechAudio"
+                        rating: 4.5
+                        stockQuantity: 150
+                        images:
+                          - "https://example.com/images/headphones1.jpg"
+                          - "https://example.com/images/headphones2.jpg"
+                        specifications:
+                          batteryLife: "20 hours"
+                          connectivity: "Bluetooth 5.0"
+                          weight: "250g"
+                        createdAt: "2024-01-15T10:30:00Z"
+                        updatedAt: "2024-01-20T14:45:00Z"
+                      - id: "prod_002"
+                        name: "Organic Cotton T-Shirt"
+                        description: "Comfortable organic cotton t-shirt in various colors"
+                        price: 29.99
+                        category: "Clothing"
+                        brand: "EcoWear"
+                        rating: 4.2
+                        stockQuantity: 300
+                        images:
+                          - "https://example.com/images/tshirt1.jpg"
+                        specifications:
+                          material: "100% Organic Cotton"
+                          sizes: ["S", "M", "L", "XL"]
+                          colors: ["White", "Black", "Navy", "Gray"]
+                        createdAt: "2024-01-10T09:15:00Z"
+                        updatedAt: "2024-01-18T16:20:00Z"
+                    pagination:
+                      page: 1
+                      limit: 20
+                      total: 1250
+                      totalPages: 63
+                      hasNext: true
+                      hasPrev: false
+        "400":
+          description: Bad request - invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: CreateProduct
+      summary: Create a new product
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreate"
+            examples:
+              newProduct:
+                summary: New product example
+                value:
+                  name: "Smart Fitness Watch"
+                  description: "Advanced fitness tracking with heart rate monitoring"
+                  price: 299.99
+                  category: "Electronics"
+                  brand: "FitTech"
+                  stockQuantity: 75
+                  images:
+                    - "https://example.com/images/watch1.jpg"
+                    - "https://example.com/images/watch2.jpg"
+                  specifications:
+                    batteryLife: "7 days"
+                    waterResistance: "5ATM"
+                    connectivity: "Bluetooth, GPS"
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Bad request - invalid product data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /products/{productId}:
+    get:
+      operationId: GetProduct
+      summary: Get a specific product by ID
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: The product ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+              examples:
+                detailedProduct:
+                  summary: Detailed product information
+                  value:
+                    id: "prod_001"
+                    name: "Wireless Bluetooth Headphones"
+                    description: "High-quality wireless headphones with active noise cancellation technology. Features include 20-hour battery life, premium sound quality, and comfortable over-ear design."
+                    price: 199.99
+                    category: "Electronics"
+                    brand: "TechAudio"
+                    rating: 4.5
+                    reviewCount: 1247
+                    stockQuantity: 150
+                    images:
+                      - "https://example.com/images/headphones1.jpg"
+                      - "https://example.com/images/headphones2.jpg"
+                      - "https://example.com/images/headphones3.jpg"
+                    specifications:
+                      batteryLife: "20 hours"
+                      connectivity: "Bluetooth 5.0"
+                      weight: "250g"
+                      dimensions: "18cm x 16cm x 8cm"
+                      noiseCancellation: true
+                      microphone: true
+                      warranty: "2 years"
+                    variants:
+                      - color: "Black"
+                        price: 199.99
+                        stockQuantity: 75
+                      - color: "White"
+                        price: 199.99
+                        stockQuantity: 50
+                      - color: "Blue"
+                        price: 219.99
+                        stockQuantity: 25
+                    reviews:
+                      - id: "rev_001"
+                        userId: "user_123"
+                        rating: 5
+                        comment: "Excellent sound quality and very comfortable!"
+                        createdAt: "2024-01-18T10:30:00Z"
+                      - id: "rev_002"
+                        userId: "user_456"
+                        rating: 4
+                        comment: "Great headphones, battery life is impressive."
+                        createdAt: "2024-01-17T14:20:00Z"
+                    createdAt: "2024-01-15T10:30:00Z"
+                    updatedAt: "2024-01-20T14:45:00Z"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users:
+    get:
+      operationId: GetUsers
+      summary: Get all users with pagination
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of users per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: role
+          in: query
+          description: Filter by user role
+          required: false
+          schema:
+            type: string
+            enum: [customer, admin, moderator]
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /orders:
+    get:
+      operationId: GetOrders
+      summary: Get user orders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of orders per page
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: status
+          in: query
+          description: Filter by order status
+          required: false
+          schema:
+            type: string
+            enum: [pending, confirmed, shipped, delivered, cancelled]
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      operationId: CreateOrder
+      summary: Create a new order
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCreate"
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Bad request - invalid order data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /payments:
+    post:
+      operationId: ProcessPayment
+      summary: Process a payment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentRequest"
+      responses:
+        "200":
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          description: Bad request - invalid payment data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "402":
+          description: Payment failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique product identifier
+        name:
+          type: string
+          description: Product name
+        description:
+          type: string
+          description: Product description
+        price:
+          type: number
+          format: double
+          description: Product price
+        category:
+          type: string
+          description: Product category
+        brand:
+          type: string
+          description: Product brand
+        rating:
+          type: number
+          format: double
+          description: Average product rating
+        reviewCount:
+          type: integer
+          description: Number of reviews
+        stockQuantity:
+          type: integer
+          description: Available stock quantity
+        images:
+          type: array
+          items:
+            type: string
+          description: Product image URLs
+        specifications:
+          type: object
+          additionalProperties: true
+          description: Product specifications
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductVariant"
+          description: Product variants
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+          description: Product reviews
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - price
+        - category
+
+    ProductCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+        brand:
+          type: string
+        stockQuantity:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+        specifications:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+        - price
+        - category
+
+    ProductList:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    ProductVariant:
+      type: object
+      properties:
+        color:
+          type: string
+        price:
+          type: number
+        stockQuantity:
+          type: integer
+      required:
+        - color
+        - price
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - rating
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [customer, admin, moderator]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - role
+
+    UserList:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        paymentMethod:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - items
+        - totalAmount
+        - status
+
+    OrderCreate:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemCreate"
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        paymentMethod:
+          type: string
+      required:
+        - items
+        - shippingAddress
+        - paymentMethod
+
+    OrderList:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        totalPrice:
+          type: number
+      required:
+        - productId
+        - quantity
+        - unitPrice
+
+    OrderItemCreate:
+      type: object
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+      required:
+        - productId
+        - quantity
+
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zipCode:
+          type: string
+        country:
+          type: string
+      required:
+        - street
+        - city
+        - state
+        - zipCode
+        - country
+
+    PaymentRequest:
+      type: object
+      properties:
+        orderId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+          default: "USD"
+        paymentMethod:
+          type: string
+          enum: [credit_card, paypal, apple_pay, google_pay]
+        cardDetails:
+          $ref: "#/components/schemas/CardDetails"
+      required:
+        - orderId
+        - amount
+        - paymentMethod
+
+    PaymentResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        status:
+          type: string
+          enum: [success, failed, pending]
+        amount:
+          type: number
+        currency:
+          type: string
+        processedAt:
+          type: string
+          format: date-time
+      required:
+        - transactionId
+        - status
+        - amount
+
+    CardDetails:
+      type: object
+      properties:
+        cardNumber:
+          type: string
+        expiryMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expiryYear:
+          type: integer
+        cvv:
+          type: string
+      required:
+        - cardNumber
+        - expiryMonth
+        - expiryYear
+        - cvv
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - code
+        - message
+        - timestamp

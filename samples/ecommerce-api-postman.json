@@ -1,0 +1,717 @@
+{
+  "info": {
+		"_postman_id": "c60c547f-69c3-45e7-b985-3f23439d4edf",
+    "name": "E-Commerce Platform API",
+    "description": "A comprehensive e-commerce platform API collection with product management, user management, orders, and payment processing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.example.com/v2",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refreshToken\": \"refresh_token_here\",\n  \"expiresIn\": 3600,\n  \"user\": {\n    \"id\": \"user_123\",\n    \"email\": \"user@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"customer\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('authToken', response.token);",
+                  "    pm.collectionVariables.set('authToken', response.token);",
+                  "    pm.collectionVariables.set('userId', response.user.id);",
+                  "    console.log('Authentication successful');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=20&category=Electronics&sortBy=price&sortOrder=asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number for pagination"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of products per page"
+                },
+                {
+                  "key": "category",
+                  "value": "Electronics",
+                  "description": "Filter by category"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "price",
+                  "description": "Sort field"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc",
+                  "description": "Sort order"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"products\": [\n    {\n      \"id\": \"prod_001\",\n      \"name\": \"Wireless Bluetooth Headphones\",\n      \"description\": \"High-quality wireless headphones with noise cancellation\",\n      \"price\": 199.99,\n      \"category\": \"Electronics\",\n      \"brand\": \"TechAudio\",\n      \"rating\": 4.5,\n      \"stockQuantity\": 150,\n      \"images\": [\n        \"https://example.com/images/headphones1.jpg\",\n        \"https://example.com/images/headphones2.jpg\"\n      ],\n      \"specifications\": {\n        \"batteryLife\": \"20 hours\",\n        \"connectivity\": \"Bluetooth 5.0\",\n        \"weight\": \"250g\"\n      },\n      \"createdAt\": \"2024-01-15T10:30:00Z\",\n      \"updatedAt\": \"2024-01-20T14:45:00Z\"\n    },\n    {\n      \"id\": \"prod_002\",\n      \"name\": \"Smart Fitness Watch\",\n      \"description\": \"Advanced fitness tracking with heart rate monitoring\",\n      \"price\": 299.99,\n      \"category\": \"Electronics\",\n      \"brand\": \"FitTech\",\n      \"rating\": 4.3,\n      \"stockQuantity\": 75,\n      \"images\": [\n        \"https://example.com/images/watch1.jpg\",\n        \"https://example.com/images/watch2.jpg\"\n      ],\n      \"specifications\": {\n        \"batteryLife\": \"7 days\",\n        \"waterResistance\": \"5ATM\",\n        \"connectivity\": \"Bluetooth, GPS\"\n      },\n      \"createdAt\": \"2024-01-12T08:15:00Z\",\n      \"updatedAt\": \"2024-01-19T11:30:00Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 1250,\n    \"totalPages\": 63,\n    \"hasNext\": true,\n    \"hasPrev\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has products array', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('products');",
+                  "    pm.expect(response.products).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Response has pagination', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('pagination');",
+                  "    pm.expect(response.pagination).to.have.property('page');",
+                  "    pm.expect(response.pagination).to.have.property('total');",
+                  "});",
+                  "",
+                  "if (pm.response.json().products.length > 0) {",
+                  "    pm.collectionVariables.set('productId', pm.response.json().products[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products/prod_001",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products",
+                    "prod_001"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"id\": \"prod_001\",\n  \"name\": \"Wireless Bluetooth Headphones\",\n  \"description\": \"High-quality wireless headphones with active noise cancellation technology. Features include 20-hour battery life, premium sound quality, and comfortable over-ear design.\",\n  \"price\": 199.99,\n  \"category\": \"Electronics\",\n  \"brand\": \"TechAudio\",\n  \"rating\": 4.5,\n  \"reviewCount\": 1247,\n  \"stockQuantity\": 150,\n  \"images\": [\n    \"https://example.com/images/headphones1.jpg\",\n    \"https://example.com/images/headphones2.jpg\",\n    \"https://example.com/images/headphones3.jpg\"\n  ],\n  \"specifications\": {\n    \"batteryLife\": \"20 hours\",\n    \"connectivity\": \"Bluetooth 5.0\",\n    \"weight\": \"250g\",\n    \"dimensions\": \"18cm x 16cm x 8cm\",\n    \"noiseCancellation\": true,\n    \"microphone\": true,\n    \"warranty\": \"2 years\"\n  },\n  \"variants\": [\n    {\n      \"color\": \"Black\",\n      \"price\": 199.99,\n      \"stockQuantity\": 75\n    },\n    {\n      \"color\": \"White\",\n      \"price\": 199.99,\n      \"stockQuantity\": 50\n    },\n    {\n      \"color\": \"Blue\",\n      \"price\": 219.99,\n      \"stockQuantity\": 25\n    }\n  ],\n  \"reviews\": [\n    {\n      \"id\": \"rev_001\",\n      \"userId\": \"user_123\",\n      \"rating\": 5,\n      \"comment\": \"Excellent sound quality and very comfortable!\",\n      \"createdAt\": \"2024-01-18T10:30:00Z\"\n    },\n    {\n      \"id\": \"rev_002\",\n      \"userId\": \"user_456\",\n      \"rating\": 4,\n      \"comment\": \"Great headphones, battery life is impressive.\",\n      \"createdAt\": \"2024-01-17T14:20:00Z\"\n    }\n  ],\n  \"createdAt\": \"2024-01-15T10:30:00Z\",\n  \"updatedAt\": \"2024-01-20T14:45:00Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Product has required fields', function () {",
+                  "    const product = pm.response.json();",
+                  "    pm.expect(product).to.have.property('id');",
+                  "    pm.expect(product).to.have.property('name');",
+                  "    pm.expect(product).to.have.property('price');",
+                  "    pm.expect(product).to.have.property('category');",
+                  "});",
+                  "",
+                  "pm.test('Product has reviews', function () {",
+                  "    const product = pm.response.json();",
+                  "    pm.expect(product).to.have.property('reviews');",
+                  "    pm.expect(product.reviews).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Smart Fitness Watch\",\n  \"description\": \"Advanced fitness tracking with heart rate monitoring\",\n  \"price\": 299.99,\n  \"category\": \"Electronics\",\n  \"brand\": \"FitTech\",\n  \"stockQuantity\": 75,\n  \"images\": [\n    \"https://example.com/images/watch1.jpg\",\n    \"https://example.com/images/watch2.jpg\"\n  ],\n  \"specifications\": {\n    \"batteryLife\": \"7 days\",\n    \"waterResistance\": \"5ATM\",\n    \"connectivity\": \"Bluetooth, GPS\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Smart Fitness Watch\",\n  \"description\": \"Advanced fitness tracking with heart rate monitoring\",\n  \"price\": 299.99,\n  \"category\": \"Electronics\",\n  \"brand\": \"FitTech\",\n  \"stockQuantity\": 75,\n  \"images\": [\n    \"https://example.com/images/watch1.jpg\",\n    \"https://example.com/images/watch2.jpg\"\n  ],\n  \"specifications\": {\n    \"batteryLife\": \"7 days\",\n    \"waterResistance\": \"5ATM\",\n    \"connectivity\": \"Bluetooth, GPS\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "products"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"id\": \"prod_003\",\n  \"name\": \"Smart Fitness Watch\",\n  \"description\": \"Advanced fitness tracking with heart rate monitoring\",\n  \"price\": 299.99,\n  \"category\": \"Electronics\",\n  \"brand\": \"FitTech\",\n  \"rating\": 0,\n  \"reviewCount\": 0,\n  \"stockQuantity\": 75,\n  \"images\": [\n    \"https://example.com/images/watch1.jpg\",\n    \"https://example.com/images/watch2.jpg\"\n  ],\n  \"specifications\": {\n    \"batteryLife\": \"7 days\",\n    \"waterResistance\": \"5ATM\",\n    \"connectivity\": \"Bluetooth, GPS\"\n  },\n  \"variants\": [],\n  \"reviews\": [],\n  \"createdAt\": \"2024-01-21T09:00:00Z\",\n  \"updatedAt\": \"2024-01-21T09:00:00Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Product created successfully', function () {",
+                  "    const product = pm.response.json();",
+                  "    pm.expect(product).to.have.property('id');",
+                  "    pm.expect(product.name).to.eql('Smart Fitness Watch');",
+                  "    pm.expect(product.price).to.eql(299.99);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=20&role=customer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "role",
+                  "value": "customer"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/users?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"users\": [\n    {\n      \"id\": \"user_123\",\n      \"email\": \"john.doe@example.com\",\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"role\": \"customer\",\n      \"isActive\": true,\n      \"createdAt\": \"2024-01-01T10:00:00Z\",\n      \"updatedAt\": \"2024-01-15T14:30:00Z\"\n    },\n    {\n      \"id\": \"user_456\",\n      \"email\": \"jane.smith@example.com\",\n      \"firstName\": \"Jane\",\n      \"lastName\": \"Smith\",\n      \"role\": \"customer\",\n      \"isActive\": true,\n      \"createdAt\": \"2024-01-02T11:15:00Z\",\n      \"updatedAt\": \"2024-01-16T09:45:00Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 1500,\n    \"totalPages\": 75,\n    \"hasNext\": true,\n    \"hasPrev\": false\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Get User Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders?page=1&limit=10&status=delivered",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "delivered"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/orders?page=1&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"orders\": [\n    {\n      \"id\": \"order_001\",\n      \"userId\": \"user_123\",\n      \"items\": [\n        {\n          \"productId\": \"prod_001\",\n          \"productName\": \"Wireless Bluetooth Headphones\",\n          \"quantity\": 1,\n          \"unitPrice\": 199.99,\n          \"totalPrice\": 199.99\n        }\n      ],\n      \"totalAmount\": 199.99,\n      \"status\": \"delivered\",\n      \"shippingAddress\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"New York\",\n        \"state\": \"NY\",\n        \"zipCode\": \"10001\",\n        \"country\": \"USA\"\n      },\n      \"paymentMethod\": \"credit_card\",\n      \"createdAt\": \"2024-01-10T15:30:00Z\",\n      \"updatedAt\": \"2024-01-12T10:15:00Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 25,\n    \"totalPages\": 3,\n    \"hasNext\": true,\n    \"hasPrev\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.json().orders.length > 0) {",
+                  "    pm.collectionVariables.set('orderId', pm.response.json().orders[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"prod_001\",\n      \"quantity\": 2\n    },\n    {\n      \"productId\": \"prod_002\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"street\": \"456 Oak Ave\",\n    \"city\": \"Los Angeles\",\n    \"state\": \"CA\",\n    \"zipCode\": \"90210\",\n    \"country\": \"USA\"\n  },\n  \"paymentMethod\": \"credit_card\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"prod_001\",\n      \"quantity\": 2\n    }\n  ],\n  \"shippingAddress\": {\n    \"street\": \"456 Oak Ave\",\n    \"city\": \"Los Angeles\",\n    \"state\": \"CA\",\n    \"zipCode\": \"90210\",\n    \"country\": \"USA\"\n  },\n  \"paymentMethod\": \"credit_card\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/orders",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"id\": \"order_002\",\n  \"userId\": \"user_123\",\n  \"items\": [\n    {\n      \"productId\": \"prod_001\",\n      \"productName\": \"Wireless Bluetooth Headphones\",\n      \"quantity\": 2,\n      \"unitPrice\": 199.99,\n      \"totalPrice\": 399.98\n    },\n    {\n      \"productId\": \"prod_002\",\n      \"productName\": \"Smart Fitness Watch\",\n      \"quantity\": 1,\n      \"unitPrice\": 299.99,\n      \"totalPrice\": 299.99\n    }\n  ],\n  \"totalAmount\": 699.97,\n  \"status\": \"pending\",\n  \"shippingAddress\": {\n    \"street\": \"456 Oak Ave\",\n    \"city\": \"Los Angeles\",\n    \"state\": \"CA\",\n    \"zipCode\": \"90210\",\n    \"country\": \"USA\"\n  },\n  \"paymentMethod\": \"credit_card\",\n  \"createdAt\": \"2024-01-21T14:30:00Z\",\n  \"updatedAt\": \"2024-01-21T14:30:00Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": 199.99,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"credit_card\",\n  \"cardDetails\": {\n    \"cardNumber\": \"4111111111111111\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2025,\n    \"cvv\": \"123\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": \"order_001\",\n  \"amount\": 199.99,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"credit_card\",\n  \"cardDetails\": {\n    \"cardNumber\": \"4111111111111111\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2025,\n    \"cvv\": \"123\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/payments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "payments"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"transactionId\": \"txn_123456789\",\n  \"status\": \"success\",\n  \"amount\": 199.99,\n  \"currency\": \"USD\",\n  \"processedAt\": \"2024-01-21T15:45:30Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payment processed successfully', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.status).to.eql('success');",
+                  "    pm.expect(response).to.have.property('transactionId');",
+                  "    pm.expect(response).to.have.property('amount');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
