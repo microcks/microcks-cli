@@ -13,10 +13,9 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Latest release is `0.5.8`.
+Latest release is `1.0.0`.
 
-Current development version is `0.5.9`.
-It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
+Current development version is `1.0.1`. It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
 
 #### Fossa license and security scans
 
@@ -44,11 +43,13 @@ To get involved with our community, please make sure you are familiar with the p
 ## Usage instructions
 
 ### Usage
+
 ```bash
 microcks [command] [flags]
 ```
 
 ### Available Commands
+
 | Command      | Description                                              | Documentation                                   |
 | ------------ | -------------------------------------------------------- | ----------------------------------------------- |
 | `login`      | Log in to a Microcks instance using Keycloak credentials | [`login`](documentation/cmd/login.md)           |
@@ -80,16 +81,19 @@ microcks [command] [flags]
 
 ### Building from Source
 To build the CLI locally:
+
 ```bash
 make build-local
 ```
 
 The resulting binary will be available at:
+
 ```bash
 /build/dist/microcks
 ```
 
 You can move it to a location in your $PATH for global usage, for example:
+
 ```bash
 sudo mv build/dist/microcks /usr/local/bin/microcks
 ```
@@ -106,7 +110,7 @@ The `microcks-cli` is available as a container image. So that you'd be able to e
 Below a sample on how using the image without getting the CLI binary:
 
 ```
-$ docker run -it quay.io/microcks/microcks-cli:latest microcks-cli test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
+$ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
 ```
 
 
