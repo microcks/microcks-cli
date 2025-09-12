@@ -23,10 +23,10 @@ spec:
       args:
         - '-c'
         - >-
-          microcks-cli import '$(params.specificationFilesList)' \
+          microcks import '$(params.specificationFilesList)' \
             --microcksURL=$(params.microcksURL) \
             --keycloakClientId=$KEYCLOAK_CLIENT_ID --keycloakClientSecret=$KEYCLOAK_CLIENT_SECRET \
-            --insecure'
+            --insecure-tls
       env:
         - name: KEYCLOAK_CLIENT_ID
           valueFrom:

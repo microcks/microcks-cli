@@ -17,11 +17,14 @@ package connectors
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
 	"encoding/json"
-	"errors"
+	errs "errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -30,7 +33,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/microcks/microcks-cli/pkg/config"
+	"github.com/microcks/microcks-cli/pkg/errors"
+	"golang.org/x/oauth2"
 )
 
 var (
@@ -39,11 +46,13 @@ var (
 
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
+	HttpClient() *http.Client
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
+	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -77,37 +86,90 @@ type OAuth2ClientContext struct {
 	Scopes       string `json:"scopes"`
 }
 
+type ClientOptions struct {
+	ServerAddr   string
+	Context      string
+	ConfigPath   string
+	AuthToken    string
+	InsecureTLS  bool
+	Verbose      bool
+	CaCertPaths  string
+	ClientId     string
+	ClientSecret string
+}
+
 type microcksClient struct {
-	APIURL     *url.URL
-	OAuthToken string
+	ServerAddr   string
+	APIURL       *url.URL
+	AuthToken    string
+	CertFile     *tls.Certificate
+	InsecureTLS  bool
+	RefreshToken string
+	Insecure     bool
+	Verbose      bool
 
 	httpClient *http.Client
 }
 
-// NewMicrocksClient build a new MicrocksClient implementation
-func NewMicrocksClient(apiURL string) MicrocksClient {
-	mc := microcksClient{}
-
-	if !strings.HasSuffix(apiURL, "/") {
-		apiURL += "/"
-	}
-
-	u, err := url.Parse(apiURL)
+func NewClient(opts ClientOptions) (MicrocksClient, error) {
+	var c microcksClient
+	localCfg, err := config.ReadLocalConfig(opts.ConfigPath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	mc.APIURL = u
+	var ctxName string
+
+	if localCfg != nil {
+		configCtx, err := localCfg.ResolveContext(opts.Context)
+		if err != nil {
+			return nil, err
+		}
+		c.ServerAddr = configCtx.Server.Server
+		c.Insecure = configCtx.Server.KeycloackEnable
+		c.InsecureTLS = configCtx.Server.InsecureTLS
+		c.AuthToken = configCtx.User.AuthToken
+		c.RefreshToken = configCtx.User.RefreshToken
+
+		apiurl := configCtx.Server.Server
+
+		if !strings.HasSuffix(apiurl, "/api/") {
+			apiurl += "/api/"
+		}
+
+		u, err := url.Parse(apiurl)
+		if err != nil {
+			panic(err)
+		}
+		c.APIURL = u
+
+		ctxName = configCtx.Name
+	}
+
+	if opts.Verbose {
+		c.Verbose = opts.Verbose
+	}
 
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
-		mc.httpClient = &http.Client{Transport: tr}
+		c.httpClient = &http.Client{Transport: tr}
 	} else {
-		mc.httpClient = http.DefaultClient
+		c.httpClient = http.DefaultClient
 	}
-	return &mc
+
+	if localCfg != nil {
+		err = c.refreshAuthToken(localCfg, ctxName, opts.ConfigPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &c, nil
+}
+
+func (c *microcksClient) HttpClient() *http.Client {
+	return c.httpClient
 }
 
 func (c *microcksClient) GetKeycloakURL() (string, error) {
@@ -156,8 +218,100 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 	return "null", nil
 }
 
+func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName, configPath string) error {
+	if c.RefreshToken == "" {
+		// If we have no refresh token, there's no point in doing anything
+		return nil
+	}
+	configCtx, err := localCfg.ResolveContext(ctxName)
+	if err != nil {
+		return err
+	}
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	var claims jwt.RegisteredClaims
+	_, _, err = parser.ParseUnverified(configCtx.User.AuthToken, &claims)
+	if err != nil {
+		return err
+	}
+	if claims.Valid() == nil {
+		// token is still valid
+		return nil
+	}
+
+	log.Printf("Auth token no longer valid. Refreshing")
+	auth, err := localCfg.GetAuth(configCtx.Server.Server)
+	if err != nil {
+		return err
+	}
+	authToken, refreshToken, err := c.redeemRefreshToken(*auth)
+	if err != nil {
+		return err
+	}
+	c.AuthToken = authToken
+	c.RefreshToken = refreshToken
+	localCfg.UpsertUser(config.User{
+		Name:         ctxName,
+		AuthToken:    authToken,
+		RefreshToken: refreshToken,
+	})
+	err = config.WriteLocalConfig(*localCfg, configPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
+	keyCloakUrl, err := c.GetKeycloakURL()
+	errors.CheckError(err)
+	kc := NewKeycloakClient(keyCloakUrl, "", "")
+	oauth2Conf, err := kc.GetOIDCConfig()
+	errors.CheckError(err)
+	oauth2Conf.ClientID = auth.ClientId
+	oauth2Conf.ClientSecret = auth.ClientSecret
+
+	httpClient := c.httpClient
+	ctx := oidc.ClientContext(context.Background(), httpClient)
+
+	t := &oauth2.Token{
+		RefreshToken: c.RefreshToken,
+	}
+	token, err := oauth2Conf.TokenSource(ctx, t).Token()
+	if err != nil {
+		return "", "", err
+	}
+
+	return token.AccessToken, token.RefreshToken, nil
+}
+
+// NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
+func NewMicrocksClient(apiURL string) MicrocksClient {
+	mc := microcksClient{}
+
+	if !strings.HasSuffix(apiURL, "/api/") {
+		apiURL += "/api/"
+	}
+
+	u, err := url.Parse(apiURL)
+	if err != nil {
+		panic(err)
+	}
+	mc.APIURL = u
+
+	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+		tlsConfig := config.CreateTLSConfig()
+		tr := &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		mc.httpClient = &http.Client{Transport: tr}
+	} else {
+		mc.httpClient = http.DefaultClient
+	}
+	return &mc
+}
+
 func (c *microcksClient) SetOAuthToken(oauthToken string) {
-	c.OAuthToken = oauthToken
+	c.AuthToken = oauthToken
 }
 
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
@@ -193,7 +347,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
 	// Dump request if verbose required.
 	config.DumpRequestIfRequired("Microcks for creating test", req, true)
@@ -232,7 +386,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
 	// Dump request if verbose required.
 	config.DumpRequestIfRequired("Microcks for getting status", req, false)
@@ -294,7 +448,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 		return "", err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+c.OAuthToken)
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
 	// Dump request if verbose required.
 	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
@@ -308,14 +462,68 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
 
 	// Raise exception if not created.
 	if resp.StatusCode != 201 {
-		return "", errors.New(string(respBody))
+		return "", errs.New(string(respBody))
+	}
+
+	return string(respBody), err
+}
+
+func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error) {
+
+	// create Multipart Form to add fields
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add all the form fields
+	writer.WriteField("url", artifactURL)
+	writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact))
+	if secret != "" {
+		writer.WriteField("secret", secret)
+	}
+
+	err := writer.Close()
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure we have a correct URL.
+	rel := &url.URL{Path: "artifact/download"}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("POST", u.String(), body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
+
+	respBody, err := io.ReadAll(req.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Raise exception if not created.
+	if resp.StatusCode != 201 {
+		return "", errs.New(string(respBody))
 	}
 
 	return string(respBody), err

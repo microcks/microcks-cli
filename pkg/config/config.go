@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"os"
+	"path/filepath"
 	strings "strings"
 )
 
@@ -32,6 +34,8 @@ var (
 	CaCertPaths string
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
+
+	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
 )
 
 // CreateTLSConfig wraps the creation of tls.Config object for use with HTTP Client for example.

@@ -43,128 +43,57 @@ To get involved with our community, please make sure you are familiar with the p
 
 ## Usage instructions
 
-Usage is simply `microcks-cli [command]`
-
-where `[command]` can be one of the following:
-
-* `version` to check this CLI version,
-* `help` to display usage informations,
-* `test` to launch new test on Microcks server.
-* `import` to import API artifacts on Microcks server.
-
-### Test command
-
-The `test` command has a bunch of arguments and flags so that you can use it that way:
-
-```
-microcks-cli test <apiName:apiVersion> <testEndpoint> <runner>
-        --microcksURL=<> --waitFor=5sec
-        --keycloakClientId=<> --keycloakClientSecret=<>
+### Usage
+```bash
+microcks [command] [flags]
 ```
 
-The arguments:
+### Available Commands
+| Command      | Description                                              | Documentation                                   |
+| ------------ | -------------------------------------------------------- | ----------------------------------------------- |
+| `login`      | Log in to a Microcks instance using Keycloak credentials | [`login`](documentation/cmd/login.md)           |
+| `logout`     | Log out and remove authentication from a given context   | [`logout`](documentation/cmd/logout.md)         |
+| `context`    | Manage CLI contexts (list, use, delete)                  | [`context`](documentation/cmd/context.md)       |
+| `start`      | Start a local Microcks instance via Docker/Podman        | [`start`](documentation/cmd/start.md)           |
+| `stop`       | Stop a local Microcks instance                           | [`stop`](documentation/cmd/stop.md)             |
+| `import`     | Import API spec files from local filesystem              | [`import`](documentation/cmd/import.md)         |
+| `import-url` | Import API spec files directly from a remote URL         | [`import-url`](documentation/cmd/import-url.md) |
+| `test`       | Run tests against a deployed API using selected runner   | [`test`](documentation/cmd/test.md)             |
+| `version`    | Print Microcks CLI version                               | [`version`](documentation/cmd/version.md)       |
 
-* `<apiName:apiVersion>` : Service to test reference. Example: `'Beer Catalog API:0.9'`
-* `<testEndpoint>` : URL where is deployed implementation to test
-* `<runner>` : Test strategy (one of: `HTTP`, `SOAP`, `SOAP_UI`, `POSTMAN`, `OPEN_API_SCHEMA`, `ASYNC_API_SCHEMA`, `GRPC_PROTOBUF`, `GRAPHQL_SCHEMA`)
+### Options
 
-The flags:
-
-* `--microcksURL` for the Microcks API endpoint,
-* `--waitFor` for the time to wait for test to finish (int + one of: milli, sec, min),
-* `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
-* `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
-
-> Since `0.5.2` release, `microcks-cli` also works in unauthenticated mode, without Keycloak being deployed and configured with your Microcks instance. However, you still have to specify the Keycloak flags on the command even if you put random values there. For eg. `--keycloakClientId=foo --keycloakClientSecret=bar`.
-
-Real life example command and execution:
-
-```sh
-$ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ POSTMAN \
-        --microcksURL=http://localhost:8080/api/ \
-        --keycloakClientId=microcks-serviceaccount \
-        --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 \
-        --waitFor=3sec
-[...]
-MicrocksClient got status for test "5c1781cf6310d94f8169384e" - success: false, inProgress: true
-MicrocksTester waiting for 2 seconds before checking again.
-MicrocksClient got status for test "5c1781cf6310d94f8169384e" - success: true, inProgress: false
-Full TestResult details are available here: http://localhost:8080/#/tests/5c1781cf6310d94f8169384e 
-```
-
-#### Advanced options
-
-The `test` command provides additional flags for advanced usages and options:
-
-* `--verbose` allows to dump on standard output all the HTTP requests and responses,
-* `--insecure` allows to interact with Microcks and Keycloak instances through HTTPS without checking certificates issuer CA,
-* `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
-* `--secretName='<Secret Name>'` is an optional flag specifying the name of a Secret to use for connecting endpoint,
-* `--filteredOperations=<JSON>` allows to filter a list of operations to launch a test for,
-* `--operationsHeaders=<JSON>` allows to override some operations headers for the tests to launch,
-* `--oAuth2Context=<JSON>` allows specification of an OAuth2 grant flow to execute before launching the test (starts with Microcks version `1.8.0`).
-
-Overriden test operations headers is a JSON strings where 1st level keys are operation name (eg. `GET /beer`) or `globals` for header applying to all the operations of the API. Headers are specified as an array of objects defining `key` and `values` properties.
-
-Here's below an example of using some of this flags:
-
-```sh
-$ ./microcks-cli test 'Beer Catalog API:0.9' http://localhost:9090/api/ OPEN_API_SCHEMA \                           
-        --microcksURL=http://localhost:8080/api/ \
-        --keycloakClientId=microcks-serviceaccount \
-        --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 \
-        --insecure --verbose  --waitFor=3sec \
-        --filteredOperations='["GET /beer", "GET /beer/{name}"]' \
-        --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}' \
-        --oAuth2Context='{"clientId": "microcks-test", "clientSecret": "ab54d329-e435-41ae-a900-ec6b3fe15c54", "tokenUri": "https://idp.acme.org/realms/my-app/protocol/openid-connect/token", "grantType": "CLIENT_CREDENTIALS"}'
-
-MicrocksClient got status for test "64c25f7ddec62569f9a0ed95" - success: true, inProgress: false 
-Full TestResult details are available here: http://localhost:8080/#/tests/64c25f7ddec62569f9a0ed95 
-```
-
-### Import command
-
-The `import` command has one argument and common flags with `test` command. You can use it that way:
-
-```
-microcks-cli import <specificationFile1[:primary],specificationFile2[:primary]>
-	--microcksURL=<>
-	--keycloakClientId=<> --keycloakClientSecret=<>
-```
-
-The arguments:
-
-* `<specificationFile1[:primary],specificationFile2[:primary]>` : Comma separated list of API specs to import with flag telling if it's a primary artifact. Example: `'specs/my-openapi.yaml:true,specs/my-postmancollection.json:false'`
-
-The flags:
-
-* `--microcksURL` for the Microcks API endpoint,
-* `--keycloakClientId` for the Keycloak Realm Service Account ClientId,
-* `--keycloakClientSecret` for the Keycloak Realm Service Account ClientSecret.
-
-> Since `0.5.2` release, `microcks-cli` also works in unauthenticated mode, without Keycloak being deployed and configured with your Microcks instance. However, you still have to specify the Keycloak flags on the command even if you put random values there. For eg. `--keycloakClientId=foo --keycloakClientSecret=bar`.
-
-Real life example command and execution:
-
-```sh
-$ ./microcks-cli import 'samples/weather-forecast-openapi.yml:true,samples/weather-forecast-postman.json:false' \
-        --microcksURL=http://localhost:8080/api/ \
-        --keycloakClientId=microcks-serviceaccount \
-        --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1
-Microcks has discovered 'WeatherForecast API:1.1.0'
-Microcks has discovered 'WeatherForecast API:1.1.0'
-```
-
-#### Advanced options
-
-The `import` command provides additional flags for advanced usages and options:
-
-* `--verbose` allows to dump on standard output all the HTTP requests and responses,
-* `--insecure` allows to interact with Microcks and Keycloak instances through HTTPS without checking certificates issuer CA,
-* `--caCerts=<path1,path2>` allows to specify additional certificates CRT files to add to trusted roots ones,
+| Flag                     | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `-h, --help`             | help for microck command                    |
+| `--config`               | Path to Microcks config file                |
+| `--microcks-context`     | Name of the Microcks context to use         |
+| `--verbose`              | Produce dumps of HTTP exchanges             |
+| `--insecure-tls`         | Allow insecure HTTPS connections            |
+| `--caCerts`              | Comma-separated paths of CA cert files      |
+| `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
+| `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
+| `--microcksURL`          | Microcks API URL                            |
 
 
 ## Installation
+
+### Building from Source
+To build the CLI locally:
+```bash
+make build-local
+```
+
+The resulting binary will be available at:
+```bash
+/build/dist/microcks
+```
+
+You can move it to a location in your $PATH for global usage, for example:
+```bash
+sudo mv build/dist/microcks /usr/local/bin/microcks
+```
+
 
 ### Binary
 

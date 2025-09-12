@@ -43,7 +43,7 @@ spec:
       args:
         - '-c'
         - >-
-          microcks-cli test '$(inputs.params.apiNameAndVersion)' $(inputs.params.testEndpoint) $(inputs.params.runner) \
+          microcks test '$(inputs.params.apiNameAndVersion)' $(inputs.params.testEndpoint) $(inputs.params.runner) \
             --microcksURL=$(inputs.params.microcksURL) --waitFor=$(inputs.params.waitFor) \
             --keycloakClientId=$(inputs.params.keycloakClientId) --keycloakClientSecret=$(inputs.params.keycloakClientSecret) \
-            --insecure --operationsHeaders='$(inputs.params.operationsHeaders)'
+            --insecure-tls --operationsHeaders='$(inputs.params.operationsHeaders)'

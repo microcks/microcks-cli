@@ -15,7 +15,50 @@
  */
 package cmd
 
-// Command define single method interface
-type Command interface {
-	Execute()
+import (
+	"github.com/microcks/microcks-cli/pkg/config"
+	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/spf13/cobra"
+)
+
+func NewCommad() *cobra.Command {
+
+	var clientOpts connectors.ClientOptions
+
+	command := &cobra.Command{
+		Use:          "microcks",
+		Short:        "A CLI tool for Microcks",
+		SilenceUsage: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.HelpFunc()(cmd, args)
+		},
+		CompletionOptions: cobra.CompletionOptions{
+			HiddenDefaultCmd: true,
+		},
+	}
+
+	command.AddCommand(NewImportCommand(&clientOpts))
+	command.AddCommand(NewVersionCommand())
+	command.AddCommand(NewTestCommand(&clientOpts))
+	command.AddCommand(NewImportURLCommand(&clientOpts))
+	command.AddCommand(NewStartCommand(&clientOpts))
+	command.AddCommand(NewStopCommand(&clientOpts))
+	command.AddCommand(NewContextCommand(&clientOpts))
+	command.AddCommand(NewLoginCommand(&clientOpts))
+	command.AddCommand(NewLogoutCommand(&clientOpts))
+
+	defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
+	errors.CheckError(err)
+	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config")
+	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use")
+	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
+	command.PersistentFlags().BoolVar(&clientOpts.InsecureTLS, "insecure-tls", false, "Whether to accept insecure HTTPS connection")
+	command.PersistentFlags().StringVar(&clientOpts.CaCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
+	command.PersistentFlags().StringVar(&clientOpts.ClientId, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
+	command.PersistentFlags().StringVar(&clientOpts.ClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
+	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL")
+	command.MarkFlagsRequiredTogether("keycloakClientId", "microcksURL", "keycloakClientSecret")
+
+	return command
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package cmd
 
 import (
@@ -23,22 +24,18 @@ import (
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
-	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
-	var watch bool
-
-	var importCmd = &cobra.Command{
-		Use:   "import",
-		Short: "import API artifacts on Microcks server",
-		Long:  `import API artifacts on Microcks server`,
+func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var importURLCmd = &cobra.Command{
+		Use:   "import-url",
+		Short: "import API artifacts from URL on Microcks server",
+		Long:  `import API artifacts from URL on Microcks server`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
 			if len(args) == 0 {
-				fmt.Println("import command require <specificationFile1[:primary],specificationFile2[:primary]> args")
-				cmd.HelpFunc()(cmd, args)
+				fmt.Println("import-url command require <specificationFile1URL[:primary],specificationFile2URL[:primary]> args")
 				os.Exit(1)
 			}
 
@@ -101,48 +98,35 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
 				mainArtifact := true
-				var err error
-				// Check if mainArtifact flag is provided.
-				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", pathAndMainArtifact[1])
+				secret := ""
+
+				// Check if URL starts with https or http
+				if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
+					urlAndMainAtrifactAndSecretName := strings.Split(f, ":")
+					n := len(urlAndMainAtrifactAndSecretName)
+					f = urlAndMainAtrifactAndSecretName[0] + ":" + urlAndMainAtrifactAndSecretName[1]
+					if n > 2 {
+						val, err := strconv.ParseBool(urlAndMainAtrifactAndSecretName[2])
+						if err != nil {
+							fmt.Println(err)
+						}
+						mainArtifact = val
+					}
+					if n > 3 {
+						secret = urlAndMainAtrifactAndSecretName[3]
 					}
 				}
 
-				// Try uploading this artifact.
-				msg, err := mc.UploadArtifact(f, mainArtifact)
+				// Try downloading the artifcat
+				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
 				}
 				fmt.Printf("Microcks has discovered '%s'\n", msg)
-
-				if watch {
-					watchFile, err := config.DefaultLocalWatchPath()
-					errors.CheckError(err)
-					watchCfg, err := config.ReadLocalWatchConfig(watchFile)
-					errors.CheckError(err)
-					if watchCfg == nil {
-						watchCfg = &config.WatchConfig{}
-					}
-
-					watchCfg.UpsertEntry(config.WatchEntry{
-						FilePath:     f,
-						Context:      []string{globalClientOpts.Context},
-						MainArtifact: mainArtifact,
-					})
-					//write watch file
-					err = config.WriteLocalWatchConfig(*watchCfg, watchFile)
-					errors.CheckError(err)
-				}
 			}
-
 		},
 	}
 
-	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change	")
-	return importCmd
+	return importURLCmd
 }
