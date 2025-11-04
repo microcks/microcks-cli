@@ -20,13 +20,13 @@ func NewContextCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comman
 		Aliases: []string{"ctx"},
 		Short:   "switch between contexts",
 		Example: `# List Microcks context
-microcks context/ctx
+microcks context
 
-#Switch Microcks context
-microcks context httP://localhost:8080 
+# Switch Microcks context
+microcks context http://localhost:8080 
 
 # Delete Microcks context
-microcks context httP://localhost:8080 --delete`,
+microcks context http://localhost:8080 --delete`,
 		Run: func(cmd *cobra.Command, args []string) {
 			configPath := globalClientOpts.ConfigPath
 			localCfg, err := config.ReadLocalConfig(configPath)
