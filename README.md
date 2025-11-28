@@ -13,9 +13,9 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Latest release is `1.0.1`.
+Latest release is `1.0.2`.
 
-Current development version is `1.0.2`. It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
+Current development version is `1.0.3`. It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
 
 #### Fossa license and security scans
 
@@ -42,7 +42,7 @@ To get involved with our community, please make sure you are familiar with the p
 
 ## Installation
 
-Visit the [Release page](https://github.com/microcks/microcks-cli/releases/tag/1.0.1), browse the **Assets** and download the one matching your platform
+Visit the [Release page](https://github.com/microcks/microcks-cli/releases/tag/1.0.2), browse the **Assets** and download the one matching your platform
 
 OR you can use the [Homebrew](https://brew.sh/) package manager on Linux and MacOS that way:
 
