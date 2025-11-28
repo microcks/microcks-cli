@@ -140,7 +140,7 @@ microcks start --name [name of you container/instance]`,
 			err = config.WriteLocalConfig(*localConfig, configFile)
 			errors.CheckError(err)
 
-			fmt.Printf("Microcks started successfully...")
+			fmt.Printf("Microcks started successfully at %s\n", server)
 		},
 	}
 	startCmd.Flags().StringVar(&name, "name", "microcks", "name for you microcks instance")

@@ -45,6 +45,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				log.Fatalf("Failed to stop a container: %v", err)
 				return
 			}
+			fmt.Println("")
 			log.Printf("Instance %s stopped successfully", instance.Name)
 
 			// update configs
@@ -65,7 +66,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			} else {
 				instance.Status = "Exited"
 				localConfig.UpsertInstance(instance)
-				log.Printf("Instance %s status update to Exited", instance.Name)
+				log.Printf("Instance %s status updated to Exited", instance.Name)
 			}
 			err = config.WriteLocalConfig(*localConfig, configFile)
 			errors.CheckError(err)
