@@ -130,13 +130,16 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		c.AuthToken = configCtx.User.AuthToken
 		c.RefreshToken = configCtx.User.RefreshToken
 
-		apiurl := configCtx.Server.Server
+		apiURL := configCtx.Server.Server
 
-		if !strings.HasSuffix(apiurl, "/api/") {
-			apiurl += "/api/"
+		if strings.HasSuffix(apiURL, "/api") {
+			apiURL += "/"
+		}
+		if !strings.HasSuffix(apiURL, "/api/") {
+			apiURL += "/api/"
 		}
 
-		u, err := url.Parse(apiurl)
+		u, err := url.Parse(apiURL)
 		if err != nil {
 			panic(err)
 		}
@@ -172,6 +175,9 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 func NewMicrocksClient(apiURL string) MicrocksClient {
 	mc := microcksClient{}
 
+	if strings.HasSuffix(apiURL, "/api") {
+		apiURL += "/"
+	}
 	if !strings.HasSuffix(apiURL, "/api/") {
 		apiURL += "/api/"
 	}
@@ -193,7 +199,6 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 	}
 	return &mc
 }
-
 func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
 }
