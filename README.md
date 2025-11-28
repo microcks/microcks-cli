@@ -13,9 +13,9 @@ It allows to launch tests or import API artifacts with minimal dependencies.
 
 ## Build Status
 
-Latest release is `1.0.0`.
+Latest release is `1.0.1`.
 
-Current development version is `1.0.1`. It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
+Current development version is `1.0.2`. It is available as a container image named `quay.io/microcks/microcks-cli:nightly`.
 
 #### Fossa license and security scans
 
@@ -40,6 +40,17 @@ Current development version is `1.0.1`. It is available as a container image nam
 
 To get involved with our community, please make sure you are familiar with the project's [Code of Conduct](./CODE_OF_CONDUCT.md).
 
+## Installation
+
+Visit the [Release page](https://github.com/microcks/microcks-cli/releases/tag/1.0.1), browse the **Assets** and download the one matching your platform
+
+OR you can use the [Homebrew](https://brew.sh/) package manager on Linux and MacOS that way:
+
+```sh
+brew tap microcks/tap 
+brew install microcks/tap/microcks
+```
+
 ## Usage instructions
 
 ### Usage
@@ -58,6 +69,7 @@ microcks [command] [flags]
 | `start`      | Start a local Microcks instance via Docker/Podman        | [`start`](documentation/cmd/start.md)           |
 | `stop`       | Stop a local Microcks instance                           | [`stop`](documentation/cmd/stop.md)             |
 | `import`     | Import API spec files from local filesystem              | [`import`](documentation/cmd/import.md)         |
+| `impor-dir`  | Scan a directory and import API spec files.              | [`import-dir`](documentation/cmd/import.md)     |
 | `import-url` | Import API spec files directly from a remote URL         | [`import-url`](documentation/cmd/import-url.md) |
 | `test`       | Run tests against a deployed API using selected runner   | [`test`](documentation/cmd/test.md)             |
 | `version`    | Print Microcks CLI version                               | [`version`](documentation/cmd/version.md)       |
