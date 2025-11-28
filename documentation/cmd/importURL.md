@@ -15,8 +15,8 @@ microcks import-url https://example.com/openapi.yaml
 microcks import-url https://example.com/spec1.yaml:true,https://example.com/spec2.yaml:false
 
 # Import specification to microcks without logining to microcks
-microck import-url https://example.com/openapi.yaml \
-    --micrcoksURL <microcks-url> \ 
+microcks import-url https://example.com/openapi.yaml \
+    --microcksURL <microcks-url> \ 
     --keycloakClientId <client-id> \
     --keycloakClientSecret <client-secret> 
 ```

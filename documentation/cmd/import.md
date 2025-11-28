@@ -17,11 +17,14 @@ microcks import ./api.yaml:false,./schema.json:true
 # Import and watch file for changes
 microcks import ./api.yaml --watch
 
-# Import specification to microcks without logining to microcks
-microck import ./api.yaml \
-    --micrcoksURL <microcks-url> \ 
+# Import specification to microcks without first running `microcks login`
+microcks import ./api.yaml \
+    --microcksURL <microcks-url> \ 
     --keycloakClientId <client-id> \
     --keycloakClientSecret <client-secret> 
+
+# Import specification to microcks running without authentication (ie. local uber instance typically)
+microcks import ./api.yaml --micrcoksURL <microcks-url>
 ```
 
 ### Options
