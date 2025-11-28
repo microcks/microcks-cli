@@ -5,7 +5,7 @@ import (
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/errors"
-	"github.com/microcks/microcks-cli/pkg/importer/watcher"
+	"github.com/microcks/microcks-cli/pkg/watcher"
 )
 
 func main() {

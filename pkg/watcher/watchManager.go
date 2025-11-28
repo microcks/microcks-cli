@@ -55,6 +55,7 @@ func (wm *WatchManager) Reload() error {
 
 	// Remove stale watchers
 	for file := range wm.watchEntries {
+
 		if _, exists := newFiles[file]; !exists {
 			wm.fileWatcher.Remove(file)
 		}
@@ -68,6 +69,7 @@ func (wm *WatchManager) Reload() error {
 				log.Printf("[WARN] Cannot watch file %s: %v", file, err)
 				continue
 			}
+			log.Printf("[INFO] Watcher added on %s", file)
 		}
 	}
 

@@ -24,6 +24,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/watcher"
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +35,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 		Use:   "import",
 		Short: "import API artifacts on Microcks server",
 		Long:  `import API artifacts on Microcks server`,
+		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
 			if len(args) == 0 {
@@ -44,14 +46,23 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 			specificationFiles := args[0]
 
+			// Initialize config from command options.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
 			config.Verbose = globalClientOpts.Verbose
 
+			// Read local config file in case we need some context info.
+			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			// Prepare Microcks client.
 			var mc connectors.MicrocksClient
 
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
-				// create client with server address
+				// Create client with server address.
 				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
 
 				keycloakURL, err := mc.GetKeycloakURL()
@@ -60,7 +71,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					os.Exit(1)
 				}
 
-				var oauthToken string = "unauthentifed-token"
+				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
@@ -73,18 +84,23 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
-				//Set Auth token
+				// Set Auth token.
 				mc.SetOAuthToken(oauthToken)
-			} else {
 
-				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-				if err != nil {
-					fmt.Println(err)
-					return
+				// If no context provided use current one from config file or client server address.
+				// So that watch config can be updated properly, referencing the right context.
+				if globalClientOpts.Context == "" {
+					if (localConfig != nil) && (localConfig.CurrentContext != "") {
+						globalClientOpts.Context = localConfig.CurrentContext
+					} else {
+						globalClientOpts.Context = globalClientOpts.ServerAddr
+					}
 				}
 
+			} else {
+				// Create client from config file and using the current or provided context.
 				if localConfig == nil {
-					fmt.Println("Please login to perform opertion...")
+					fmt.Println("Please login to perform operation...")
 					return
 				}
 
@@ -98,10 +114,13 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					return
 				}
 			}
+
+			// Handle multiple specification files separated by comma.
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
 				mainArtifact := true
 				var err error
+
 				// Check if mainArtifact flag is provided.
 				if strings.Contains(f, ":") {
 					pathAndMainArtifact := strings.Split(f, ":")
@@ -118,31 +137,55 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
 				}
-				fmt.Printf("Microcks has discovered '%s'\n", msg)
+				action := "discovered"
+				if !mainArtifact {
+					action = "completed"
+				}
+				fmt.Printf("Microcks has %s '%s'\n", action, msg)
 
+				// If watch flag is provided, update watch config.
 				if watch {
 					watchFile, err := config.DefaultLocalWatchPath()
 					errors.CheckError(err)
+
 					watchCfg, err := config.ReadLocalWatchConfig(watchFile)
 					errors.CheckError(err)
 					if watchCfg == nil {
 						watchCfg = &config.WatchConfig{}
 					}
 
+					// Normalize file path to match the watcher fsnotify events format.
+					if strings.HasPrefix(f, "./") {
+						f = strings.TrimPrefix(f, "./")
+					}
+
+					// Upsert entry.
 					watchCfg.UpsertEntry(config.WatchEntry{
 						FilePath:     f,
 						Context:      []string{globalClientOpts.Context},
 						MainArtifact: mainArtifact,
 					})
-					//write watch file
+
+					// Write watch file.
 					err = config.WriteLocalWatchConfig(*watchCfg, watchFile)
 					errors.CheckError(err)
 				}
 			}
 
+			// Start watcher if --watch flag is provided.
+			if watch {
+				watchFile, err := config.DefaultLocalWatchPath()
+				errors.CheckError(err)
+
+				wm, err := watcher.NewWatchManger(watchFile)
+				errors.CheckError(err)
+
+				fmt.Println("Watch mode enabled - microcks-watcher started...")
+				wm.Run()
+			}
 		},
 	}
 
-	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change	")
+	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change")
 	return importCmd
 }

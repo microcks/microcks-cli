@@ -129,7 +129,7 @@ microcks start --name [name of you container/instance]`,
 			})
 
 			localConfig.CurrentContext = server
-			localConfig.UpserContext(config.ContextRef{
+			localConfig.UpsertContext(config.ContextRef{
 				Name:     server,
 				Server:   server,
 				User:     server,

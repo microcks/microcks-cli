@@ -168,6 +168,32 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 	return &c, nil
 }
 
+// NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
+func NewMicrocksClient(apiURL string) MicrocksClient {
+	mc := microcksClient{}
+
+	if !strings.HasSuffix(apiURL, "/api/") {
+		apiURL += "/api/"
+	}
+
+	u, err := url.Parse(apiURL)
+	if err != nil {
+		panic(err)
+	}
+	mc.APIURL = u
+
+	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+		tlsConfig := config.CreateTLSConfig()
+		tr := &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		mc.httpClient = &http.Client{Transport: tr}
+	} else {
+		mc.httpClient = http.DefaultClient
+	}
+	return &mc
+}
+
 func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
 }
@@ -282,32 +308,6 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	}
 
 	return token.AccessToken, token.RefreshToken, nil
-}
-
-// NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
-func NewMicrocksClient(apiURL string) MicrocksClient {
-	mc := microcksClient{}
-
-	if !strings.HasSuffix(apiURL, "/api/") {
-		apiURL += "/api/"
-	}
-
-	u, err := url.Parse(apiURL)
-	if err != nil {
-		panic(err)
-	}
-	mc.APIURL = u
-
-	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
-		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		mc.httpClient = &http.Client{Transport: tr}
-	} else {
-		mc.httpClient = http.DefaultClient
-	}
-	return &mc
 }
 
 func (c *microcksClient) SetOAuthToken(oauthToken string) {

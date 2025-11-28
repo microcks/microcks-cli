@@ -98,7 +98,6 @@ func ReadLocalConfig(path string) (*LocalConfig, error) {
 
 // DefaultConfigDir returns the local configuration path for settings such as cached authentication tokens.
 func DefaultConfigDir() (string, error) {
-
 	configDir := os.Getenv("MICROCKS_CONFIG_DIR")
 
 	if configDir != "" {
@@ -134,6 +133,7 @@ func DefaultLocalConfigPath() (string, error) {
 	return path.Join(dir, "config"), nil
 }
 
+// DefaultLocalWatchPath returns the local watch configuration path.
 func DefaultLocalWatchPath() (string, error) {
 	dir, err := DefaultConfigDir()
 	if err != nil {
@@ -142,6 +142,7 @@ func DefaultLocalWatchPath() (string, error) {
 	return path.Join(dir, "watch"), nil
 }
 
+// ValidateLocalConfig validates the local configuration.
 func ValidateLocalConfig(config LocalConfig) error {
 	if config.CurrentContext == "" {
 		return nil
@@ -161,6 +162,7 @@ func WriteLocalConfig(config LocalConfig, configPath string) error {
 	return configUtil.MarshalLocalYAMLFile(configPath, &config)
 }
 
+// DeleteLocalConfig deletes the local configuration file.
 func (l *LocalConfig) DeleteLocalConfig(configPath string) error {
 	_, err := os.Stat(configPath)
 	if os.IsNotExist(err) {
@@ -202,7 +204,8 @@ func (l *LocalConfig) ResolveContext(name string) (*Context, error) {
 	return nil, fmt.Errorf("Context '%s' undefined", name)
 }
 
-func (l *LocalConfig) UpserContext(context ContextRef) {
+// UpsertContext upserts a context reference.
+func (l *LocalConfig) UpsertContext(context ContextRef) {
 	for i, c := range l.Contexts {
 		if c.Name == context.Name {
 			l.Contexts[i] = context
@@ -212,6 +215,7 @@ func (l *LocalConfig) UpserContext(context ContextRef) {
 	l.Contexts = append(l.Contexts, context)
 }
 
+// RemoveContext and returns server name and true if context was removed successfully
 func (l *LocalConfig) RemoveContext(serverName string) (string, bool) {
 	for i, c := range l.Contexts {
 		if c.Name == serverName {
@@ -222,7 +226,7 @@ func (l *LocalConfig) RemoveContext(serverName string) (string, bool) {
 	return "", false
 }
 
-// Returns true if user was removed successfully
+// RemoveToken and returns true if user was removed successfully
 func (l *LocalConfig) RemoveToken(serverName string) bool {
 	for i, u := range l.Users {
 		if u.Name == serverName {
@@ -234,6 +238,7 @@ func (l *LocalConfig) RemoveToken(serverName string) bool {
 	return false
 }
 
+// GetUser retrieves a user by name.
 func (l *LocalConfig) GetUser(name string) (*User, error) {
 	for _, u := range l.Users {
 		if u.Name == name {
@@ -243,6 +248,7 @@ func (l *LocalConfig) GetUser(name string) (*User, error) {
 	return nil, fmt.Errorf("User '%s' undefined", name)
 }
 
+// UpsertUser upserts a user.
 func (l *LocalConfig) UpsertUser(user User) {
 	for i, u := range l.Users {
 		if u.Name == user.Name {
@@ -363,6 +369,7 @@ func (l *LocalConfig) RemoveAuth(server string) bool {
 	return false
 }
 
+// UpsertEntry upserts a watch entry.
 func (w *WatchConfig) UpsertEntry(entry WatchEntry) {
 	for i, e := range w.Entries {
 		if e.FilePath == entry.FilePath {
@@ -377,6 +384,7 @@ func (w *WatchConfig) UpsertEntry(entry WatchEntry) {
 	w.Entries = append(w.Entries, entry)
 }
 
+// ReadLocalWatchConfig loads up the local watch configuration file. Returns nil if config does not exist
 func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 	var err error
 	var config WatchConfig
@@ -397,6 +405,7 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 	return &config, nil
 }
 
+// WriteLocalWatchConfig writes a new local watch configuration file.
 func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
 	err := os.MkdirAll(path.Dir(cfgPath), os.ModePerm)
 	if err != nil {

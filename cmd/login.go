@@ -160,7 +160,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			})
 
 			localConfig.CurrentContext = ctxName
-			localConfig.UpserContext(config.ContextRef{
+			localConfig.UpsertContext(config.ContextRef{
 				Name:   ctxName,
 				Server: server,
 				User:   server,
