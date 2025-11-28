@@ -183,6 +183,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					fmt.Printf("✗ Failed: %s - %s\n", file, errorMsg)
 				}
 			} else {
+				fmt.Println("\nImport results:")
 				for _, file := range result.SuccessFiles {
 					fmt.Printf("✓ Imported: %s\n", file)
 				}
@@ -230,12 +231,18 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 	for _, file := range files {
 		fileType := detectFileType(file)
 
-		_, err := client.UploadArtifact(file, fileType.IsPrimary)
+		msg, err := client.UploadArtifact(file, fileType.IsPrimary)
 		if err != nil {
 			result.FailedCount++
 			result.FailedFiles = append(result.FailedFiles, file)
 			result.Errors = append(result.Errors, fmt.Sprintf("error importing %s: %v", file, err))
 			continue
+		} else {
+			action := "discovered"
+			if !fileType.IsPrimary {
+				action = "completed"
+			}
+			fmt.Printf("Microcks has %s '%s'\n", action, msg)
 		}
 
 		result.SuccessCount++
@@ -308,7 +315,7 @@ func detectFileType(filePath string) FileType {
 	// Default to primary for most files
 	isPrimary := true
 
-	if strings.Contains(fileName, "postman") || strings.Contains(fileName, "collection") {
+	if strings.Contains(fileName, "postman") || strings.Contains(fileName, "collection") || strings.Contains(fileName, "metadata") || strings.Contains(fileName, "examples") {
 		isPrimary = false
 	}
 

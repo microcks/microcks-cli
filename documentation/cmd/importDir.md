@@ -4,7 +4,8 @@ The `import-dir` command in Microcks CLI is used to import multiple API specific
 
 📝 Description
 
-The `import-dir` command provides a convenient way to bulk import API specifications from a local directory. It automatically scans for supported file types and imports them into Microcks. This is particularly useful for CI/CD pipelines, bulk operations, and managing large collections of API specifications.
+The `import-dir` command provides a convenient way to bulk import API specifications from a local directory. It automatically scans for supported file types and imports them into Microcks.
+This is particularly useful for CI/CD pipelines, bulk operations, and managing large collections of API specifications.
 
 📌 Usage
 ```bash
@@ -42,6 +43,19 @@ microcks import-dir ./api-specs --pattern "*.yaml"
 microcks import-dir ./api-specs --recursive --pattern "openapi.*"
 ```
 
+- Import specification to microcks without first running `microcks login`
+```bash
+microcks import-dir ./api-spec \
+    --microcksURL <microcks-url> \ 
+    --keycloakClientId <client-id> \
+    --keycloakClientSecret <client-secret> 
+```
+
+- Import specification to microcks running without authentication (ie. local uber instance typically)
+```bash
+microcks import-dir ./api-spec --microcksURL <microcks-url>
+```
+
 📋 Supported File Types
 
 The command automatically detects and imports the following file types:
@@ -53,7 +67,7 @@ The command automatically detects and imports the following file types:
 
 The command automatically determines which files should be marked as primary artifacts:
 - Files containing "openapi" or "swagger" in the filename are marked as primary
-- Files containing "postman" or "collection" in the filename are marked as secondary
+- Files containing "postman", "collection", "metadata" or "examples" in the filename are marked as secondary
 - All other files default to primary
 
 📊 Output

@@ -24,7 +24,7 @@ microcks import ./api.yaml \
     --keycloakClientSecret <client-secret> 
 
 # Import specification to microcks running without authentication (ie. local uber instance typically)
-microcks import ./api.yaml --micrcoksURL <microcks-url>
+microcks import ./api.yaml --microcksURL <microcks-url>
 ```
 
 ### Options
