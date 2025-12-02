@@ -4,7 +4,7 @@ go 1.24.10
 
 require (
 	github.com/coreos/go-oidc/v3 v3.15.0
-	github.com/docker/docker v28.5.1+incompatible
+	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
