@@ -1,5 +1,5 @@
 # Build binary
-FROM --platform=$BUILDPLATFORM golang:1.24.10-alpine AS build-env
+FROM --platform=$BUILDPLATFORM golang:1.25.9-alpine AS build-env
 ADD . /app
 WORKDIR /app
 ARG TARGETOS
@@ -8,7 +8,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o microcks github.com/microcks/microcks-cli
     
 # Build image
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7-1763362218
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7-1776833838
 
 # Some version information
 LABEL maintainer="Laurent Broudoux <laurent@microcks.io>" \
