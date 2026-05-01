@@ -520,7 +520,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
-	respBody, err := io.ReadAll(req.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
