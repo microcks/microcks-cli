@@ -23,7 +23,6 @@ import (
 	errs "errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -227,7 +226,7 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 	// Dump request if verbose required.
 	config.DumpResponseIfRequired("Microcks for getting Keycloak config", resp, true)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -366,7 +365,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for creating test", resp, true)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -405,7 +404,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for getting status test", resp, true)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}

@@ -20,7 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -95,7 +95,7 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Keycloak for getting token", resp, true)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -125,7 +125,7 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -172,7 +172,7 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
