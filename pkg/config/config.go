@@ -19,7 +19,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -54,7 +53,7 @@ func CreateTLSConfig() *tls.Config {
 		sepCaFiles := strings.Split(CaCertPaths, ",")
 		for _, f := range sepCaFiles {
 			// Read in the cert file
-			certs, err := ioutil.ReadFile(f)
+			certs, err := os.ReadFile(f)
 			if err != nil {
 				fmt.Println("Unable to read cert file from CaCertPaths: " + f)
 			}
