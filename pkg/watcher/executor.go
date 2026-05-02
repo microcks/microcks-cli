@@ -12,7 +12,7 @@ func TriggerImport(entry config.WatchEntry) {
 	// Retrieve config to get client options.
 	cfgPath, err := config.DefaultLocalConfigPath()
 	if err != nil {
-		fmt.Errorf("Error while loading config: %s", err.Error())
+		fmt.Printf("Error while loading config: %s\n", err.Error())
 	}
 
 	fmt.Println("[INFO] Re-importing changed file: " + entry.FilePath)
