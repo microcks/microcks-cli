@@ -8,6 +8,10 @@ WATCHER_NAME=watcher
 HOST_OS=$(shell go env GOOS)
 HOST_ARCH=$(shell go env GOARCH)
 
+.PHONY: vet
+vet:
+	go vet ./...
+
 .PHONY: build-local
 build-local:
 	go build -o ${DIST_DIR}/${BIN_NAME}
