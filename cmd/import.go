@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -65,7 +66,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				// Create client with server address.
 				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
 
-				keycloakURL, err := mc.GetKeycloakURL()
+				keycloakURL, err := mc.GetKeycloakURL(context.Background())
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
 					os.Exit(1)
@@ -76,7 +77,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
-					oauthToken, err = kc.ConnectAndGetToken()
+					oauthToken, err = kc.ConnectAndGetToken(context.Background())
 					if err != nil {
 						fmt.Printf("Got error when invoking Keycloack client: %s", err)
 						os.Exit(1)
@@ -132,7 +133,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				}
 
 				// Try uploading this artifact.
-				msg, err := mc.UploadArtifact(f, mainArtifact)
+				msg, err := mc.UploadArtifact(context.Background(), f, mainArtifact)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
