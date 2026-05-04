@@ -115,13 +115,8 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			microcks import-dir ./api-specs --recursive
 			microcks import-dir ./api-specs --pattern "*.yaml"
 			microcks import-dir ./api-specs --recursive --pattern "openapi.*"`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				fmt.Println("import-dir command requires a directory path")
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
-			}
-
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			dirPath := args[0]
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
@@ -130,13 +125,11 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			if err != nil {
-				fmt.Println(err)
-				return
+				return err
 			}
 
 			if localConfig == nil {
-				fmt.Println("Please login to perform operation...")
-				return
+				return fmt.Errorf("please login to perform operation")
 			}
 
 			if globalClientOpts.Context == "" {
@@ -146,8 +139,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			// Create client
 			mc, err := connectors.NewClient(*globalClientOpts)
 			if err != nil {
-				fmt.Printf("error %v", err)
-				return
+				return err
 			}
 
 			// Set up business logic dependencies
@@ -163,10 +155,9 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			if err != nil {
 				if validationErr, ok := err.(*ValidationError); ok {
 					fmt.Println(validationErr.Message)
-					return
+					return nil
 				}
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 
 			// Display results
@@ -197,6 +188,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 
 			fmt.Printf("\nImport completed: %d/%d files imported successfully\n", result.SuccessCount, result.TotalFiles)
+			return nil
 		},
 	}
 

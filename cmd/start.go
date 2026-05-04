@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	"strconv"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -32,7 +32,14 @@ microcks start --driver [driver you wnat either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
-		Run: func(cmd *cobra.Command, args []string) {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			portNum, err := strconv.Atoi(hostPort)
+			if err != nil || portNum < 1 || portNum > 65535 {
+				return fmt.Errorf("--port must be a number between 1 and 65535, got %q", hostPort)
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
@@ -49,21 +56,20 @@ microcks start --name [name of you container/instance]`,
 
 			if instance.Status == "Running" {
 				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+				return nil
 			}
 
 			switch instance.Status {
 			case "Running":
 				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+				return nil
 			case "Exited":
 				containerClient, err := connectors.NewContainerClient(instance.Driver)
 				errors.CheckError(err)
 				defer containerClient.CloseClient()
 
 				if err := containerClient.StartContainer(instance.ContainerID); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					return fmt.Errorf("failed to start container: %w", err)
 				}
 				instance.Status = "Running"
 			default:
@@ -78,13 +84,11 @@ microcks start --name [name of you container/instance]`,
 					AutoRemove: autoRemove,
 				})
 				if err != nil {
-					log.Fatalf("Failed to create a container: %v", err)
-					return
+					return fmt.Errorf("failed to create a container: %w", err)
 				}
 
 				if err := containerClient.StartContainer(containerId); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					return fmt.Errorf("failed to start container: %w", err)
 				}
 
 				instance.ContainerID = containerId
@@ -141,6 +145,7 @@ microcks start --name [name of you container/instance]`,
 			errors.CheckError(err)
 
 			fmt.Printf("Microcks started successfully at %s\n", server)
+			return nil
 		},
 	}
 	startCmd.Flags().StringVar(&name, "name", "microcks", "name for you microcks instance")
