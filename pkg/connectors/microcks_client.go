@@ -410,9 +410,11 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	}
 
 	result := TestResultSummary{}
-	json.Unmarshal([]byte(body), &result)
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse test result response: %w", err)
+	}
 
-	return &result, err
+	return &result, nil
 }
 
 func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
