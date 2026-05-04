@@ -25,10 +25,10 @@ import (
 func NewVersionCommand() *cobra.Command {
 	var command = &cobra.Command{
 		Use:   "version",
-		Short: "Print the version number of microkcs CLI",
-		Long:  `Print the version number of microkcs CLI`,
+		Short: "Print the version number of Microcks CLI",
+		Long:  `Print the version number of Microcks CLI`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Microcks-CLI %s\n", version.Version)
+			fmt.Println(version.Info())
 		},
 	}
 

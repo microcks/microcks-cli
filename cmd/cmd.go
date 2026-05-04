@@ -19,6 +19,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/version"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,7 @@ func NewCommad() *cobra.Command {
 	command := &cobra.Command{
 		Use:          "microcks",
 		Short:        "A CLI tool for Microcks",
+		Version:      version.Info(),
 		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
@@ -37,6 +39,7 @@ func NewCommad() *cobra.Command {
 			HiddenDefaultCmd: true,
 		},
 	}
+	command.SetVersionTemplate("{{.Version}}\n")
 
 	command.AddCommand(NewImportCommand(&clientOpts))
 	command.AddCommand(NewImportDirCommand(&clientOpts))

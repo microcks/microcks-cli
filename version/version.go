@@ -16,5 +16,10 @@
 package version
 
 var (
-	Version = "1.0.3"
+	Version = "unknown"
+	Commit  = "unknown"
 )
+
+func Info() string {
+	return "Microcks CLI " + Version + "\nCommit: " + Commit
+}
