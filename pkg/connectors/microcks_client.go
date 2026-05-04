@@ -67,6 +67,18 @@ type TestResultSummary struct {
 	InProgress     bool   `json:"inProgress"`
 }
 
+// createTestResultRequest is the JSON payload sent to the Microcks tests endpoint.
+type createTestResultRequest struct {
+	ServiceID          string                 `json:"serviceId"`
+	TestEndpoint       string                 `json:"testEndpoint"`
+	RunnerType         string                 `json:"runnerType"`
+	Timeout            int64                  `json:"timeout"`
+	SecretName         string                 `json:"secretName,omitempty"`
+	FilteredOperations []string               `json:"filteredOperations,omitempty"`
+	OperationsHeaders  map[string][]HeaderDTO `json:"operationsHeaders,omitempty"`
+	OAuth2Context      *OAuth2ClientContext   `json:"oAuth2Context,omitempty"`
+}
+
 // HeaderDTO represents an operation header passed for Test
 type HeaderDTO struct {
 	Name   string `json:"name"`
@@ -323,28 +335,36 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
 
-	// Prepare an input string as body.
-	var input = "{"
-	input += ("\"serviceId\": \"" + serviceID + "\", ")
-	input += ("\"testEndpoint\": \"" + testEndpoint + "\", ")
-	input += ("\"runnerType\": \"" + runnerType + "\", ")
-	input += ("\"timeout\":  " + strconv.FormatInt(timeout, 10))
-	if len(secretName) > 0 {
-		input += (", \"secretName\": \"" + secretName + "\"")
+	// Build request payload via a struct so json.Marshal handles escaping.
+	payload := createTestResultRequest{
+		ServiceID:    serviceID,
+		TestEndpoint: testEndpoint,
+		RunnerType:   runnerType,
+		Timeout:      timeout,
+		SecretName:   secretName,
 	}
 	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
-		input += (", \"filteredOperations\": " + filteredOperations)
+		var ops []string
+		_ = json.Unmarshal([]byte(filteredOperations), &ops)
+		payload.FilteredOperations = ops
 	}
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
-		input += (", \"operationsHeaders\": " + operationsHeaders)
+		var headers map[string][]HeaderDTO
+		_ = json.Unmarshal([]byte(operationsHeaders), &headers)
+		payload.OperationsHeaders = headers
 	}
 	if len(oAuth2Context) > 0 && ensureValieOAuth2Context(oAuth2Context) {
-		input += (", \"oAuth2Context\": " + oAuth2Context)
+		var oCtx OAuth2ClientContext
+		_ = json.Unmarshal([]byte(oAuth2Context), &oCtx)
+		payload.OAuth2Context = &oCtx
 	}
 
-	input += "}"
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal test result request: %w", err)
+	}
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(input))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -365,13 +385,13 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for creating test", resp, true)
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
 
 	var createTestResp map[string]interface{}
-	if err := json.Unmarshal(body, &createTestResp); err != nil {
+	if err := json.Unmarshal(respBody, &createTestResp); err != nil {
 		panic(err)
 	}
 
