@@ -39,6 +39,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		output             string
 	)
 	var testCmd = &cobra.Command{
 
@@ -76,7 +77,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			// Validate presence and values of flags.
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Applying default 5sec")
+				if output != "json" {
+					fmt.Println("--waitFor format is wrong. Applying default 5sec")
+				}
 			}
 
 			// Collect optional HTTPS transport flags.
@@ -171,25 +174,35 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			future := now + waitForMilliseconds + 10000
 
 			var success = false
+			var testResultSummary *connectors.TestResultSummary
 			for nowInMilliseconds() < future {
-				testResultSummary, err := mc.GetTestResult(testResultID)
+				testResultSummary, err = mc.GetTestResult(testResultID)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
 					os.Exit(1)
 				}
 				success = testResultSummary.Success
 				inProgress := testResultSummary.InProgress
-				fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+				if output != "json" {
+					fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+				}
 
 				if !inProgress {
 					break
 				}
 
-				fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
+				if output != "json" {
+					fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
+				}
 				time.Sleep(2 * time.Second)
 			}
 
-			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			if output == "json" {
+				jsonResult, _ := json.MarshalIndent(testResultSummary, "", "  ")
+				fmt.Println(string(jsonResult))
+			} else {
+				fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			}
 
 			if !success {
 				os.Exit(1)
@@ -202,6 +215,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().StringVarP(&output, "output", "o", "text", "Output format. One of: text|json")
 
 	return testCmd
 }
