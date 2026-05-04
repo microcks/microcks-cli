@@ -27,9 +27,9 @@ func NewCommad() *cobra.Command {
 	var clientOpts connectors.ClientOptions
 
 	command := &cobra.Command{
-		Use:          "microcks",
-		Short:        "A CLI tool for Microcks",
-		SilenceUsage: true,
+		Use:           "microcks",
+		Short:         "A CLI tool for Microcks",
+		SilenceErrors: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
 		},

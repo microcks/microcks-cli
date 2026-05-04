@@ -27,8 +27,9 @@ func NewVersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Print the version number of microkcs CLI",
 		Long:  `Print the version number of microkcs CLI`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Microcks-CLI %s\n", version.Version)
+			return nil
 		},
 	}
 

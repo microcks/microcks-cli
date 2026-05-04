@@ -57,15 +57,16 @@ microcks login http://localhost:8080 --sso --sso-port
 # Get OAuth URI instead of getting redirect to browser for SSO login
 microcks login http://localhost:8080 --sso --sso-launch-browser=false
 `,
-		Run: func(cmd *cobra.Command, args []string) {
-			ctx := cmd.Context()
-			var server string
-
-			//Chekc if server name is provided or not
-			if len(args) != 1 {
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
+		Args: cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if ssoProt < 1 || ssoProt > 65535 {
+				return fmt.Errorf("--sso-port must be a number between 1 and 65535, got %d", ssoProt)
 			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			server := args[0]
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
@@ -116,8 +117,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					clientSecret := os.Getenv("MICROCKS_CLIENT_SECRET")
 
 					if clientID == "" || clientSecret == "" {
-						fmt.Printf("Please Set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' to perform password login\n")
-						os.Exit(1)
+						return fmt.Errorf("please set MICROCKS_CLIENT_ID and MICROCKS_CLIENT_SECRET environment variables to perform password login")
 					}
 					//Perform login and retrive tokens
 					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
@@ -170,6 +170,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			errors.CheckError(err)
 
 			fmt.Printf("Context '%s' updated\n", ctxName)
+			return nil
 		},
 	}
 
@@ -229,7 +230,7 @@ func oauth2login(
 		handledRequests++
 		if handledRequests > 2 {
 			// Since implicit flow will redirect back to ourselves, this counter ensures we do not
-			// fallinto a redirect loop (e.g. user visits the page by hand)
+			// fall into a redirect loop (e.g. user visits the page by hand)
 			handleErr(w, "Unable to complete login flow: too many redirects")
 			return
 		}
