@@ -46,12 +46,12 @@ var (
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
 	HttpClient() *http.Client
-	GetKeycloakURL() (string, error)
+	GetKeycloakURL(ctx context.Context) (string, error)
 	SetOAuthToken(oauthToken string)
-	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
-	GetTestResult(testResultID string) (*TestResultSummary, error)
-	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
-	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+	CreateTestResult(ctx context.Context, serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
+	GetTestResult(ctx context.Context, testResultID string) (*TestResultSummary, error)
+	UploadArtifact(ctx context.Context, specificationFilePath string, mainArtifact bool) (string, error)
+	DownloadArtifact(ctx context.Context, artifactURL string, mainArtifact bool, secret string) (string, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -202,12 +202,12 @@ func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
 }
 
-func (c *microcksClient) GetKeycloakURL() (string, error) {
+func (c *microcksClient) GetKeycloakURL(ctx context.Context) (string, error) {
 	// Ensure we have a correct URL for retrieving Keycloal configuration.
 	rel := &url.URL{Path: "keycloak/config"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -292,10 +292,10 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 }
 
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
-	keyCloakUrl, err := c.GetKeycloakURL()
+	keyCloakUrl, err := c.GetKeycloakURL(context.Background())
 	errors.CheckError(err)
 	kc := NewKeycloakClient(keyCloakUrl, "", "")
-	oauth2Conf, err := kc.GetOIDCConfig()
+	oauth2Conf, err := kc.GetOIDCConfig(context.Background())
 	errors.CheckError(err)
 	oauth2Conf.ClientID = auth.ClientId
 	oauth2Conf.ClientSecret = auth.ClientSecret
@@ -318,7 +318,7 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.AuthToken = oauthToken
 }
 
-func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
+func (c *microcksClient) CreateTestResult(ctx context.Context, serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
@@ -344,7 +344,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	input += "}"
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(input))
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), strings.NewReader(input))
 	if err != nil {
 		return "", err
 	}
@@ -379,12 +379,12 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	return testID, err
 }
 
-func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
+func (c *microcksClient) GetTestResult(ctx context.Context, testResultID string) (*TestResultSummary, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests/" + testResultID}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +417,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	return &result, nil
 }
 
-func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
+func (c *microcksClient) UploadArtifact(ctx context.Context, specificationFilePath string, mainArtifact bool) (string, error) {
 	// Ensure file exists on fs.
 	file, err := os.Open(specificationFilePath)
 	if err != nil {
@@ -449,7 +449,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	rel := &url.URL{Path: "artifact/upload"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), body)
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), body)
 	if err != nil {
 		return "", err
 	}
@@ -481,7 +481,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	return string(respBody), err
 }
 
-func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error) {
+func (c *microcksClient) DownloadArtifact(ctx context.Context, artifactURL string, mainArtifact bool, secret string) (string, error) {
 
 	// create Multipart Form to add fields
 	body := &bytes.Buffer{}
@@ -503,7 +503,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	rel := &url.URL{Path: "artifact/download"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), body)
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), body)
 	if err != nil {
 		return "", err
 	}

@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -17,7 +18,7 @@ func TriggerImport(entry config.WatchEntry) {
 
 	fmt.Println("[INFO] Re-importing changed file: " + entry.FilePath)
 
-	for _, context := range entry.Context {
+	for _, ctx := range entry.Context {
 
 		// Prepare Microcks client.
 		var mc connectors.MicrocksClient
@@ -26,23 +27,23 @@ func TriggerImport(entry config.WatchEntry) {
 		if _, err := os.Stat(cfgPath); err == nil {
 			globalClientOpts := &connectors.ClientOptions{
 				ConfigPath: cfgPath,
-				Context:    context,
+				Context:    ctx,
 			}
 
 			mc, err = connectors.NewClient(*globalClientOpts)
 			if err != nil {
-				fmt.Printf("[ERROR] Cannot connect to Microcks client: %v in context '%s'\n", err, context)
+				fmt.Printf("[ERROR] Cannot connect to Microcks client: %v in context '%s'\n", err, ctx)
 			}
 		} else {
 			// We have no config file, so just create a client with context as server URL.
-			mc = connectors.NewMicrocksClient(context)
+			mc = connectors.NewMicrocksClient(ctx)
 		}
 
-		_, err = mc.UploadArtifact(entry.FilePath, entry.MainArtifact)
+		_, err = mc.UploadArtifact(context.Background(), entry.FilePath, entry.MainArtifact)
 		if err != nil {
 			fmt.Printf("[WARN] Error re-importing %s: %v\n", entry.FilePath, err)
 		} else {
-			fmt.Printf("[INFO] Successfully re-imported %s in context '%s'\n", entry.FilePath, context)
+			fmt.Printf("[INFO] Successfully re-imported %s in context '%s'\n", entry.FilePath, ctx)
 		}
 	}
 }

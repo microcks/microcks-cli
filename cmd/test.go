@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -119,7 +120,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				serverAddr = globalClientOpts.ServerAddr
 				mc = connectors.NewMicrocksClient(serverAddr)
 
-				keycloakURL, err := mc.GetKeycloakURL()
+				keycloakURL, err := mc.GetKeycloakURL(context.Background())
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
 					os.Exit(1)
@@ -130,7 +131,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
-					oauthToken, err = kc.ConnectAndGetToken()
+					oauthToken, err = kc.ConnectAndGetToken(context.Background())
 					if err != nil {
 						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
@@ -170,7 +171,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			}
 
 			var testResultID string
-			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			testResultID, err := mc.CreateTestResult(context.Background(), serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
 				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 				os.Exit(1)
@@ -186,7 +187,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			var success = false
 			for nowInMilliseconds() < future {
-				testResultSummary, err := mc.GetTestResult(testResultID)
+				testResultSummary, err := mc.GetTestResult(context.Background(), testResultID)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
 					os.Exit(1)
