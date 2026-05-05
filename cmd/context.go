@@ -27,29 +27,28 @@ microcks context http://localhost:8080
 
 # Delete Microcks context
 microcks context http://localhost:8080 --delete`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath := globalClientOpts.ConfigPath
 			localCfg, err := config.ReadLocalConfig(configPath)
 			errors.CheckError(err)
 			if delete {
 				if len(args) == 0 {
-					cmd.HelpFunc()(cmd, args)
-					os.Exit(1)
+					return fmt.Errorf("context name is required when using --delete")
 				}
 				err := deleteContext(args[0], configPath)
 				errors.CheckError(err)
-				return
+				return nil
 			}
 
 			if len(args) == 0 {
 				printMicrocksContexts(configPath)
-				return
+				return nil
 			}
 
 			ctxName := args[0]
 			if localCfg.CurrentContext == ctxName {
 				fmt.Printf("Already at context '%s'\n", localCfg.CurrentContext)
-				return
+				return nil
 			}
 			if _, err = localCfg.ResolveContext(ctxName); err != nil {
 				log.Fatal(err)
@@ -58,6 +57,7 @@ microcks context http://localhost:8080 --delete`,
 			err = config.WriteLocalConfig(*localCfg, configPath)
 			errors.CheckError(err)
 			fmt.Printf("Switched to context '%s'\n", localCfg.CurrentContext)
+			return nil
 		},
 	}
 
