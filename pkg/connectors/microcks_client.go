@@ -124,7 +124,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 			return nil, err
 		}
 		c.ServerAddr = configCtx.Server.Server
-		c.Insecure = configCtx.Server.KeycloackEnable
+		c.Insecure = configCtx.Server.KeycloakEnable
 		c.InsecureTLS = configCtx.Server.InsecureTLS
 		c.AuthToken = configCtx.User.AuthToken
 		c.RefreshToken = configCtx.User.RefreshToken
@@ -338,7 +338,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
 		input += (", \"operationsHeaders\": " + operationsHeaders)
 	}
-	if len(oAuth2Context) > 0 && ensureValieOAuth2Context(oAuth2Context) {
+	if len(oAuth2Context) > 0 && ensureValidOAuth2Context(oAuth2Context) {
 		input += (", \"oAuth2Context\": " + oAuth2Context)
 	}
 
@@ -557,7 +557,7 @@ func ensureValidOperationsHeaders(operationsHeaders string) bool {
 	return true
 }
 
-func ensureValieOAuth2Context(oAuth2Context string) bool {
+func ensureValidOAuth2Context(oAuth2Context string) bool {
 	var oContext = OAuth2ClientContext{}
 	err := json.Unmarshal([]byte(oAuth2Context), &oContext)
 	if err != nil {
