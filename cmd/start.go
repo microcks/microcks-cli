@@ -110,13 +110,13 @@ microcks start --name [name of you container/instance]`,
 			server := fmt.Sprintf("http://localhost:%s", instance.Port)
 
 			localConfig.UpsertServer(config.Server{
-				Name:            name,
-				Server:          server,
-				InsecureTLS:     true,
-				KeycloackEnable: false,
+				Name:           name,
+				Server:         server,
+				InsecureTLS:    true,
+				KeycloakEnable: false,
 			})
 
-			localConfig.UpserAuth(config.Auth{
+			localConfig.UpsertAuth(config.Auth{
 				Server:       server,
 				ClientId:     "",
 				ClientSecret: "",
