@@ -151,8 +151,11 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		c.Verbose = opts.Verbose
 	}
 
-	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+	if config.InsecureTLS || c.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
+		if c.InsecureTLS {
+			tlsConfig.InsecureSkipVerify = true
+		}
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
