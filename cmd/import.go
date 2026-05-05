@@ -78,7 +78,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloack client: %s", err)
+						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)

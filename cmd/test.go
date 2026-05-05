@@ -76,7 +76,8 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			// Validate presence and values of flags.
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Applying default 5sec")
+				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
+				os.Exit(1)
 			}
 
 			// Collect optional HTTPS transport flags.
@@ -85,15 +86,28 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			config.Verbose = globalClientOpts.Verbose
 
 			// Compute time to wait in milliseconds.
-			var waitForMilliseconds int64 = 5000
+			var waitForMilliseconds int64
 			if strings.HasSuffix(waitFor, "milli") {
-				waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
+				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
+				if err != nil {
+					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
+					os.Exit(1)
+				}
+				waitForMilliseconds = n
 			} else if strings.HasSuffix(waitFor, "sec") {
-				waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				waitForMilliseconds = waitForMilliseconds * 1000
+				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+				if err != nil {
+					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
+					os.Exit(1)
+				}
+				waitForMilliseconds = n * 1000
 			} else if strings.HasSuffix(waitFor, "min") {
-				waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				waitForMilliseconds = waitForMilliseconds * 60 * 1000
+				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+				if err != nil {
+					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
+					os.Exit(1)
+				}
+				waitForMilliseconds = n * 60 * 1000
 			}
 
 			var mc connectors.MicrocksClient
@@ -111,14 +125,14 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 					os.Exit(1)
 				}
 
-				var oauthToken string = "unauthentifed-token"
+				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloack client: %s", err)
+						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
@@ -135,7 +149,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				}
 
 				if localConfig == nil {
-					fmt.Println("Please login to perform opertion...")
+					fmt.Println("Please login to perform operation...")
 					return
 				}
 
