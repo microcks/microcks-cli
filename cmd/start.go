@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -33,6 +34,8 @@ microcks start --driver [driver you wnat either 'docker' or 'podman']
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
 		Run: func(cmd *cobra.Command, args []string) {
+			err := validateStartPort(hostPort)
+			errors.CheckError(err)
 
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
@@ -149,4 +152,12 @@ microcks start --name [name of you container/instance]`,
 	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of dokcer to automatically remove the container when it exits")
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
 	return startCmd
+}
+
+func validateStartPort(port string) error {
+	portNum, err := strconv.Atoi(port)
+	if err != nil || portNum < 1 || portNum > 65535 {
+		return fmt.Errorf("--port must be a number between 1 and 65535, got %q", port)
+	}
+	return nil
 }
