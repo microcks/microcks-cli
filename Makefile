@@ -7,13 +7,15 @@ WATCHER_NAME=watcher
 
 HOST_OS=$(shell go env GOOS)
 HOST_ARCH=$(shell go env GOARCH)
+GO ?= go
+BUILD_FLAGS ?=
 VERSION ?= $(shell git describe --tags --dirty --always 2>/dev/null || echo unknown)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS=-X ${PACKAGE}/version.Version=${VERSION} -X ${PACKAGE}/version.Commit=${COMMIT}
 
 .PHONY: build-local
 build-local:
-	go build -ldflags "${LDFLAGS}" -o ${DIST_DIR}/${BIN_NAME}
+	$(GO) build $(BUILD_FLAGS) -ldflags "${LDFLAGS}" -o ${DIST_DIR}/${BIN_NAME}
 
 .PHONY: clean
 clean:
@@ -36,4 +38,4 @@ build-release:
 
 .PHONY: build-watcher
 build-watcher:
-	go build -o ${DIST_DIR}/${BIN_NAME}-${WATCHER_NAME} ${PACKAGE}/watcher
+	$(GO) build $(BUILD_FLAGS) -o ${DIST_DIR}/${BIN_NAME}-${WATCHER_NAME} ${PACKAGE}/watcher
