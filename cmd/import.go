@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -118,21 +117,10 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			// Handle multiple specification files separated by comma.
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
-				var err error
-
-				// Check if mainArtifact flag is provided.
-				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", pathAndMainArtifact[1])
-					}
-				}
+				path, mainArtifact := parseImportFileSpecifier(f)
 
 				// Try uploading this artifact.
-				msg, err := mc.UploadArtifact(f, mainArtifact)
+				msg, err := mc.UploadArtifact(path, mainArtifact)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
@@ -155,13 +143,11 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					}
 
 					// Normalize file path to match the watcher fsnotify events format.
-					if strings.HasPrefix(f, "./") {
-						f = strings.TrimPrefix(f, "./")
-					}
+					path = strings.TrimPrefix(path, "./")
 
 					// Upsert entry.
 					watchCfg.UpsertEntry(config.WatchEntry{
-						FilePath:     f,
+						FilePath:     path,
 						Context:      []string{globalClientOpts.Context},
 						MainArtifact: mainArtifact,
 					})

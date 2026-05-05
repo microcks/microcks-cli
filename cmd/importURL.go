@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -97,28 +96,10 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
-				secret := ""
-
-				// Check if URL starts with https or http
-				if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
-					urlAndMainAtrifactAndSecretName := strings.Split(f, ":")
-					n := len(urlAndMainAtrifactAndSecretName)
-					f = urlAndMainAtrifactAndSecretName[0] + ":" + urlAndMainAtrifactAndSecretName[1]
-					if n > 2 {
-						val, err := strconv.ParseBool(urlAndMainAtrifactAndSecretName[2])
-						if err != nil {
-							fmt.Println(err)
-						}
-						mainArtifact = val
-					}
-					if n > 3 {
-						secret = urlAndMainAtrifactAndSecretName[3]
-					}
-				}
+				artifactURL, mainArtifact, secret := parseImportURLSpecifier(f)
 
 				// Try downloading the artifcat
-				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
+				msg, err := mc.DownloadArtifact(artifactURL, mainArtifact, secret)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
