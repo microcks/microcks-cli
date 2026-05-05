@@ -19,6 +19,7 @@ package cmd
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -99,6 +100,8 @@ users:
 const testConfigFilePath = "./testdata/local.config"
 
 func TestDeleteContext(t *testing.T) {
+	require.NoError(t, os.MkdirAll(filepath.Dir(testConfigFilePath), 0o755))
+
 	//write the test config file
 	require.NoError(t, os.MkdirAll("./testdata", 0o750))
 	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
