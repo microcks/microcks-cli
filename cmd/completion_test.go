@@ -36,3 +36,16 @@ func TestCompletionCommandGeneratesBash(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "completion for microcks")
 }
+
+func TestCompletionCommandRejectsUnsupportedShell(t *testing.T) {
+	cmd := NewCommad()
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"completion", "nushell"})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid argument")
+}

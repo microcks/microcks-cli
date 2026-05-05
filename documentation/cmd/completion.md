@@ -1,13 +1,12 @@
-## `microcks completion` - Generate shell completion scripts
-
-Generates shell completion scripts for supported shells.
+## `microcks completion` – Generate Shell Completion Scripts
+Generates shell completion scripts for bash, zsh, fish, and PowerShell.
 
 ### Usage
 ```bash
 microcks completion [bash|zsh|fish|powershell]
 ```
 
-### Examples
+### Example
 ```bash
 # Generate bash completion
 microcks completion bash

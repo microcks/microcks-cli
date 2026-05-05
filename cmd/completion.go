@@ -16,8 +16,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +25,13 @@ func NewCompletionCommand() *cobra.Command {
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Generate shell completion scripts",
 		Long:  `Generate shell completion scripts`,
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		ValidArgs: []string{
+			"bash",
+			"zsh",
+			"fish",
+			"powershell",
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			rootCmd := cmd.Root()
 			var err error
@@ -41,8 +45,6 @@ func NewCompletionCommand() *cobra.Command {
 				err = rootCmd.GenFishCompletion(cmd.OutOrStdout(), true)
 			case "powershell":
 				err = rootCmd.GenPowerShellCompletion(cmd.OutOrStdout())
-			default:
-				err = fmt.Errorf("unsupported shell %q", args[0])
 			}
 			errors.CheckError(err)
 		},
