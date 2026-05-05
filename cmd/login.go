@@ -61,7 +61,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			ctx := cmd.Context()
 			var server string
 
-			//Checkc if server name is provided or not
+			//Check if server name is provided or not
 			if len(args) != 1 {
 				cmd.HelpFunc()(cmd, args)
 				os.Exit(1)
