@@ -39,6 +39,7 @@ func NewCommad() *cobra.Command {
 	}
 
 	command.AddCommand(NewImportCommand(&clientOpts))
+	command.AddCommand(NewDeleteCommand(&clientOpts))
 	command.AddCommand(NewImportDirCommand(&clientOpts))
 	command.AddCommand(NewVersionCommand())
 	command.AddCommand(NewTestCommand(&clientOpts))
