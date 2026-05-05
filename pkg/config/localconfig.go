@@ -56,9 +56,32 @@ type Instance struct {
 }
 
 type Auth struct {
-	Server       string
-	ClientId     string
-	ClientSecret string
+	Server       string `yaml:"server"`
+	ClientId     string `yaml:"clientId"`
+	ClientSecret string `yaml:"clientSecret"`
+}
+
+func (a *Auth) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var raw struct {
+		Server             string `yaml:"server"`
+		ClientId           string `yaml:"clientId"`
+		ClientSecret       string `yaml:"clientSecret"`
+		LegacyClientId     string `yaml:"clientid"`
+		LegacyClientSecret string `yaml:"clientsecret"`
+	}
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	if raw.ClientId == "" {
+		raw.ClientId = raw.LegacyClientId
+	}
+	if raw.ClientSecret == "" {
+		raw.ClientSecret = raw.LegacyClientSecret
+	}
+	a.Server = raw.Server
+	a.ClientId = raw.ClientId
+	a.ClientSecret = raw.ClientSecret
+	return nil
 }
 
 type WatchConfig struct {
