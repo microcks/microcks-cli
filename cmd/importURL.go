@@ -71,7 +71,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				}
 
 				if localConfig == nil {
-					return fmt.Errorf("please login to perform operation")
+					return fmt.Errorf("Please login to perform operation...")
 				}
 
 				if globalClientOpts.Context == "" {

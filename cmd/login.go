@@ -42,7 +42,7 @@ func NewLoginCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		Long:  "Login into Microcks instance",
 		Example: `microcks login http://locahost:8080
 
-# Provide name to your logged in context (Defautl context name is server name)
+# Provide name to your logged in context (Default context name is server name)
 microcks login http://localhost:8080 --name
 
 # Provide username and password as flags
@@ -105,14 +105,14 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 
 			if keycloakUrl == "null" {
 				localConfig.UpsertServer(config.Server{
-					Server:          server,
-					InsecureTLS:     true,
-					KeycloackEnable: false,
+					Server:         server,
+					InsecureTLS:    true,
+					KeycloakEnable: false,
 				})
 				fmt.Print("No login required...\n")
 			} else {
 				if !sso {
-					//Chek for the enviroment variables
+					//Check for the enviroment variables
 					clientID := os.Getenv("MICROCKS_CLIENT_ID")
 					clientSecret := os.Getenv("MICROCKS_CLIENT_SECRET")
 
@@ -145,13 +145,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				fmt.Printf("'%s' logged in successfully\n", em)
 
 				localConfig.UpsertServer(config.Server{
-					Server:          server,
-					InsecureTLS:     true,
-					KeycloackEnable: true,
+					Server:         server,
+					InsecureTLS:    true,
+					KeycloakEnable: true,
 				})
 			}
 
-			localConfig.UpserAuth(authCfg)
+			localConfig.UpsertAuth(authCfg)
 
 			localConfig.UpsertUser(config.User{
 				Name:         server,
