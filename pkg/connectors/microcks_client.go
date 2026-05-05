@@ -339,7 +339,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
 		input += (", \"operationsHeaders\": " + operationsHeaders)
 	}
-	if len(oAuth2Context) > 0 && ensureValieOAuth2Context(oAuth2Context) {
+	if len(oAuth2Context) > 0 && ensureValidOAuth2Context(oAuth2Context) {
 		input += (", \"oAuth2Context\": " + oAuth2Context)
 	}
 
@@ -521,7 +521,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
-	respBody, err := io.ReadAll(req.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -556,7 +556,7 @@ func ensureValidOperationsHeaders(operationsHeaders string) bool {
 	return true
 }
 
-func ensureValieOAuth2Context(oAuth2Context string) bool {
+func ensureValidOAuth2Context(oAuth2Context string) bool {
 	var oContext = OAuth2ClientContext{}
 	err := json.Unmarshal([]byte(oAuth2Context), &oContext)
 	if err != nil {
