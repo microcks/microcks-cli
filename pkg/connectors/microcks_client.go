@@ -52,6 +52,7 @@ type MicrocksClient interface {
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+	DeleteService(service string, version string) error
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -168,6 +169,101 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		}
 	}
 	return &c, nil
+}
+
+type serviceSummary struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+func (c *microcksClient) DeleteService(service string, version string) error {
+	// First, search for the service ID
+	searchRel := &url.URL{Path: "services/search"}
+	searchU := c.APIURL.ResolveReference(searchRel)
+
+	q := searchU.Query()
+	q.Set("name", service)
+	q.Set("version", version)
+	// We also set queryMap JSON string just in case Microcks uses a custom deserializer,
+	// but standard Spring Boot uses direct query params.
+	queryMap := map[string]string{
+		"name":    service,
+		"version": version,
+	}
+	queryMapBytes, _ := json.Marshal(queryMap)
+	q.Set("queryMap", string(queryMapBytes))
+	searchU.RawQuery = q.Encode()
+
+	searchReq, err := http.NewRequest("GET", searchU.String(), nil)
+	if err != nil {
+		return err
+	}
+	searchReq.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	searchReq.Header.Set("Accept", "application/json")
+
+	config.DumpRequestIfRequired("Microcks search service", searchReq, true)
+
+	searchResp, err := c.httpClient.Do(searchReq)
+	if err != nil {
+		return err
+	}
+	defer searchResp.Body.Close()
+
+	config.DumpResponseIfRequired("Microcks search service", searchResp, true)
+
+	if searchResp.StatusCode != 200 {
+		body, _ := io.ReadAll(searchResp.Body)
+		return fmt.Errorf("failed to search service: %s", string(body))
+	}
+
+	body, _ := io.ReadAll(searchResp.Body)
+	var services []serviceSummary
+	if err := json.Unmarshal(body, &services); err != nil {
+		return fmt.Errorf("failed to parse search response: %v", err)
+	}
+
+	var serviceID string
+	for _, s := range services {
+		if s.Name == service && s.Version == version {
+			serviceID = s.ID
+			break
+		}
+	}
+
+	if serviceID == "" {
+		return fmt.Errorf("service '%s:%s' not found", service, version)
+	}
+
+	// Now delete using the ID
+	deleteRel := &url.URL{Path: "services/" + serviceID}
+	deleteU := c.APIURL.ResolveReference(deleteRel)
+
+	req, err := http.NewRequest("DELETE", deleteU.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	req.Header.Set("Accept", "application/json")
+
+	config.DumpRequestIfRequired("Microcks delete service", req, true)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired("Microcks delete service", resp, true)
+
+	body, _ = io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 200 && resp.StatusCode != 204 {
+		return fmt.Errorf("delete failed: %s", string(body))
+	}
+
+	return nil
 }
 
 // NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
