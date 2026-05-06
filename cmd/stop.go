@@ -40,13 +40,15 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			errors.CheckError(err)
 			defer containerClient.CloseClient()
 
-			daemonID, _, err := containerClient.GetContainer(instance.Name)
+			daemonID, daemonStatus, err := containerClient.GetContainer(instance.Name)
 			if err != nil {
 				log.Fatalf("failed to inspect container: %v", err)
 			}
 
 			if daemonID == "" {
 				fmt.Printf("Container %s not found in daemon; cleaning up config.\n", instance.Name)
+			} else if daemonStatus != "running" && daemonStatus != "restarting" && daemonStatus != "paused" {
+				fmt.Printf("Microcks instance %s is already stopped (status: %s)\n", instance.Name, daemonStatus)
 			} else {
 				err = containerClient.StopContainer(daemonID)
 				if err != nil {
@@ -73,9 +75,11 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				localConfig.CurrentContext = ""
 				log.Printf("Instance %s removed successfully", instance.Name)
 			} else {
-				instance.Status = "Exited"
-				localConfig.UpsertInstance(instance)
-				log.Printf("Instance %s status updated to Exited", instance.Name)
+				if instance.Status != "Exited" {
+					instance.Status = "Exited"
+					localConfig.UpsertInstance(instance)
+					log.Printf("Instance %s status updated to Exited", instance.Name)
+				}
 			}
 			err = config.WriteLocalConfig(*localConfig, configFile)
 			errors.CheckError(err)
