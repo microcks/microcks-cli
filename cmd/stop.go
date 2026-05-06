@@ -40,13 +40,22 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			errors.CheckError(err)
 			defer containerClient.CloseClient()
 
-			err = containerClient.StopContainer(instance.ContainerID)
+			daemonID, _, err := containerClient.GetContainer(instance.Name)
 			if err != nil {
-				log.Fatalf("Failed to stop a container: %v", err)
-				return
+				log.Fatalf("failed to inspect container: %v", err)
 			}
-			fmt.Println("")
-			log.Printf("Instance %s stopped successfully", instance.Name)
+
+			if daemonID == "" {
+				fmt.Printf("Container %s not found in Docker; cleaning up config.\n", instance.Name)
+			} else {
+				err = containerClient.StopContainer(daemonID)
+				if err != nil {
+					log.Fatalf("Failed to stop a container: %v", err)
+					return
+				}
+				fmt.Println("")
+				log.Printf("Instance %s stopped successfully", instance.Name)
+			}
 
 			// update configs
 
