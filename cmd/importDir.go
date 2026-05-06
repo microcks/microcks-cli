@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ import (
 
 // MicrocksClient interface for dependency injection
 type MicrocksClient interface {
-	UploadArtifact(file string, main bool) (string, error)
+	UploadArtifact(ctx context.Context, file string, main bool) (string, error)
 }
 
 type FileType struct {
@@ -231,7 +232,7 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 	for _, file := range files {
 		fileType := detectFileType(file)
 
-		msg, err := client.UploadArtifact(file, fileType.IsPrimary)
+		msg, err := client.UploadArtifact(context.Background(), file, fileType.IsPrimary)
 		if err != nil {
 			result.FailedCount++
 			result.FailedFiles = append(result.FailedFiles, file)

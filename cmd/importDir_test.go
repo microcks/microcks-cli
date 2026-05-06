@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ type MockMicrocksClient struct {
 	UploadCalls int
 }
 
-func (m *MockMicrocksClient) UploadArtifact(file string, main bool) (string, error) {
+func (m *MockMicrocksClient) UploadArtifact(ctx context.Context, file string, main bool) (string, error) {
 	m.UploadCalls++
 	m.Uploaded = append(m.Uploaded, file)
 

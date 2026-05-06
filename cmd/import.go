@@ -176,16 +176,19 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			}
 
 			// Start watcher if --watch flag is provided.
-			if watch {
-				watchFile, err := config.DefaultLocalWatchPath()
-				errors.CheckError(err)
+	if watch {
+		watchFile, err := config.DefaultLocalWatchPath()
+		errors.CheckError(err)
 
-				wm, err := watcher.NewWatchManger(watchFile)
-				errors.CheckError(err)
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
 
-				fmt.Println("Watch mode enabled - microcks-watcher started...")
-				wm.Run()
-			}
+		wm, err := watcher.NewWatchManger(ctx, watchFile)
+		errors.CheckError(err)
+
+		fmt.Println("Watch mode enabled - microcks-watcher started...")
+		wm.Run()
+	}
 		},
 	}
 

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os/signal"
+	"syscall"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/errors"
@@ -12,7 +15,10 @@ func main() {
 	watchFile, err := config.DefaultLocalWatchPath()
 	errors.CheckError(err)
 
-	wm, err := watcher.NewWatchManger(watchFile)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	wm, err := watcher.NewWatchManger(ctx, watchFile)
 	errors.CheckError(err)
 
 	fmt.Println("[INFO] microcks-watcher started...")
