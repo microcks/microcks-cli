@@ -40,7 +40,7 @@ func NewLoginCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		Use:   "login SERVER",
 		Short: "Login into Microcks instance",
 		Long:  "Login into Microcks instance",
-		Example: `microcks login http://locahost:8080
+		Example: `microcks login http://localhost:8080
 
 # Provide name to your logged in context (Default context name is server name)
 microcks login http://localhost:8080 --name

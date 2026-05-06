@@ -78,7 +78,7 @@ microcks [command] [flags]
 
 | Flag                     | Description                                 |
 | ------------------------ | ------------------------------------------- |
-| `-h, --help`             | help for microck command                    |
+| `-h, --help`             | help for microcks command                    |
 | `--config`               | Path to Microcks config file                |
 | `--microcks-context`     | Name of the Microcks context to use         |
 | `--verbose`              | Produce dumps of HTTP exchanges             |

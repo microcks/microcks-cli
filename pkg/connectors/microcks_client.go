@@ -203,7 +203,7 @@ func (c *microcksClient) HttpClient() *http.Client {
 }
 
 func (c *microcksClient) GetKeycloakURL() (string, error) {
-	// Ensure we have a correct URL for retrieving Keycloal configuration.
+	// Ensure we have a correct URL for retrieving Keycloak configuration.
 	rel := &url.URL{Path: "keycloak/config"}
 	u := c.APIURL.ResolveReference(rel)
 
@@ -241,7 +241,7 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 	authServerURL := configResp["auth-server-url"].(string)
 	realmName := configResp["realm"].(string)
 
-	// Return a proper URL or 'null' if Keycloak is disables.
+	// Return a proper URL or 'null' if Keycloak is disabled.
 	if enabled {
 		return authServerURL + "/realms/" + realmName + "/", nil
 	}
