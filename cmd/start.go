@@ -48,13 +48,13 @@ microcks start --name [name of you container/instance]`,
 			}
 
 			if instance.Status == "Running" {
-				fmt.Printf("Microcks instance with name %s is already running", name)
+				fmt.Printf("Microcks instance with name %s is already running\n", name)
 				return
 			}
 
 			switch instance.Status {
 			case "Running":
-				fmt.Printf("Microcks instance with name %s is already running", name)
+				fmt.Printf("Microcks instance with name %s is already running\n", name)
 				return
 			case "Exited":
 				containerClient, err := connectors.NewContainerClient(instance.Driver)

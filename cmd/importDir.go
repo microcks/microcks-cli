@@ -146,7 +146,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			// Create client
 			mc, err := connectors.NewClient(*globalClientOpts)
 			if err != nil {
-				fmt.Printf("error %v", err)
+				fmt.Printf("error %v\n", err)
 				return
 			}
 

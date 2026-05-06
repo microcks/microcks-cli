@@ -121,7 +121,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					fmt.Printf("Got error when invoking Microcks client retrieving config: %s\n", err)
 					os.Exit(1)
 				}
 
@@ -132,10 +132,10 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
+						fmt.Printf("Got error when invoking Keycloak client: %s\n", err)
 						os.Exit(1)
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
+					//fmt.Printf("Retrieve OAuthToken: %s\n", oauthToken)
 				}
 
 				// Then - launch the test on Microcks Server.
@@ -159,7 +159,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
+					fmt.Printf("error %v\n", err)
 					return
 				}
 
@@ -172,10 +172,10 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			var testResultID string
 			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
-				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
+				fmt.Printf("Got error when invoking Microcks client creating Test: %s\n", err)
 				os.Exit(1)
 			}
-			//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
+			//fmt.Printf("Retrieve TestResult ID: %s\n", testResultID)
 
 			// Finally - wait before checking and loop for some time
 			time.Sleep(1 * time.Second)
@@ -188,7 +188,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			for nowInMilliseconds() < future {
 				testResultSummary, err := mc.GetTestResult(testResultID)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
+					fmt.Printf("Got error when invoking Microcks client check TestResult: %s\n", err)
 					os.Exit(1)
 				}
 				success = testResultSummary.Success
