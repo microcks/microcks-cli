@@ -16,10 +16,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -132,7 +135,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				}
 
 				// Try uploading this artifact.
-				msg, err := mc.UploadArtifact(f, mainArtifact)
+				msg, err := mc.UploadArtifact(context.Background(), f, mainArtifact)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
