@@ -91,7 +91,9 @@ func (wm *WatchManager) Reload() error {
 }
 
 func (wm *WatchManager) Stop() {
-	wm.cancel()
+	if wm.cancel != nil {
+		wm.cancel()
+	}
 }
 
 func (wm *WatchManager) Run() {
