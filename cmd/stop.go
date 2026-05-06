@@ -46,7 +46,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			}
 
 			if daemonID == "" {
-				fmt.Printf("Container %s not found in Docker; cleaning up config.\n", instance.Name)
+				fmt.Printf("Container %s not found in daemon; cleaning up config.\n", instance.Name)
 			} else {
 				err = containerClient.StopContainer(daemonID)
 				if err != nil {
