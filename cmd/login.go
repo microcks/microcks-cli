@@ -266,8 +266,12 @@ func oauth2login(
 		completionChan <- ""
 	}
 
-	srv := &http.Server{Addr: "localhost:" + strconv.Itoa(port)}
-	http.HandleFunc("/auth/callback", callbackHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
+	srv := &http.Server{
+		Addr:    "localhost:" + strconv.Itoa(port),
+		Handler: mux,
+	}
 
 	var url string
 	opts := []oauth2.AuthCodeOption{}
