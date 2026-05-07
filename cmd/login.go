@@ -297,7 +297,10 @@ func oauth2login(
 	ssoAuthFlow(url, ssoLaunchBrowser)
 	errMsg := <-completionChan
 	if errMsg != "" {
-		log.Fatal(errMsg)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer shutdownCancel()
+		_ = srv.Shutdown(shutdownCtx)
+		return "", "", fmt.Errorf("%s", errMsg)
 	}
 	fmt.Printf("Authentication successful\n")
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
