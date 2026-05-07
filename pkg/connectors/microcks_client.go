@@ -36,6 +36,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/util"
 	"golang.org/x/oauth2"
 )
 
@@ -51,7 +52,7 @@ type MicrocksClient interface {
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
-	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+	DownloadArtifact(artifactURL string, mainArtifact bool, secret string, allowInsecure bool) (string, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -481,7 +482,10 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	return string(respBody), err
 }
 
-func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error) {
+func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string, allowInsecure bool) (string, error) {
+	if err := util.ValidateArtifactURL(artifactURL, allowInsecure); err != nil {
+		return "", fmt.Errorf("artifact URL validation failed: %w", err)
+	}
 
 	// create Multipart Form to add fields
 	body := &bytes.Buffer{}
