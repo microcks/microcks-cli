@@ -482,10 +482,9 @@ func (c *microcksClient) GetTestResults(serviceRef string, page, size int) ([]Te
 		return nil, err
 	}
 
-	rel := &url.URL{Path: "tests"}
+	rel := &url.URL{Path: "tests/service/" + serviceID}
 	u := c.APIURL.ResolveReference(rel)
 	q := u.Query()
-	q.Set("serviceId", serviceID)
 	q.Set("page", fmt.Sprintf("%d", page))
 	q.Set("size", fmt.Sprintf("%d", size))
 	u.RawQuery = q.Encode()
@@ -515,12 +514,12 @@ func (c *microcksClient) GetTestResults(serviceRef string, page, size int) ([]Te
 		panic(err.Error())
 	}
 
-	var result testResultsPage
-	if err := json.Unmarshal(body, &result); err != nil {
+	var results []TestResultSummary
+	if err := json.Unmarshal(body, &results); err != nil {
 		return nil, fmt.Errorf("failed to parse test results response: %w", err)
 	}
 
-	return result.Content, nil
+	return results, nil
 }
 
 func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {

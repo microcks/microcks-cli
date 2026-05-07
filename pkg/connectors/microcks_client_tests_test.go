@@ -28,12 +28,8 @@ func makeTestsServer(t *testing.T, serviceID string, results []TestResultSummary
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/services":
-			services := []serviceSummary{{ID: serviceID, Name: "WeatherForecast API", Version: "1.1.0"}}
-			_ = json.NewEncoder(w).Encode(services)
-		case "/api/tests":
-			if got := r.URL.Query().Get("serviceId"); got != serviceID {
-				t.Fatalf("unexpected serviceId: %s", got)
-			}
+			_ = json.NewEncoder(w).Encode([]serviceSummary{{ID: serviceID, Name: "WeatherForecast API", Version: "1.1.0"}})
+		case "/api/tests/service/" + serviceID:
 			if checkPage != "" {
 				if got := r.URL.Query().Get("page"); got != checkPage {
 					t.Fatalf("unexpected page: %s", got)
@@ -44,7 +40,7 @@ func makeTestsServer(t *testing.T, serviceID string, results []TestResultSummary
 					t.Fatalf("unexpected size: %s", got)
 				}
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"content": results})
+			_ = json.NewEncoder(w).Encode(results)
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
