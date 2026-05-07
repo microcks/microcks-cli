@@ -39,7 +39,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
 			if len(args) == 0 {
-				fmt.Println("import command require <specificationFile1[:primary],specificationFile2[:primary]> args")
+				fmt.Println("import command requires <specificationFile1[:primary],specificationFile2[:primary]> args")
 				cmd.HelpFunc()(cmd, args)
 				os.Exit(1)
 			}
