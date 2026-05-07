@@ -286,15 +286,15 @@ func oauth2login(
 		return "", "", fmt.Errorf("failed to bind callback port %s: %v (is another process using it?)", srv.Addr, listenErr)
 	}
 
-	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", url)
-	time.Sleep(1 * time.Second)
-	ssoAuthFlow(url, ssoLaunchBrowser)
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
 		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
 			completionChan <- fmt.Sprintf("Temporary HTTP server failed: %s", serveErr)
 		}
 	}()
+
+	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", url)
+	ssoAuthFlow(url, ssoLaunchBrowser)
 	errMsg := <-completionChan
 	if errMsg != "" {
 		log.Fatal(errMsg)
