@@ -228,12 +228,12 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read Keycloak config response: %w", err)
 	}
 
 	var configResp map[string]interface{}
 	if err := json.Unmarshal(body, &configResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse Keycloak config response: %w", err)
 	}
 
 	// Retrieve auth server url and realm name.
@@ -367,16 +367,16 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read create test result response: %w", err)
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse create test result response: %w", err)
 	}
 
 	testID := createTestResp["id"].(string)
-	return testID, err
+	return testID, nil
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
@@ -406,7 +406,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read test result response: %w", err)
 	}
 
 	result := TestResultSummary{}
@@ -434,7 +434,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	}
 	_, err = io.Copy(part, file)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to copy file content into multipart body: %w", err)
 	}
 
 	// Add the mainArtifact flag to request.
@@ -470,7 +470,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read upload artifact response: %w", err)
 	}
 
 	// Raise exception if not created.
@@ -478,7 +478,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 		return "", errs.New(string(respBody))
 	}
 
-	return string(respBody), err
+	return string(respBody), nil
 }
 
 func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error) {
@@ -524,7 +524,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read download artifact response: %w", err)
 	}
 
 	// Raise exception if not created.
@@ -532,7 +532,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 		return "", errs.New(string(respBody))
 	}
 
-	return string(respBody), err
+	return string(respBody), nil
 }
 
 func ensureValidOperationsList(filteredOperations string) bool {
