@@ -22,33 +22,41 @@ import (
 	"testing"
 )
 
-func TestGetTestResultsReturnsResults(t *testing.T) {
-	payload := map[string]interface{}{
-		"content": []TestResultSummary{
-			{ID: "abc123", ServiceID: "WeatherForecast API:1.1.0", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: true},
-			{ID: "def456", ServiceID: "WeatherForecast API:1.1.0", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: false},
-		},
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/tests" {
+func makeTestsServer(t *testing.T, serviceID string, results []TestResultSummary, checkPage, checkSize string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/services":
+			services := []serviceSummary{{ID: serviceID, Name: "WeatherForecast API", Version: "1.1.0"}}
+			_ = json.NewEncoder(w).Encode(services)
+		case "/api/tests":
+			if got := r.URL.Query().Get("serviceId"); got != serviceID {
+				t.Fatalf("unexpected serviceId: %s", got)
+			}
+			if checkPage != "" {
+				if got := r.URL.Query().Get("page"); got != checkPage {
+					t.Fatalf("unexpected page: %s", got)
+				}
+			}
+			if checkSize != "" {
+				if got := r.URL.Query().Get("size"); got != checkSize {
+					t.Fatalf("unexpected size: %s", got)
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"content": results})
+		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if r.Method != http.MethodGet {
-			t.Fatalf("unexpected method: %s", r.Method)
-		}
-		if got := r.URL.Query().Get("serviceId"); got != "WeatherForecast API:1.1.0" {
-			t.Fatalf("unexpected serviceId: %s", got)
-		}
-		if got := r.URL.Query().Get("page"); got != "0" {
-			t.Fatalf("unexpected page: %s", got)
-		}
-		if got := r.URL.Query().Get("size"); got != "20" {
-			t.Fatalf("unexpected size: %s", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(payload)
 	}))
+}
+
+func TestGetTestResultsReturnsResults(t *testing.T) {
+	results := []TestResultSummary{
+		{ID: "abc123", ServiceID: "svc001", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: true},
+		{ID: "def456", ServiceID: "svc001", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: false},
+	}
+	server := makeTestsServer(t, "svc001", results, "0", "20")
 	defer server.Close()
 
 	client := NewMicrocksClient(server.URL)
@@ -68,14 +76,11 @@ func TestGetTestResultsReturnsResults(t *testing.T) {
 }
 
 func TestGetTestResultsReturnsEmptySlice(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"content":[]}`))
-	}))
+	server := makeTestsServer(t, "svc001", []TestResultSummary{}, "", "")
 	defer server.Close()
 
 	client := NewMicrocksClient(server.URL)
-	got, err := client.GetTestResults("Unknown API:1.0.0", 0, 20)
+	got, err := client.GetTestResults("WeatherForecast API:1.1.0", 0, 20)
 	if err != nil {
 		t.Fatalf("GetTestResults returned error: %v", err)
 	}
@@ -85,34 +90,23 @@ func TestGetTestResultsReturnsEmptySlice(t *testing.T) {
 }
 
 func TestGetTestResultsPaginationParams(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("page"); got != "2" {
-			t.Fatalf("unexpected page: %s", got)
-		}
-		if got := r.URL.Query().Get("size"); got != "5" {
-			t.Fatalf("unexpected size: %s", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"content":[]}`))
-	}))
+	server := makeTestsServer(t, "svc001", []TestResultSummary{}, "2", "5")
 	defer server.Close()
 
 	client := NewMicrocksClient(server.URL)
-	_, err := client.GetTestResults("SomeAPI:1.0.0", 2, 5)
+	_, err := client.GetTestResults("WeatherForecast API:1.1.0", 2, 5)
 	if err != nil {
 		t.Fatalf("GetTestResults returned error: %v", err)
 	}
 }
 
-func TestGetTestResultsInvalidJSONReturnsError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("not json"))
-	}))
+func TestGetTestResultsInvalidServiceRefReturnsError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer server.Close()
 
 	client := NewMicrocksClient(server.URL)
-	_, err := client.GetTestResults("SomeAPI:1.0.0", 0, 20)
+	_, err := client.GetTestResults("NoColonHere", 0, 20)
 	if err == nil {
-		t.Fatal("expected error for invalid JSON, got nil")
+		t.Fatal("expected error for invalid serviceRef format, got nil")
 	}
 }

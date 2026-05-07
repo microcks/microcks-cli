@@ -74,6 +74,13 @@ type testResultsPage struct {
 	Content []TestResultSummary `json:"content"`
 }
 
+// serviceSummary holds the fields needed to resolve a service ObjectId by name and version
+type serviceSummary struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 // HeaderDTO represents an operation header passed for Test
 type HeaderDTO struct {
 	Name   string `json:"name"`
@@ -424,11 +431,61 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	return &result, nil
 }
 
+func (c *microcksClient) getServiceID(serviceRef string) (string, error) {
+	parts := strings.SplitN(serviceRef, ":", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("serviceRef must be in <name>:<version> format")
+	}
+	name, version := parts[0], parts[1]
+
+	rel := &url.URL{Path: "services"}
+	u := c.APIURL.ResolveReference(rel)
+	q := u.Query()
+	q.Set("page", "0")
+	q.Set("size", "200")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var services []serviceSummary
+	if err := json.Unmarshal(body, &services); err != nil {
+		return "", fmt.Errorf("failed to parse services response: %w", err)
+	}
+
+	for _, s := range services {
+		if s.Name == name && s.Version == version {
+			return s.ID, nil
+		}
+	}
+	return "", fmt.Errorf("service %q not found", serviceRef)
+}
+
 func (c *microcksClient) GetTestResults(serviceRef string, page, size int) ([]TestResultSummary, error) {
+	serviceID, err := c.getServiceID(serviceRef)
+	if err != nil {
+		return nil, err
+	}
+
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
 	q := u.Query()
-	q.Set("serviceId", serviceRef)
+	q.Set("serviceId", serviceID)
 	q.Set("page", fmt.Sprintf("%d", page))
 	q.Set("size", fmt.Sprintf("%d", size))
 	u.RawQuery = q.Encode()
