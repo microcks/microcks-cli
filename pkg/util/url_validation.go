@@ -33,6 +33,11 @@ var privateHostnames = map[string]bool{
 	"host.docker.internal": true,
 }
 
+var carrierGradeNAT = &net.IPNet{
+	IP:   net.ParseIP("100.64.0.0"),
+	Mask: net.CIDRMask(10, 32),
+}
+
 func ValidateArtifactURL(rawURL string, allowInsecure bool) error {
 	if rawURL == "" {
 		return fmt.Errorf("URL must not be empty")
@@ -41,6 +46,10 @@ func ValidateArtifactURL(rawURL string, allowInsecure bool) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	if u.Scheme == "" {
+		return fmt.Errorf("URL must have a scheme")
 	}
 
 	if u.Host == "" {
@@ -86,6 +95,17 @@ func validateHost(host string) error {
 		return nil
 	}
 
+	if ip := net.ParseIP(hostname); ip == nil {
+		hostname = strings.TrimPrefix(hostname, "[")
+		hostname = strings.TrimSuffix(hostname, "]")
+		if ip = net.ParseIP(hostname); ip != nil {
+			if isPrivateIP(ip) {
+				return fmt.Errorf("IP address %q is not allowed as it is a private/reserved address", ip.String())
+			}
+			return nil
+		}
+	}
+
 	return resolveAndCheckHost(hostname)
 }
 
@@ -94,11 +114,20 @@ func isPrivateHostname(host string) bool {
 }
 
 func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() ||
+	if ip.IsLoopback() ||
 		ip.IsPrivate() ||
 		ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified()
+		ip.IsUnspecified() {
+		return true
+	}
+
+	ipv4 := ip.To4()
+	if ipv4 != nil && carrierGradeNAT.Contains(ipv4) {
+		return true
+	}
+
+	return false
 }
 
 func resolveAndCheckHost(hostname string) error {
