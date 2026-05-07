@@ -189,7 +189,7 @@ func oauth2login(
 	port int,
 	oauth2conf *oauth2.Config,
 	ssoLaunchBrowser bool,
-) (string, string) {
+) (string, string, error) {
 	oauth2conf.ClientID = "microcks-app-js"
 	oauth2conf.RedirectURL = fmt.Sprintf("http://localhost:%d/auth/callback", port)
 
@@ -308,7 +308,7 @@ func oauth2login(
 	_ = srv.Shutdown(ctx)
 	log.Printf("Token: %s\n", tokenString)
 	log.Printf("Refresh Token: %s\n", refreshToken)
-	return tokenString, refreshToken
+	return tokenString, refreshToken, nil
 }
 
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
