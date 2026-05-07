@@ -69,6 +69,11 @@ type TestResultSummary struct {
 	RunnerType     string `json:"runnerType"`
 }
 
+// testResultsPage wraps the paginated response from GET /api/tests
+type testResultsPage struct {
+	Content []TestResultSummary `json:"content"`
+}
+
 // HeaderDTO represents an operation header passed for Test
 type HeaderDTO struct {
 	Name   string `json:"name"`
@@ -453,12 +458,12 @@ func (c *microcksClient) GetTestResults(serviceRef string, page, size int) ([]Te
 		panic(err.Error())
 	}
 
-	var results []TestResultSummary
-	if err := json.Unmarshal(body, &results); err != nil {
+	var result testResultsPage
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse test results response: %w", err)
 	}
 
-	return results, nil
+	return result.Content, nil
 }
 
 func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {

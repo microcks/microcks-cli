@@ -23,9 +23,11 @@ import (
 )
 
 func TestGetTestResultsReturnsResults(t *testing.T) {
-	results := []TestResultSummary{
-		{ID: "abc123", ServiceID: "WeatherForecast API:1.1.0", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: true},
-		{ID: "def456", ServiceID: "WeatherForecast API:1.1.0", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: false},
+	payload := map[string]interface{}{
+		"content": []TestResultSummary{
+			{ID: "abc123", ServiceID: "WeatherForecast API:1.1.0", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: true},
+			{ID: "def456", ServiceID: "WeatherForecast API:1.1.0", TestedEndpoint: "http://localhost:8080", RunnerType: "OPEN_API_SCHEMA", Success: false},
+		},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +47,7 @@ func TestGetTestResultsReturnsResults(t *testing.T) {
 			t.Fatalf("unexpected size: %s", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(results)
+		_ = json.NewEncoder(w).Encode(payload)
 	}))
 	defer server.Close()
 
@@ -68,7 +70,7 @@ func TestGetTestResultsReturnsResults(t *testing.T) {
 func TestGetTestResultsReturnsEmptySlice(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte("[]"))
+		_, _ = w.Write([]byte(`{"content":[]}`))
 	}))
 	defer server.Close()
 
@@ -91,7 +93,7 @@ func TestGetTestResultsPaginationParams(t *testing.T) {
 			t.Fatalf("unexpected size: %s", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte("[]"))
+		_, _ = w.Write([]byte(`{"content":[]}`))
 	}))
 	defer server.Close()
 
