@@ -50,6 +50,7 @@ type MicrocksClient interface {
 	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
+	GetTestResults(serviceRef string, page, size int) ([]TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
@@ -65,6 +66,7 @@ type TestResultSummary struct {
 	ElapsedTime    int32  `json:"elapsedTime"`
 	Success        bool   `json:"success"`
 	InProgress     bool   `json:"inProgress"`
+	RunnerType     string `json:"runnerType"`
 }
 
 // HeaderDTO represents an operation header passed for Test
@@ -415,6 +417,48 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	}
 
 	return &result, nil
+}
+
+func (c *microcksClient) GetTestResults(serviceRef string, page, size int) ([]TestResultSummary, error) {
+	rel := &url.URL{Path: "tests"}
+	u := c.APIURL.ResolveReference(rel)
+	q := u.Query()
+	q.Set("serviceId", serviceRef)
+	q.Set("page", fmt.Sprintf("%d", page))
+	q.Set("size", fmt.Sprintf("%d", size))
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for listing test results", req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for listing test results", resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var results []TestResultSummary
+	if err := json.Unmarshal(body, &results); err != nil {
+		return nil, fmt.Errorf("failed to parse test results response: %w", err)
+	}
+
+	return results, nil
 }
 
 func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
