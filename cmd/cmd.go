@@ -18,7 +18,6 @@ package cmd
 import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
-	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -27,11 +26,13 @@ func NewCommad() *cobra.Command {
 	var clientOpts connectors.ClientOptions
 
 	command := &cobra.Command{
-		Use:          "microcks",
-		Short:        "A CLI tool for Microcks",
-		SilenceUsage: true,
-		Run: func(cmd *cobra.Command, args []string) {
+		Use:           "microcks",
+		Short:         "A CLI tool for Microcks",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.HelpFunc()(cmd, args)
+			return nil
 		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
@@ -50,7 +51,9 @@ func NewCommad() *cobra.Command {
 	command.AddCommand(NewLogoutCommand(&clientOpts))
 
 	defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
-	errors.CheckError(err)
+	if err != nil {
+		defaultLocalConfigPath = ""
+	}
 	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config")
 	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use")
 	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
