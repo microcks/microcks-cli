@@ -130,7 +130,8 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					kc := connectors.NewKeycloakClient(keycloakUrl, "", "")
 					oauth2conf, err := kc.GetOIDCConfig()
 					errors.CheckError(err)
-					authToken, refreshToken = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					authToken, refreshToken, err = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					errors.CheckError(err)
 					authCfg.ClientId = "microcks-app-js"
 				}
 
