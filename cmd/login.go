@@ -281,13 +281,18 @@ func oauth2login(
 	opts = append(opts, oauth2.SetAuthURLParam("code_challenge_method", "S256"))
 	url = oauth2conf.AuthCodeURL(stateNonce, opts...)
 
+	ln, listenErr := net.Listen("tcp", srv.Addr)
+	if listenErr != nil {
+		return "", "", fmt.Errorf("failed to bind callback port %s: %v (is another process using it?)", srv.Addr, listenErr)
+	}
+
 	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", url)
 	time.Sleep(1 * time.Second)
 	ssoAuthFlow(url, ssoLaunchBrowser)
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("Temporary HTTP server failed: %s", err)
+		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
+			completionChan <- fmt.Sprintf("Temporary HTTP server failed: %s", serveErr)
 		}
 	}()
 	errMsg := <-completionChan
