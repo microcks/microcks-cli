@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -32,13 +31,8 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 		Use:   "import-url",
 		Short: "import API artifacts from URL on Microcks server",
 		Long:  `import API artifacts from URL on Microcks server`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Parse subcommand args first.
-			if len(args) == 0 {
-				fmt.Println("import-url command require <specificationFile1URL[:primary],specificationFile2URL[:primary]> args")
-				os.Exit(1)
-			}
-
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			specificationFiles := args[0]
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
@@ -48,41 +42,32 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			var mc connectors.MicrocksClient
 
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
-				// create client with server address
 				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
-					os.Exit(1)
+					return fmt.Errorf("got error when invoking Microcks client retrieving config: %w", err)
 				}
 
 				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
-					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
-						os.Exit(1)
+						return fmt.Errorf("got error when invoking Keycloak client: %w", err)
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
-				//Set Auth token
 				mc.SetOAuthToken(oauthToken)
 			} else {
-
 				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 				if err != nil {
-					fmt.Println(err)
-					return
+					return err
 				}
 
 				if localConfig == nil {
-					fmt.Println("Please login to perform operation...")
-					return
+					return fmt.Errorf("please login to perform operation")
 				}
 
 				if globalClientOpts.Context == "" {
@@ -91,16 +76,15 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
-					return
+					return fmt.Errorf("error creating client: %w", err)
 				}
 			}
+
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
 				mainArtifact := true
 				secret := ""
 
-				// Check if URL starts with https or http
 				if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
 					urlAndMainAtrifactAndSecretName := strings.Split(f, ":")
 					n := len(urlAndMainAtrifactAndSecretName)
@@ -117,14 +101,13 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					}
 				}
 
-				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
-					os.Exit(1)
+					return fmt.Errorf("got error when invoking Microcks client importing Artifact: %w", err)
 				}
 				fmt.Printf("Microcks has discovered '%s'\n", msg)
 			}
+			return nil
 		},
 	}
 

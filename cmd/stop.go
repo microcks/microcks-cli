@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -16,15 +15,14 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Use:   "stop",
 		Short: "stop microcks instance",
 		Long:  "stop microcks instance",
-		Run: func(cmd *cobra.Command, args []string) {
-
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
 			errors.CheckError(err)
 
 			if localConfig == nil {
 				fmt.Println("Config not found, nothing to stop")
-				return
+				return nil
 			}
 
 			ctx, err := localConfig.ResolveContext("")
@@ -32,29 +30,23 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			instance := ctx.Instance
 
 			if instance.Name == "" {
-				fmt.Println("No instance is associated with this context")
-				return
+				return fmt.Errorf("no instance is associated with this context")
 			}
 
 			containerClient, err := connectors.NewContainerClient(instance.Driver)
 			errors.CheckError(err)
 			defer containerClient.CloseClient()
 
-			err = containerClient.StopContainer(instance.ContainerID)
-			if err != nil {
-				log.Fatalf("Failed to stop a container: %v", err)
-				return
+			if err := containerClient.StopContainer(instance.ContainerID); err != nil {
+				return fmt.Errorf("failed to stop container: %w", err)
 			}
-			fmt.Println("")
-			log.Printf("Instance %s stopped successfully", instance.Name)
 
-			// update configs
+			fmt.Printf("Instance %s stopped successfully\n", instance.Name)
 
 			if instance.AutoRemove {
 				_, ok := localConfig.RemoveContext(ctx.Name)
 				if !ok {
-					log.Fatalf("Context %s does not exist", ctx.Name)
-					return
+					return fmt.Errorf("context %s does not exist", ctx.Name)
 				}
 				_ = localConfig.RemoveServer(ctx.Server.Server)
 				_ = localConfig.RemoveUser(ctx.User.Name)
@@ -62,14 +54,17 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				_ = localConfig.RemoveInstance(instance.Name)
 
 				localConfig.CurrentContext = ""
-				log.Printf("Instance %s removed successfully", instance.Name)
+				fmt.Printf("Instance %s removed successfully\n", instance.Name)
 			} else {
 				instance.Status = "Exited"
 				localConfig.UpsertInstance(instance)
-				log.Printf("Instance %s status updated to Exited", instance.Name)
+				fmt.Printf("Instance %s status updated to Exited\n", instance.Name)
 			}
-			err = config.WriteLocalConfig(*localConfig, configFile)
-			errors.CheckError(err)
+
+			if err := config.WriteLocalConfig(*localConfig, configFile); err != nil {
+				return fmt.Errorf("failed to write config: %w", err)
+			}
+			return nil
 		},
 	}
 

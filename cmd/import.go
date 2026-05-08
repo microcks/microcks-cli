@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -35,15 +34,8 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 		Use:   "import",
 		Short: "import API artifacts on Microcks server",
 		Long:  `import API artifacts on Microcks server`,
-		Args:  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			// Parse subcommand args first.
-			if len(args) == 0 {
-				fmt.Println("import command require <specificationFile1[:primary],specificationFile2[:primary]> args")
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
-			}
-
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			specificationFiles := args[0]
 
 			// Initialize config from command options.
@@ -54,8 +46,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			// Read local config file in case we need some context info.
 			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			if err != nil {
-				fmt.Println(err)
-				return
+				return err
 			}
 
 			// Prepare Microcks client.
@@ -67,8 +58,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
-					os.Exit(1)
+					return fmt.Errorf("got error when invoking Microcks client retrieving config: %w", err)
 				}
 
 				var oauthToken string = "unauthenticated-token"
@@ -78,10 +68,8 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
-						os.Exit(1)
+						return fmt.Errorf("got error when invoking Keycloak client: %w", err)
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
 				// Set Auth token.
@@ -100,8 +88,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			} else {
 				// Create client from config file and using the current or provided context.
 				if localConfig == nil {
-					fmt.Println("Please login to perform operation...")
-					return
+					return fmt.Errorf("please login to perform operation")
 				}
 
 				if globalClientOpts.Context == "" {
@@ -110,8 +97,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
-					return
+					return fmt.Errorf("error creating client: %w", err)
 				}
 			}
 
@@ -134,8 +120,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				// Try uploading this artifact.
 				msg, err := mc.UploadArtifact(f, mainArtifact)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
-					os.Exit(1)
+					return fmt.Errorf("got error when invoking Microcks client importing Artifact: %w", err)
 				}
 				action := "discovered"
 				if !mainArtifact {
@@ -183,6 +168,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				fmt.Println("Watch mode enabled - microcks-watcher started...")
 				wm.Run()
 			}
+			return nil
 		},
 	}
 

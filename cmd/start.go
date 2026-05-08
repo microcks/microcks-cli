@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -28,12 +27,11 @@ microcks start
 microcks start --port [Port you want]
 
 # Define your driver (by default docker)
-microcks start --driver [driver you wnat either 'docker' or 'podman']
+microcks start --driver [driver you want either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
-microcks start --name [name of you container/instance]`,
-		Run: func(cmd *cobra.Command, args []string) {
-
+microcks start --name [name of your container/instance]`,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
 			errors.CheckError(err)
@@ -47,23 +45,17 @@ microcks start --name [name of you container/instance]`,
 				instance = &config.Instance{}
 			}
 
-			if instance.Status == "Running" {
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
-			}
-
 			switch instance.Status {
 			case "Running":
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+				fmt.Printf("Microcks instance with name %s is already running\n", name)
+				return nil
 			case "Exited":
 				containerClient, err := connectors.NewContainerClient(instance.Driver)
 				errors.CheckError(err)
 				defer containerClient.CloseClient()
 
 				if err := containerClient.StartContainer(instance.ContainerID); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					return fmt.Errorf("failed to start container: %w", err)
 				}
 				instance.Status = "Running"
 			default:
@@ -78,13 +70,11 @@ microcks start --name [name of you container/instance]`,
 					AutoRemove: autoRemove,
 				})
 				if err != nil {
-					log.Fatalf("Failed to create a container: %v", err)
-					return
+					return fmt.Errorf("failed to create container: %w", err)
 				}
 
 				if err := containerClient.StartContainer(containerId); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					return fmt.Errorf("failed to start container: %w", err)
 				}
 
 				instance.ContainerID = containerId
@@ -96,7 +86,6 @@ microcks start --name [name of you container/instance]`,
 				instance.Driver = driver
 			}
 
-			//Store config and change context
 			localConfig.UpsertInstance(config.Instance{
 				ContainerID: instance.ContainerID,
 				Name:        instance.Name,
@@ -136,17 +125,18 @@ microcks start --name [name of you container/instance]`,
 				Instance: instance.Name,
 			})
 
-			// Save configs to config file
-			err = config.WriteLocalConfig(*localConfig, configFile)
-			errors.CheckError(err)
+			if err := config.WriteLocalConfig(*localConfig, configFile); err != nil {
+				return fmt.Errorf("failed to write config: %w", err)
+			}
 
 			fmt.Printf("Microcks started successfully at %s\n", server)
+			return nil
 		},
 	}
-	startCmd.Flags().StringVar(&name, "name", "microcks", "name for you microcks instance")
-	startCmd.Flags().StringVar(&hostPort, "port", "8585", "")
+	startCmd.Flags().StringVar(&name, "name", "microcks", "name for your microcks instance")
+	startCmd.Flags().StringVar(&hostPort, "port", "8585", "port to expose Microcks on")
 	startCmd.Flags().StringVar(&imageName, "image", "quay.io/microcks/microcks-uber:latest-native", "image which will be used to create a container")
-	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of dokcer to automatically remove the container when it exits")
-	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
+	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "automatically remove the container when it exits")
+	startCmd.Flags().StringVar(&driver, "driver", "docker", "container driver to use: 'docker' or 'podman'")
 	return startCmd
 }
