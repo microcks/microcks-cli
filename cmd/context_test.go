@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -36,15 +37,13 @@ users:
   auth-token: ""
   refresh-token: ""`
 
-const testConfigFilePath = "./testdata/local.config"
-
 func TestDeleteContext(t *testing.T) {
-	//write the test config file
-	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
+	testConfigFilePath := filepath.Join(t.TempDir(), "local.config")
+
+	// write the test config file
+	err := os.WriteFile(testConfigFilePath, []byte(testConfig), 0o600)
 	require.NoError(t, err)
 
-	err = os.Chmod(testConfigFilePath, 0o600)
-	require.NoError(t, err, "Could not change the file permission to 0600 %v", err)
 	localCfg, err := config.ReadLocalConfig(testConfigFilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:8083", localCfg.CurrentContext)
