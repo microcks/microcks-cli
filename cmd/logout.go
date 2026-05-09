@@ -17,8 +17,11 @@ func NewLogoutCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 		Use:   "logout CONTEXT",
 		Short: "Log out from Microcks",
 		Long:  "Log out from Microcks",
-		Example: `# To log out of Microcks
-$ microcks logout`,
+		Example: `# Log out from a Microcks server URL
+microcks logout http://localhost:8080
+
+# Log out from a named context
+microcks logout dev-context`,
 
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
