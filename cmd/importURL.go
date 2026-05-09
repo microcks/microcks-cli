@@ -28,6 +28,8 @@ import (
 )
 
 func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var allowInsecureURL bool
+
 	var importURLCmd = &cobra.Command{
 		Use:   "import-url",
 		Short: "import API artifacts from URL on Microcks server",
@@ -117,8 +119,8 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					}
 				}
 
-				// Try downloading the artifcat
-				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
+		// Try downloading the artifcat
+		msg, err := mc.DownloadArtifact(f, mainArtifact, secret, allowInsecureURL)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
@@ -127,6 +129,8 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 		},
 	}
+
+	importURLCmd.Flags().BoolVar(&allowInsecureURL, "allow-insecure-url", false, "Allow http:// URLs (by default only https:// is permitted)")
 
 	return importURLCmd
 }
