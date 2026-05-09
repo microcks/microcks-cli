@@ -36,6 +36,18 @@ jobs:
           go-version-file: ./go.mod
           cache-dependency-path: ./go.sum
 
+      - name: Run unit tests
+        run: go test ./...
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run staticcheck
+        uses: dominikh/staticcheck-action@v1.3.0
+        with:
+          version: latest
+          install-go: false
+
       - name: Build Go packages
         run: |
           make clean
