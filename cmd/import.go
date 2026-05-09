@@ -118,18 +118,10 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			// Handle multiple specification files separated by comma.
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
-				var err error
-
-				// Check if mainArtifact flag is provided.
-				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", pathAndMainArtifact[1])
-					}
-				}
+				// Parse optional :true / :false suffix. Preserves paths
+				// containing colons (e.g. Windows C:\Temp\api.yaml).
+				path, mainArtifact := parseImportEntry(f)
+				f = path
 
 				// Try uploading this artifact.
 				msg, err := mc.UploadArtifact(f, mainArtifact)
@@ -188,4 +180,26 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change")
 	return importCmd
+}
+
+// parseImportEntry parses a single comma-separated entry of the import
+// command argument. The accepted forms are "<path>" and
+// "<path>:<bool>", where <bool> is anything strconv.ParseBool accepts
+// (true, false, TRUE, FALSE, 1, 0, t, f, ...). Because <path> may
+// itself contain colons (e.g. Windows-absolute paths such as
+// C:\Temp\api.yaml), the optional boolean suffix is detected from the
+// right: only the substring after the last ':' is considered, and
+// only when it parses as a bool is it treated as the mainArtifact
+// flag. Otherwise the whole input is returned unchanged with
+// mainArtifact defaulting to true.
+func parseImportEntry(input string) (string, bool) {
+	idx := strings.LastIndex(input, ":")
+	if idx < 0 {
+		return input, true
+	}
+	b, err := strconv.ParseBool(input[idx+1:])
+	if err != nil {
+		return input, true
+	}
+	return input[:idx], b
 }
