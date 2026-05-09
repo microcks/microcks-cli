@@ -32,6 +32,10 @@ var (
 	runnerChoices = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true, "GRPC_PROTOBUF": true, "GRAPHQL_SCHEMA": true}
 )
 
+const testCommandUsageError = "test command require <apiName:apiVersion> <testEndpoint> <runner> args"
+const testCommandRunnerError = "<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA"
+const testCommandWaitForFormatError = "--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)"
+
 func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var (
 		waitFor            string
@@ -47,32 +51,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Long:  `Run tests on Microcks`,
 		Args:  cobra.ExactArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-
-			serviceRef := args[0]
-			testEndpoint := args[1]
-			runnerType := args[2]
-
-			// Validate presence and values of args.
-			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
-			}
-			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
-			}
-			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
-			}
-			if _, validChoice := runnerChoices[runnerType]; !validChoice {
-				fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
-				os.Exit(1)
-			}
-
-			// Validate presence and values of flags.
-			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
+			serviceRef, testEndpoint, runnerType, err := validateTestCommandArgs(args)
+			if err != nil {
+				fmt.Println(err.Error())
 				os.Exit(1)
 			}
 
@@ -81,29 +62,10 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			config.CaCertPaths = globalClientOpts.CaCertPaths
 			config.Verbose = globalClientOpts.Verbose
 
-			// Compute time to wait in milliseconds.
-			var waitForMilliseconds int64
-			if strings.HasSuffix(waitFor, "milli") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
-				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
-				}
-				waitForMilliseconds = n
-			} else if strings.HasSuffix(waitFor, "sec") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
-				}
-				waitForMilliseconds = n * 1000
-			} else if strings.HasSuffix(waitFor, "min") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
-				}
-				waitForMilliseconds = n * 60 * 1000
+			waitForMilliseconds, err := parseWaitForMilliseconds(waitFor)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
 			}
 
 			var mc connectors.MicrocksClient
@@ -165,7 +127,8 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				serverAddr = ctx.Server.Server
 			}
 
-			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			var testResultID string
+			testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
 				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 				os.Exit(1)
@@ -213,6 +176,53 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
 
 	return testCmd
+}
+
+func validateTestCommandArgs(args []string) (string, string, string, error) {
+	if len(args) < 3 {
+		return "", "", "", fmt.Errorf(testCommandUsageError)
+	}
+
+	serviceRef := args[0]
+	testEndpoint := args[1]
+	runnerType := args[2]
+
+	if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
+		return "", "", "", fmt.Errorf(testCommandUsageError)
+	}
+	if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
+		return "", "", "", fmt.Errorf(testCommandUsageError)
+	}
+	if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
+		return "", "", "", fmt.Errorf(testCommandUsageError)
+	}
+	if _, validChoice := runnerChoices[runnerType]; !validChoice {
+		return "", "", "", fmt.Errorf(testCommandRunnerError)
+	}
+
+	return serviceRef, testEndpoint, runnerType, nil
+}
+
+func parseWaitForMilliseconds(waitFor string) (int64, error) {
+	if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
+		return 0, fmt.Errorf(testCommandWaitForFormatError)
+	}
+
+	if strings.HasSuffix(waitFor, "milli") {
+		return parseWaitForValue(waitFor, "milli", 1)
+	}
+	if strings.HasSuffix(waitFor, "sec") {
+		return parseWaitForValue(waitFor, "sec", 1000)
+	}
+	return parseWaitForValue(waitFor, "min", 60*1000)
+}
+
+func parseWaitForValue(waitFor string, suffix string, multiplier int64) (int64, error) {
+	n, err := strconv.ParseInt(waitFor[:len(waitFor)-len(suffix)], 0, 64)
+	if err != nil {
+		return 0, fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
+	}
+	return n * multiplier, nil
 }
 
 func nowInMilliseconds() int64 {
