@@ -14,7 +14,16 @@ func String(n int) (string, error) {
 }
 
 // StringFromCharset generates, from a given charset, a cryptographically-secure pseudo-random string of a given length.
+//
+// Returns an error when n is negative, or when n > 0 and charset is empty.
+// n == 0 returns "" with no error regardless of the charset.
 func StringFromCharset(n int, charset string) (string, error) {
+	if n < 0 {
+		return "", fmt.Errorf("rand: requested length %d is negative", n)
+	}
+	if n > 0 && len(charset) == 0 {
+		return "", fmt.Errorf("rand: cannot generate %d-character string from empty charset", n)
+	}
 	b := make([]byte, n)
 	maxIdx := big.NewInt(int64(len(charset)))
 	for i := 0; i < n; i++ {
