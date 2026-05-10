@@ -112,7 +112,9 @@ func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) 
 		return "", err
 	}
 	defer out.Close()
-	io.Copy(os.Stdout, out)
+	if err := copyImagePullOutput(out); err != nil {
+		return "", err
+	}
 
 	resp, err := cli.cli.ContainerCreate(
 		ctx,
@@ -147,4 +149,12 @@ func (cli *containerClient) StopContainer(containerId string) error {
 
 func (cli *containerClient) CloseClient() error {
 	return cli.cli.Close()
+}
+
+func copyImagePullOutput(out io.Reader) error {
+	_, err := io.Copy(os.Stdout, out)
+	if err != nil {
+		return fmt.Errorf("failed to read image pull output: %w", err)
+	}
+	return nil
 }
