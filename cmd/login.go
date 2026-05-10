@@ -105,7 +105,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			if keycloakUrl == "null" {
 				localConfig.UpsertServer(config.Server{
 					Server:         server,
-					InsecureTLS:    true,
+					InsecureTLS:    globalClientOpts.InsecureTLS,
 					KeycloakEnable: false,
 				})
 				fmt.Print("No login required...\n")
@@ -146,7 +146,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 
 				localConfig.UpsertServer(config.Server{
 					Server:         server,
-					InsecureTLS:    true,
+					InsecureTLS:    globalClientOpts.InsecureTLS,
 					KeycloakEnable: true,
 				})
 			}
