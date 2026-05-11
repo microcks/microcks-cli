@@ -46,7 +46,7 @@ type keycloakClient struct {
 }
 
 // NewKeycloakClient build a new KeycloakClient implementation
-func NewKeycloakClient(realmURL string, username string, password string) KeycloakClient {
+func NewKeycloakClient(realmURL string, username string, password string, verbose bool) KeycloakClient {
 	kc := keycloakClient{}
 
 	u, err := url.Parse(realmURL)
@@ -57,15 +57,15 @@ func NewKeycloakClient(realmURL string, username string, password string) Keyclo
 	kc.Username = username
 	kc.Password = password
 
+	var transport http.RoundTripper = http.DefaultTransport
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		kc.httpClient = &http.Client{Transport: tr}
-	} else {
-		kc.httpClient = http.DefaultClient
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+	if verbose {
+		transport = &loggingTransport{transport: transport, verbose: true}
+	}
+	kc.httpClient = &http.Client{Transport: transport}
 	return &kc
 }
 

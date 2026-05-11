@@ -45,9 +45,13 @@ var (
 
 type loggingTransport struct {
 	transport http.RoundTripper
+	verbose   bool
 }
 
 func (l *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !l.verbose {
+		return l.transport.RoundTrip(req)
+	}
 	fmt.Fprintf(os.Stderr, ">> %s %s\n", req.Method, req.URL.String())
 	for k, v := range req.Header {
 		if strings.EqualFold(k, "authorization") {
@@ -178,7 +182,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
 	if c.Verbose {
-		transport = &loggingTransport{transport: transport}
+		transport = &loggingTransport{transport: transport, verbose: true}
 	}
 	c.httpClient = &http.Client{Transport: transport}
 
@@ -192,8 +196,8 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 }
 
 // NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
-func NewMicrocksClient(apiURL string) MicrocksClient {
-	mc := microcksClient{}
+func NewMicrocksClient(apiURL string, verbose bool) MicrocksClient {
+	mc := microcksClient{Verbose: verbose}
 
 	if strings.HasSuffix(apiURL, "/api") {
 		apiURL += "/"
@@ -212,6 +216,9 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
 		transport = &http.Transport{TLSClientConfig: tlsConfig}
+	}
+	if verbose {
+		transport = &loggingTransport{transport: transport, verbose: true}
 	}
 	mc.httpClient = &http.Client{Transport: transport}
 	return &mc
@@ -306,7 +313,7 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
 	keyCloakUrl, err := c.GetKeycloakURL()
 	errors.CheckError(err)
-	kc := NewKeycloakClient(keyCloakUrl, "", "")
+	kc := NewKeycloakClient(keyCloakUrl, "", "", c.Verbose)
 	oauth2Conf, err := kc.GetOIDCConfig()
 	errors.CheckError(err)
 	oauth2Conf.ClientID = auth.ClientId

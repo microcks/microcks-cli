@@ -35,7 +35,7 @@ func TriggerImport(entry config.WatchEntry) {
 			}
 		} else {
 			// We have no config file, so just create a client with context as server URL.
-			mc = connectors.NewMicrocksClient(context)
+			mc = connectors.NewMicrocksClient(context, false)
 		}
 
 		_, err = mc.UploadArtifact(entry.FilePath, entry.MainArtifact)

@@ -99,7 +99,6 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	var (
 		recursive bool
 		pattern   string
-		verbose   bool
 	)
 
 	var importDirCmd = &cobra.Command{
@@ -154,7 +153,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			importConfig := ImportConfig{
 				Recursive: recursive,
 				Pattern:   pattern,
-				Verbose:   verbose,
+				Verbose:   globalClientOpts.Verbose,
 			}
 
 			// Execute business logic
@@ -169,7 +168,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 
 			// Display results
-			if verbose {
+			if globalClientOpts.Verbose {
 				fmt.Printf("Found %d specification files to import...\n", result.TotalFiles)
 				for i, file := range result.SuccessFiles {
 					fmt.Printf("[%d/%d] ✓ Imported: %s\n", i+1, result.TotalFiles, file)
@@ -201,7 +200,6 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 	importDirCmd.Flags().BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
 	importDirCmd.Flags().StringVar(&pattern, "pattern", "", "File pattern to match (e.g., '*.yaml', 'openapi.*')")
-	importDirCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed progress")
 
 	return importDirCmd
 }

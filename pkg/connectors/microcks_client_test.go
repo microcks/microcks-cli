@@ -32,7 +32,7 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewMicrocksClient(server.URL)
+	client := NewMicrocksClient(server.URL, false)
 
 	msg, err := client.DownloadArtifact("https://example.com/openapi.yaml", true, "")
 	if err != nil {
@@ -43,14 +43,14 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 	}
 }
 
-func TestLoggingTransportPassesThrough(t *testing.T) {
+func TestLoggingTransportSilentWhenVerboseFalse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
 	req, _ := http.NewRequest("GET", server.URL, nil)
-	lt := &loggingTransport{transport: http.DefaultTransport}
+	lt := &loggingTransport{transport: http.DefaultTransport, verbose: false}
 
 	old := os.Stderr
 	pr, pw, _ := os.Pipe()
@@ -60,6 +60,9 @@ func TestLoggingTransportPassesThrough(t *testing.T) {
 
 	pw.Close()
 	os.Stderr = old
+
+	buf := make([]byte, 4096)
+	n, _ := pr.Read(buf)
 	pr.Close()
 
 	if err != nil {
@@ -67,6 +70,9 @@ func TestLoggingTransportPassesThrough(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if n > 0 {
+		t.Fatalf("expected no stderr output when verbose=false, got: %q", string(buf[:n]))
 	}
 }
 
@@ -83,7 +89,7 @@ func TestLoggingTransportRedactsAuth(t *testing.T) {
 	pr, pw, _ := os.Pipe()
 	os.Stderr = pw
 
-	lt := &loggingTransport{transport: http.DefaultTransport}
+	lt := &loggingTransport{transport: http.DefaultTransport, verbose: true}
 	_, _ = lt.RoundTrip(req)
 
 	pw.Close()
@@ -91,6 +97,7 @@ func TestLoggingTransportRedactsAuth(t *testing.T) {
 
 	buf := make([]byte, 4096)
 	n, _ := pr.Read(buf)
+	pr.Close()
 	out := string(buf[:n])
 
 	if strings.Contains(out, "supersecret") {

@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type MockMicrocksClient struct {
@@ -68,7 +68,7 @@ func (m *MockFileSystem) Walk(root string, walkFn filepath.WalkFunc) error {
 	}
 
 	for path, isDir := range m.Files {
-		if filepath.HasPrefix(path, root) {
+		if strings.HasPrefix(path, root) {
 			info := &MockFileInfo{name: filepath.Base(path), isDir: isDir}
 			if err := walkFn(path, info, nil); err != nil {
 				return err
@@ -374,10 +374,6 @@ func TestNewImportDirCommand(t *testing.T) {
 	patternFlag := cmd.Flags().Lookup("pattern")
 	assert.NotNil(t, patternFlag)
 	assert.Equal(t, "string", patternFlag.Value.Type())
-
-	verboseFlag := cmd.Flags().Lookup("verbose")
-	assert.NotNil(t, verboseFlag)
-	assert.Equal(t, "bool", verboseFlag.Value.Type())
 }
 
 // TestImportResult tests the ImportResult struct
@@ -397,27 +393,4 @@ func TestImportResult(t *testing.T) {
 	assert.Len(t, result.SuccessFiles, 3)
 	assert.Len(t, result.FailedFiles, 2)
 	assert.Len(t, result.Errors, 2)
-}
-
-// Benchmark tests for performance
-func BenchmarkImportDirectory(b *testing.B) {
-	// Create a mock with many files
-	mockClient := &MockMicrocksClient{}
-	mockFS := &MockFileSystem{
-		Files: make(map[string]bool),
-	}
-
-	// Add 100 test files
-	for i := 0; i < 100; i++ {
-		path := fmt.Sprintf("/test/spec_%d.yaml", i)
-		mockFS.Files[path] = false
-	}
-
-	config := ImportConfig{Recursive: false, Pattern: ""}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := ImportDirectory(mockClient, mockFS, "/test", config)
-		require.NoError(b, err)
-	}
 }

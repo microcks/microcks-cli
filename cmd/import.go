@@ -61,7 +61,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
 				// Create client with server address.
-				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
+				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr, globalClientOpts.Verbose)
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
@@ -72,7 +72,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret, globalClientOpts.Verbose)
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
