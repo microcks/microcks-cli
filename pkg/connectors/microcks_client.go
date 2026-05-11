@@ -409,6 +409,13 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 		panic(err.Error())
 	}
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("authentication failed (HTTP 401): bearer token has expired or is invalid — check Keycloak token lifetime vs --waitFor duration")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected HTTP %d from Microcks API while polling test result: %s", resp.StatusCode, string(body))
+	}
+
 	result := TestResultSummary{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse test result response: %w", err)
