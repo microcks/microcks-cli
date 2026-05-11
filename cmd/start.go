@@ -46,12 +46,6 @@ microcks start --name [name of you container/instance]`,
 			if instance == nil {
 				instance = &config.Instance{}
 			}
-
-			if instance.Status == "Running" {
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
-			}
-
 			switch instance.Status {
 			case "Running":
 				fmt.Printf("Microcks instance with name %s is already running", name)
