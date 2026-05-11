@@ -28,10 +28,10 @@ microcks start
 microcks start --port [Port you want]
 
 # Define your driver (by default docker)
-microcks start --driver [driver you wnat either 'docker' or 'podman']
+microcks start --driver [driver you want either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
-microcks start --name [name of you container/instance]`,
+microcks start --name [name of your container/instance]`,
 		Run: func(cmd *cobra.Command, args []string) {
 
 			configFile := globalClientOpts.ConfigPath
@@ -143,10 +143,10 @@ microcks start --name [name of you container/instance]`,
 			fmt.Printf("Microcks started successfully at %s\n", server)
 		},
 	}
-	startCmd.Flags().StringVar(&name, "name", "microcks", "name for you microcks instance")
+	startCmd.Flags().StringVar(&name, "name", "microcks", "name for your microcks instance")
 	startCmd.Flags().StringVar(&hostPort, "port", "8585", "")
 	startCmd.Flags().StringVar(&imageName, "image", "quay.io/microcks/microcks-uber:latest-native", "image which will be used to create a container")
-	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of dokcer to automatically remove the container when it exits")
+	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of docker to automatically remove the container when it exits")
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
 	return startCmd
 }

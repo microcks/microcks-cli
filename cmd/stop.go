@@ -16,6 +16,8 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Use:   "stop",
 		Short: "stop microcks instance",
 		Long:  "stop microcks instance",
+		Example: `# Stop the current Microcks instance
+microcks stop`,
 		Run: func(cmd *cobra.Command, args []string) {
 
 			configFile := globalClientOpts.ConfigPath
