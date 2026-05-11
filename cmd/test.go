@@ -17,8 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -50,10 +48,8 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
 				return fmt.Errorf("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 			}
-			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				return fmt.Errorf("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
-			}
-			return nil
+			_, err := parseWaitForMilliseconds(waitFor)
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			serviceRef := args[0]
@@ -66,25 +62,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			config.Verbose = globalClientOpts.Verbose
 
 			// Compute time to wait in milliseconds.
-			var waitForMilliseconds int64
-			if strings.HasSuffix(waitFor, "milli") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
-				if err != nil {
-					return fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
-				}
-				waitForMilliseconds = n
-			} else if strings.HasSuffix(waitFor, "sec") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				if err != nil {
-					return fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
-				}
-				waitForMilliseconds = n * 1000
-			} else if strings.HasSuffix(waitFor, "min") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				if err != nil {
-					return fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
-				}
-				waitForMilliseconds = n * 60 * 1000
+			waitForMilliseconds, err := parseWaitForMilliseconds(waitFor)
+			if err != nil {
+				return err
 			}
 
 			var mc connectors.MicrocksClient
