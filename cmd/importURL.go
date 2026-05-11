@@ -43,7 +43,6 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
 
 			var mc connectors.MicrocksClient
 

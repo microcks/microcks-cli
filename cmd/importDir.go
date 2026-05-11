@@ -126,7 +126,6 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
 
 			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			if err != nil {

@@ -83,7 +83,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			// Collect optional HTTPS transport flags.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
 
 			// Compute time to wait in milliseconds.
 			var waitForMilliseconds int64

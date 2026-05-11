@@ -46,10 +46,8 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 			specificationFiles := args[0]
 
-			// Initialize config from command options.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
 
 			// Read local config file in case we need some context info.
 			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
