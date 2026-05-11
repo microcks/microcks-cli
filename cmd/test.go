@@ -145,12 +145,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 				if err != nil {
 					fmt.Println(err)
-					return
+					os.Exit(1)
 				}
 
 				if localConfig == nil {
 					fmt.Println("Please login to perform operation...")
-					return
+					os.Exit(1)
 				}
 
 				if globalClientOpts.Context == "" {
@@ -160,7 +160,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
 					fmt.Printf("error %v", err)
-					return
+					os.Exit(1)
 				}
 
 				ctx, err := localConfig.ResolveContext(globalClientOpts.Context)
