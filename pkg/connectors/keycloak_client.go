@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -31,9 +32,9 @@ import (
 
 // KeycloakClient defines methods for cinteracting with Keycloak
 type KeycloakClient interface {
-	ConnectAndGetToken() (string, error)
-	ConnectAndGetTokenAndRefreshToken(string, string) (string, string, error)
-	GetOIDCConfig() (*oauth2.Config, error)
+	ConnectAndGetToken(ctx context.Context) (string, error)
+	ConnectAndGetTokenAndRefreshToken(ctx context.Context, username string, password string) (string, string, error)
+	GetOIDCConfig(ctx context.Context) (*oauth2.Config, error)
 }
 
 type keycloakClient struct {
@@ -69,11 +70,11 @@ func NewKeycloakClient(realmURL string, username string, password string) Keyclo
 }
 
 // ConnectAndGetToken implementation on keycloakClient structure
-func (c *keycloakClient) ConnectAndGetToken() (string, error) {
+func (c *keycloakClient) ConnectAndGetToken(ctx context.Context) (string, error) {
 	rel := &url.URL{Path: "protocol/openid-connect/token"}
 	u := c.BaseURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -109,12 +110,12 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	return accessToken, err
 }
 
-func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
+func (c *keycloakClient) GetOIDCConfig(ctx context.Context) (*oauth2.Config, error) {
 	rel := &url.URL{Path: ".well-known/openid-configuration"}
 	u := c.BaseURL.ResolveReference(rel)
 
 	// Create HTTP request
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 	}
@@ -146,7 +147,7 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 	}, nil
 }
 
-func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password string) (string, string, error) {
+func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(ctx context.Context, username, password string) (string, string, error) {
 
 	rel := &url.URL{Path: "protocol/openid-connect/token"}
 	u := c.BaseURL.ResolveReference(rel)
@@ -158,7 +159,7 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	data.Set("password", password)
 	data.Set("grant_type", "password")
 	// Create HTTP request
-	req, err := http.NewRequest("POST", u.String(), bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 	}

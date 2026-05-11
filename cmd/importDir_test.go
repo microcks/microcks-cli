@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ type MockMicrocksClient struct {
 	UploadCalls int
 }
 
-func (m *MockMicrocksClient) UploadArtifact(file string, main bool) (string, error) {
+func (m *MockMicrocksClient) UploadArtifact(ctx context.Context, file string, main bool) (string, error) {
 	m.UploadCalls++
 	m.Uploaded = append(m.Uploaded, file)
 
@@ -189,7 +190,7 @@ func TestImportDirectory(t *testing.T) {
 			}
 
 			// Execute
-			result, err := ImportDirectory(mockClient, mockFS, "/test", tt.config)
+			result, err := ImportDirectory(context.Background(), mockClient, mockFS, "/test", tt.config)
 
 			// Assertions
 			if tt.expectError {
@@ -417,7 +418,7 @@ func BenchmarkImportDirectory(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ImportDirectory(mockClient, mockFS, "/test", config)
+		_, err := ImportDirectory(context.Background(), mockClient, mockFS, "/test", config)
 		require.NoError(b, err)
 	}
 }

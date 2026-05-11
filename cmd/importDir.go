@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ import (
 
 // MicrocksClient interface for dependency injection
 type MicrocksClient interface {
-	UploadArtifact(file string, main bool) (string, error)
+	UploadArtifact(ctx context.Context, file string, main bool) (string, error)
 }
 
 type FileType struct {
@@ -159,7 +160,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 
 			// Execute business logic
-			result, err := ImportDirectory(mc, fs, dirPath, importConfig)
+			result, err := ImportDirectory(context.Background(), mc, fs, dirPath, importConfig)
 			if err != nil {
 				if validationErr, ok := err.(*ValidationError); ok {
 					fmt.Println(validationErr.Message)
@@ -207,7 +208,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	return importDirCmd
 }
 
-func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, config ImportConfig) (ImportResult, error) {
+func ImportDirectory(ctx context.Context, client MicrocksClient, fs FileSystem, dirPath string, config ImportConfig) (ImportResult, error) {
 	if err := validateDirectory(fs, dirPath); err != nil {
 		return ImportResult{}, err
 	}
@@ -231,7 +232,7 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 	for _, file := range files {
 		fileType := detectFileType(file)
 
-		msg, err := client.UploadArtifact(file, fileType.IsPrimary)
+		msg, err := client.UploadArtifact(ctx, file, fileType.IsPrimary)
 		if err != nil {
 			result.FailedCount++
 			result.FailedFiles = append(result.FailedFiles, file)
