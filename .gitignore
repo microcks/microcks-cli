@@ -18,4 +18,4 @@ build/dist
 .DS_Store
 
 # test data files
-**/testdata/**
+**/testdata/**.gocache/
