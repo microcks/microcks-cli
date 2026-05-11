@@ -25,8 +25,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/microcks/microcks-cli/pkg/config"
 	"golang.org/x/oauth2"
+
+	"github.com/microcks/microcks-cli/pkg/config"
 )
 
 // KeycloakClient defines methods for cinteracting with Keycloak
@@ -83,17 +84,11 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Basic "+credential)
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Keycloak for getting token", req, false)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Keycloak for getting token", resp, true)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
