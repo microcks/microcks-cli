@@ -16,10 +16,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -132,7 +135,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				}
 
 				// Try uploading this artifact.
-				msg, err := mc.UploadArtifact(f, mainArtifact)
+				msg, err := mc.UploadArtifact(context.Background(), f, mainArtifact)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
 					os.Exit(1)
@@ -173,16 +176,19 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			}
 
 			// Start watcher if --watch flag is provided.
-			if watch {
-				watchFile, err := config.DefaultLocalWatchPath()
-				errors.CheckError(err)
+	if watch {
+		watchFile, err := config.DefaultLocalWatchPath()
+		errors.CheckError(err)
 
-				wm, err := watcher.NewWatchManger(watchFile)
-				errors.CheckError(err)
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
 
-				fmt.Println("Watch mode enabled - microcks-watcher started...")
-				wm.Run()
-			}
+		wm, err := watcher.NewWatchManger(ctx, watchFile)
+		errors.CheckError(err)
+
+		fmt.Println("Watch mode enabled - microcks-watcher started...")
+		wm.Run()
+	}
 		},
 	}
 

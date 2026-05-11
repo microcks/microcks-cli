@@ -50,7 +50,7 @@ type MicrocksClient interface {
 	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
-	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
+	UploadArtifact(ctx context.Context, specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
 
@@ -417,7 +417,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	return &result, nil
 }
 
-func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
+func (c *microcksClient) UploadArtifact(ctx context.Context, specificationFilePath string, mainArtifact bool) (string, error) {
 	// Ensure file exists on fs.
 	file, err := os.Open(specificationFilePath)
 	if err != nil {
@@ -445,18 +445,16 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 		return "", err
 	}
 
-	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "artifact/upload"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), body)
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), body)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
-	// Dump request if verbose required.
 	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
 
 	resp, err := c.httpClient.Do(req)
