@@ -78,17 +78,8 @@ var supportedExtensions = map[string]bool{
 	".xml":  true,
 }
 
-type ImportError struct {
-	File string
-	Err  error
-}
-
 type ValidationError struct {
 	Message string
-}
-
-func (e ImportError) Error() string {
-	return fmt.Sprintf("failed to import %s: %v", e.File, e.Err)
 }
 
 func (e ValidationError) Error() string {
@@ -126,26 +117,45 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
 
-			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+			var mc connectors.MicrocksClient
 
-			if localConfig == nil {
-				fmt.Println("Please login to perform operation...")
-				return
-			}
+			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
+				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr, globalClientOpts.Verbose)
 
-			if globalClientOpts.Context == "" {
-				globalClientOpts.Context = localConfig.CurrentContext
-			}
+				keycloakURL, err := mc.GetKeycloakURL()
+				if err != nil {
+					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					os.Exit(1)
+				}
 
-			// Create client
-			mc, err := connectors.NewClient(*globalClientOpts)
-			if err != nil {
-				fmt.Printf("error %v", err)
-				return
+				var oauthToken string = "unauthenticated-token"
+				if keycloakURL != "null" {
+					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret, globalClientOpts.Verbose)
+					oauthToken, err = kc.ConnectAndGetToken()
+					if err != nil {
+						fmt.Printf("Got error when invoking Keycloak client: %s", err)
+						os.Exit(1)
+					}
+				}
+				mc.SetOAuthToken(oauthToken)
+			} else {
+				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				if localConfig == nil {
+					fmt.Println("Please login to perform operation...")
+					return
+				}
+				if globalClientOpts.Context == "" {
+					globalClientOpts.Context = localConfig.CurrentContext
+				}
+				mc, err = connectors.NewClient(*globalClientOpts)
+				if err != nil {
+					fmt.Printf("error %v", err)
+					return
+				}
 			}
 
 			// Set up business logic dependencies
@@ -169,28 +179,28 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			// Display results
 			if globalClientOpts.Verbose {
-				fmt.Printf("Found %d specification files to import...\n", result.TotalFiles)
+				fmt.Fprintf(os.Stderr, "Found %d specification files to import...\n", result.TotalFiles)
 				for i, file := range result.SuccessFiles {
-					fmt.Printf("[%d/%d] ✓ Imported: %s\n", i+1, result.TotalFiles, file)
+					fmt.Fprintf(os.Stderr, "[%d/%d] Imported: %s\n", i+1, result.TotalFiles, file)
 				}
 				for i, file := range result.FailedFiles {
-					errorMsg := "Unknown error"
+					errorMsg := "unknown error"
 					if i < len(result.Errors) {
 						errorMsg = result.Errors[i]
 					}
-					fmt.Printf("✗ Failed: %s - %s\n", file, errorMsg)
+					fmt.Fprintf(os.Stderr, "Failed: %s - %s\n", file, errorMsg)
 				}
 			} else {
 				fmt.Println("\nImport results:")
 				for _, file := range result.SuccessFiles {
-					fmt.Printf("✓ Imported: %s\n", file)
+					fmt.Printf("Imported: %s\n", file)
 				}
 				for i, file := range result.FailedFiles {
-					errorMsg := "Unknown error"
+					errorMsg := "unknown error"
 					if i < len(result.Errors) {
 						errorMsg = result.Errors[i]
 					}
-					fmt.Printf("✗ Failed: %s - %s\n", file, errorMsg)
+					fmt.Printf("Failed: %s - %s\n", file, errorMsg)
 				}
 			}
 
