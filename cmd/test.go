@@ -74,40 +74,15 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				os.Exit(1)
 			}
 
-			// Validate presence and values of flags.
-			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
-				os.Exit(1)
-			}
-
 			// Collect optional HTTPS transport flags.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
 			config.Verbose = globalClientOpts.Verbose
 
-			// Compute time to wait in milliseconds.
-			var waitForMilliseconds int64
-			if strings.HasSuffix(waitFor, "milli") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
-				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
-				}
-				waitForMilliseconds = n
-			} else if strings.HasSuffix(waitFor, "sec") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
-				}
-				waitForMilliseconds = n * 1000
-			} else if strings.HasSuffix(waitFor, "min") {
-				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
-				}
-				waitForMilliseconds = n * 60 * 1000
+			waitForMilliseconds, err := parseWaitFor(waitFor)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
 			}
 
 			var mc connectors.MicrocksClient
@@ -222,4 +197,27 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 func nowInMilliseconds() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+func parseWaitFor(waitFor string) (int64, error) {
+	if strings.HasSuffix(waitFor, "milli") {
+		n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
+		if err != nil {
+			return 0, fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
+		}
+		return n, nil
+	} else if strings.HasSuffix(waitFor, "sec") {
+		n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+		if err != nil {
+			return 0, fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
+		}
+		return n * 1000, nil
+	} else if strings.HasSuffix(waitFor, "min") {
+		n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+		if err != nil {
+			return 0, fmt.Errorf("--waitFor value %q is not a valid number", waitFor)
+		}
+		return n * 60 * 1000, nil
+	}
+	return 0, fmt.Errorf("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
 }
