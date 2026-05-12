@@ -183,7 +183,7 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	}
 
 	authToken := openIDResp["access_token"].(string)
-	refershToken := openIDResp["refresh_token"].(string)
+	refreshToken := openIDResp["refresh_token"].(string)
 
-	return authToken, refershToken, nil
+	return authToken, refreshToken, nil
 }

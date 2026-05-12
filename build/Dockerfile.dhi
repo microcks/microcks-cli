@@ -1,0 +1,25 @@
+# Build binary
+FROM --platform=$BUILDPLATFORM dhi.io/golang:1.25.9-alpine3.23-dev AS build-env
+ADD . /app
+WORKDIR /app
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o microcks github.com/microcks/microcks-cli
+    
+# Build image
+FROM dhi.io/static:20260413-alpine3.23
+
+# Some version information
+LABEL maintainer="Laurent Broudoux <laurent@microcks.io>" \
+      org.opencontainers.image.authors="Laurent Broudoux <laurent@microcks.io>" \
+      org.opencontainers.image.title="Microcks CLI" \
+      org.opencontainers.image.description="Microcks is Open Source cloud-native native tool for API Mocking and Testing" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.documentation="https://github.com/microcks/microcks-cli" \
+      io.artifacthub.package.readme-url="https://raw.githubusercontent.com/microcks/microcks-cli/master/README.md"
+
+# install cli binary
+COPY --from=build-env /app/microcks /usr/local/bin/microcks
+
+COPY build/bin /usr/local/bin

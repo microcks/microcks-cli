@@ -57,14 +57,14 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					os.Exit(1)
 				}
 
-				var oauthToken string = "unauthentifed-token"
+				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloack client: %s", err)
+						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
@@ -81,7 +81,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				}
 
 				if localConfig == nil {
-					fmt.Println("Please login to perform opertion...")
+					fmt.Println("Please login to perform operation...")
 					return
 				}
 

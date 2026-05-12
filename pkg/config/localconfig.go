@@ -39,10 +39,10 @@ type User struct {
 }
 
 type Server struct {
-	Name            string `yaml:"name"`
-	Server          string `yaml:"server"`
-	InsecureTLS     bool   `yaml:"insecureTLS"`
-	KeycloackEnable bool   `yaml:"keycloakEnable"`
+	Name           string `yaml:"name"`
+	Server         string `yaml:"server"`
+	InsecureTLS    bool   `yaml:"insecureTLS"`
+	KeycloakEnable bool   `yaml:"keycloakEnable"`
 }
 
 type Instance struct {
@@ -348,7 +348,7 @@ func (l *LocalConfig) GetAuth(server string) (*Auth, error) {
 	return nil, fmt.Errorf("Auth for '%s' is undifined", server)
 }
 
-func (l *LocalConfig) UpserAuth(auth Auth) {
+func (l *LocalConfig) UpsertAuth(auth Auth) {
 	for i, a := range l.Auths {
 		if a.Server == auth.Server {
 			l.Auths[i] = auth
