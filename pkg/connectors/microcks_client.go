@@ -425,31 +425,41 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	}
 	defer file.Close()
 
-	// Create a multipart request body, reading the file.
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", filepath.Base(specificationFilePath))
-	if err != nil {
-		return "", err
-	}
-	_, err = io.Copy(part, file)
-	if err != nil {
-		panic(err.Error())
-	}
+	// Use io.Pipe to stream the multipart form data directly to the HTTP
+	// request without buffering the entire file in memory.
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
 
-	// Add the mainArtifact flag to request.
-	_ = writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact))
+	// Write the multipart form data in a background goroutine so the pipe
+	// reader can be consumed concurrently by the HTTP request.
+	errCh := make(chan error, 1)
+	go func() {
+		defer pw.Close()
 
-	err = writer.Close()
-	if err != nil {
-		return "", err
-	}
+		part, err := writer.CreateFormFile("file", filepath.Base(specificationFilePath))
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if _, err = io.Copy(part, file); err != nil {
+			errCh <- err
+			return
+		}
+
+		// Add the mainArtifact flag to request.
+		if err = writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact)); err != nil {
+			errCh <- err
+			return
+		}
+
+		errCh <- writer.Close()
+	}()
 
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "artifact/upload"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), body)
+	req, err := http.NewRequest("POST", u.String(), pr)
 	if err != nil {
 		return "", err
 	}
@@ -465,12 +475,17 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	}
 	defer resp.Body.Close()
 
+	// Check for errors from the multipart writer goroutine.
+	if pipeErr := <-errCh; pipeErr != nil {
+		return "", fmt.Errorf("failed to write multipart form: %w", pipeErr)
+	}
+
 	// Dump response if verbose required.
 	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read upload response: %w", err)
 	}
 
 	// Raise exception if not created.
@@ -478,7 +493,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 		return "", errs.New(string(respBody))
 	}
 
-	return string(respBody), err
+	return string(respBody), nil
 }
 
 func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error) {
