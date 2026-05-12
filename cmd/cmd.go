@@ -53,7 +53,7 @@ func NewCommad() *cobra.Command {
 	errors.CheckError(err)
 	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config")
 	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use")
-	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
+	command.PersistentFlags().BoolVarP(&clientOpts.Verbose, "verbose", "v", false, "print HTTP request and response details to stderr")
 	command.PersistentFlags().BoolVar(&clientOpts.InsecureTLS, "insecure-tls", false, "Whether to accept insecure HTTPS connection")
 	command.PersistentFlags().StringVar(&clientOpts.CaCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
 	command.PersistentFlags().StringVar(&clientOpts.ClientId, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")

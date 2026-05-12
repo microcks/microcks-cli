@@ -83,7 +83,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			// Collect optional HTTPS transport flags.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
 
 			// Compute time to wait in milliseconds.
 			var waitForMilliseconds int64
@@ -117,7 +116,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				// create client with server address
 				serverAddr = globalClientOpts.ServerAddr
-				mc = connectors.NewMicrocksClient(serverAddr)
+				mc = connectors.NewMicrocksClient(serverAddr, globalClientOpts.Verbose)
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
@@ -128,7 +127,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret, globalClientOpts.Verbose)
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {

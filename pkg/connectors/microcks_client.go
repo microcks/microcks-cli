@@ -43,6 +43,31 @@ var (
 	grantTypeChoices = map[string]bool{"PASSWORD": true, "CLIENT_CREDENTIALS": true, "REFRESH_TOKEN": true}
 )
 
+type loggingTransport struct {
+	transport http.RoundTripper
+	verbose   bool
+}
+
+func (l *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !l.verbose {
+		return l.transport.RoundTrip(req)
+	}
+	fmt.Fprintf(os.Stderr, ">> %s %s\n", req.Method, req.URL.String())
+	for k, v := range req.Header {
+		if strings.EqualFold(k, "authorization") {
+			fmt.Fprintf(os.Stderr, ">> %s: [REDACTED]\n", k)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, ">> %s: %s\n", k, strings.Join(v, ", "))
+	}
+	res, err := l.transport.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(os.Stderr, "<< %s\n", res.Status)
+	return res, nil
+}
+
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
 	HttpClient() *http.Client
@@ -148,18 +173,18 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 	}
 
 	if opts.Verbose {
-		c.Verbose = opts.Verbose
+		c.Verbose = true
 	}
 
+	var transport http.RoundTripper = http.DefaultTransport
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		c.httpClient = &http.Client{Transport: tr}
-	} else {
-		c.httpClient = http.DefaultClient
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+	if c.Verbose {
+		transport = &loggingTransport{transport: transport, verbose: true}
+	}
+	c.httpClient = &http.Client{Transport: transport}
 
 	if localCfg != nil {
 		err = c.refreshAuthToken(localCfg, ctxName, opts.ConfigPath)
@@ -171,8 +196,8 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 }
 
 // NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
-func NewMicrocksClient(apiURL string) MicrocksClient {
-	mc := microcksClient{}
+func NewMicrocksClient(apiURL string, verbose bool) MicrocksClient {
+	mc := microcksClient{Verbose: verbose}
 
 	if strings.HasSuffix(apiURL, "/api") {
 		apiURL += "/"
@@ -187,15 +212,15 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 	}
 	mc.APIURL = u
 
+	var transport http.RoundTripper = http.DefaultTransport
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		mc.httpClient = &http.Client{Transport: tr}
-	} else {
-		mc.httpClient = http.DefaultClient
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+	if verbose {
+		transport = &loggingTransport{transport: transport, verbose: true}
+	}
+	mc.httpClient = &http.Client{Transport: transport}
 	return &mc
 }
 func (c *microcksClient) HttpClient() *http.Client {
@@ -214,17 +239,11 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	req.Header.Set("Accept", "application/json")
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for getting Keycloak config", req, true)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	// Dump request if verbose required.
-	config.DumpResponseIfRequired("Microcks for getting Keycloak config", resp, true)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -294,7 +313,7 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
 	keyCloakUrl, err := c.GetKeycloakURL()
 	errors.CheckError(err)
-	kc := NewKeycloakClient(keyCloakUrl, "", "")
+	kc := NewKeycloakClient(keyCloakUrl, "", "", c.Verbose)
 	oauth2Conf, err := kc.GetOIDCConfig()
 	errors.CheckError(err)
 	oauth2Conf.ClientID = auth.ClientId
@@ -353,17 +372,11 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for creating test", req, true)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for creating test", resp, true)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -392,17 +405,11 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for getting status", req, false)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for getting status test", resp, true)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -456,17 +463,11 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -510,17 +511,11 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

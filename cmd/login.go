@@ -69,10 +69,9 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
 
 			server = args[0]
-			mc := connectors.NewMicrocksClient(server)
+			mc := connectors.NewMicrocksClient(server, globalClientOpts.Verbose)
 			keycloakUrl, err := mc.GetKeycloakURL()
 
 			if err != nil {
@@ -120,13 +119,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 						os.Exit(1)
 					}
 					//Perform login and retrive tokens
-					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password, globalClientOpts.Verbose)
 					authCfg.ClientId = clientID
 					authCfg.ClientSecret = clientSecret
 				} else {
 					httpClient := mc.HttpClient()
 					ctx = oidc.ClientContext(ctx, httpClient)
-					kc := connectors.NewKeycloakClient(keycloakUrl, "", "")
+					kc := connectors.NewKeycloakClient(keycloakUrl, "", "", globalClientOpts.Verbose)
 					oauth2conf, err := kc.GetOIDCConfig()
 					errors.CheckError(err)
 					authToken, refreshToken = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
@@ -308,8 +307,8 @@ func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
 	}
 }
 
-func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string) {
-	kc := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret)
+func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string, verbose bool) (string, string) {
+	kc := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret, verbose)
 	username, password := promptCredentials(Username, Password)
 
 	authToken, refreshToken, err := kc.ConnectAndGetTokenAndRefreshToken(username, password)

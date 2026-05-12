@@ -19,8 +19,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"net/http"
-	"net/http/httputil"
 	"os"
 	"path/filepath"
 	strings "strings"
@@ -31,8 +29,6 @@ var (
 	InsecureTLS bool = false
 	// CaCertPaths defines extra paths (comma-separated) of CRT files to add to system CA Roots.
 	CaCertPaths string
-	// Verbose represents a debug flag for HTTP Exchanges
-	Verbose bool = false
 
 	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
 )
@@ -66,31 +62,4 @@ func CreateTLSConfig() *tls.Config {
 		tlsConfig.RootCAs = rootCAs
 	}
 	return tlsConfig
-}
-
-// DumpRequestIfRequired takes care of dumping request if configured that way
-func DumpRequestIfRequired(name string, req *http.Request, body bool) {
-	if Verbose {
-		fmt.Printf("\nDumping request '%s':\n", name)
-		dump, err := httputil.DumpRequestOut(req, body)
-		if err != nil {
-			fmt.Println("Got error while dumping request out")
-		}
-		fmt.Printf("%s", dump)
-	}
-}
-
-// DumpResponseIfRequired takes care of dumping request if configured that way
-func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
-	if Verbose {
-		fmt.Printf("\nDumping response '%s':\n", name)
-		dump, err := httputil.DumpResponse(resp, body)
-		if err != nil {
-			fmt.Println("Got error while dumping response")
-		}
-		fmt.Printf("%s", dump)
-		if body {
-			fmt.Println("")
-		}
-	}
 }

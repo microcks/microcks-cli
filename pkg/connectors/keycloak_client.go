@@ -25,8 +25,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/microcks/microcks-cli/pkg/config"
 	"golang.org/x/oauth2"
+
+	"github.com/microcks/microcks-cli/pkg/config"
 )
 
 // KeycloakClient defines methods for cinteracting with Keycloak
@@ -45,7 +46,7 @@ type keycloakClient struct {
 }
 
 // NewKeycloakClient build a new KeycloakClient implementation
-func NewKeycloakClient(realmURL string, username string, password string) KeycloakClient {
+func NewKeycloakClient(realmURL string, username string, password string, verbose bool) KeycloakClient {
 	kc := keycloakClient{}
 
 	u, err := url.Parse(realmURL)
@@ -56,15 +57,15 @@ func NewKeycloakClient(realmURL string, username string, password string) Keyclo
 	kc.Username = username
 	kc.Password = password
 
+	var transport http.RoundTripper = http.DefaultTransport
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
 		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		kc.httpClient = &http.Client{Transport: tr}
-	} else {
-		kc.httpClient = http.DefaultClient
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+	if verbose {
+		transport = &loggingTransport{transport: transport, verbose: true}
+	}
+	kc.httpClient = &http.Client{Transport: transport}
 	return &kc
 }
 
@@ -83,17 +84,11 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Basic "+credential)
 
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Keycloak for getting token", req, false)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Keycloak for getting token", resp, true)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
