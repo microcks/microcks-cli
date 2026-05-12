@@ -318,33 +318,52 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.AuthToken = oauthToken
 }
 
+// testRequest represents a request for creating a new TestResult
+type testRequest struct {
+	ServiceID          string               `json:"serviceId"`
+	TestEndpoint       string               `json:"testEndpoint"`
+	RunnerType         string               `json:"runnerType"`
+	Timeout            int64                `json:"timeout"`
+	SecretName         string               `json:"secretName,omitempty"`
+	FilteredOperations json.RawMessage      `json:"filteredOperations,omitempty"`
+	OperationsHeaders  json.RawMessage      `json:"operationsHeaders,omitempty"`
+	OAuth2Context      *OAuth2ClientContext `json:"oAuth2Context,omitempty"`
+}
+
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
 
-	// Prepare an input string as body.
-	var input = "{"
-	input += ("\"serviceId\": \"" + serviceID + "\", ")
-	input += ("\"testEndpoint\": \"" + testEndpoint + "\", ")
-	input += ("\"runnerType\": \"" + runnerType + "\", ")
-	input += ("\"timeout\":  " + strconv.FormatInt(timeout, 10))
+	// Prepare an input struct as body.
+	request := testRequest{
+		ServiceID:    serviceID,
+		TestEndpoint: testEndpoint,
+		RunnerType:   runnerType,
+		Timeout:      timeout,
+	}
 	if len(secretName) > 0 {
-		input += (", \"secretName\": \"" + secretName + "\"")
+		request.SecretName = secretName
 	}
 	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
-		input += (", \"filteredOperations\": " + filteredOperations)
+		request.FilteredOperations = json.RawMessage(filteredOperations)
 	}
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
-		input += (", \"operationsHeaders\": " + operationsHeaders)
+		request.OperationsHeaders = json.RawMessage(operationsHeaders)
 	}
-	if len(oAuth2Context) > 0 && ensureValieOAuth2Context(oAuth2Context) {
-		input += (", \"oAuth2Context\": " + oAuth2Context)
+	if len(oAuth2Context) > 0 {
+		oContext, valid := ensureValidOAuth2Context(oAuth2Context)
+		if valid {
+			request.OAuth2Context = oContext
+		}
 	}
 
-	input += "}"
+	input, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(input))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(input))
 	if err != nil {
 		return "", err
 	}
@@ -555,16 +574,17 @@ func ensureValidOperationsHeaders(operationsHeaders string) bool {
 	return true
 }
 
-func ensureValieOAuth2Context(oAuth2Context string) bool {
+func ensureValidOAuth2Context(oAuth2Context string) (*OAuth2ClientContext, bool) {
 	var oContext = OAuth2ClientContext{}
 	err := json.Unmarshal([]byte(oAuth2Context), &oContext)
 	if err != nil {
 		fmt.Println("Error parsing JSON in oAuth2Context: ", err)
-		return false
+		return nil, false
 	}
 	if !grantTypeChoices[oContext.GrantType] {
 		fmt.Println("grantType in oAuth2Context is not supported. OAuth2 is turned off.")
-		return false
+		return nil, false
 	}
-	return true
+	return &oContext, true
 }
+
