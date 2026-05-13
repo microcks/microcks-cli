@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -22,13 +21,8 @@ microcks logout http://localhost:8080
 
 # Log out from a named context
 microcks logout dev-context`,
-
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
-			}
-
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			context := args[0]
 			localCfg, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			errors.CheckError(err)
@@ -36,7 +30,6 @@ microcks logout dev-context`,
 				log.Fatalf("Nothing to logout from")
 			}
 
-			// Remove authToken
 			ok := localCfg.RemoveToken(context)
 			if !ok {
 				log.Fatalf("Context %s does not exist", context)
@@ -44,12 +37,13 @@ microcks logout dev-context`,
 
 			err = config.ValidateLocalConfig(*localCfg)
 			if err != nil {
-				log.Fatalf("Error in loging out: %s", err)
+				log.Fatalf("Error in logging out: %s", err)
 			}
 			err = config.WriteLocalConfig(*localCfg, globalClientOpts.ConfigPath)
 			errors.CheckError(err)
 
 			fmt.Printf("Logged out from '%s'\n", context)
+			return nil
 		},
 	}
 

@@ -16,7 +16,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Use:   "stop",
 		Short: "stop microcks instance",
 		Long:  "stop microcks instance",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
@@ -24,7 +24,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			if localConfig == nil {
 				fmt.Println("Config not found, nothing to stop")
-				return
+				return nil
 			}
 
 			ctx, err := localConfig.ResolveContext("")
@@ -33,7 +33,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			if instance.Name == "" {
 				fmt.Println("No instance is associated with this context")
-				return
+				return nil
 			}
 
 			containerClient, err := connectors.NewContainerClient(instance.Driver)
@@ -42,19 +42,16 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			err = containerClient.StopContainer(instance.ContainerID)
 			if err != nil {
-				log.Fatalf("Failed to stop a container: %v", err)
-				return
+				return fmt.Errorf("failed to stop a container: %w", err)
 			}
 			fmt.Println("")
 			log.Printf("Instance %s stopped successfully", instance.Name)
 
-			// update configs
-
 			if instance.AutoRemove {
+				// Update config after removal.
 				_, ok := localConfig.RemoveContext(ctx.Name)
 				if !ok {
-					log.Fatalf("Context %s does not exist", ctx.Name)
-					return
+					return fmt.Errorf("context %s does not exist", ctx.Name)
 				}
 				_ = localConfig.RemoveServer(ctx.Server.Server)
 				_ = localConfig.RemoveUser(ctx.User.Name)
@@ -70,6 +67,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			}
 			err = config.WriteLocalConfig(*localConfig, configFile)
 			errors.CheckError(err)
+			return nil
 		},
 	}
 
