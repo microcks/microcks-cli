@@ -97,16 +97,16 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read Keycloak token response: %w", err)
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse Keycloak token response: %w", err)
 	}
 
 	accessToken := openIDResp["access_token"].(string)
-	return accessToken, err
+	return accessToken, nil
 }
 
 func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
@@ -127,12 +127,12 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read OIDC config response: %w", err)
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to parse OIDC config response: %w", err)
 	}
 
 	authURL := openIDResp["authorization_endpoint"].(string)
@@ -174,12 +174,12 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", "", fmt.Errorf("failed to read Keycloak token response: %w", err)
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", "", fmt.Errorf("failed to parse Keycloak token response: %w", err)
 	}
 
 	authToken := openIDResp["access_token"].(string)
