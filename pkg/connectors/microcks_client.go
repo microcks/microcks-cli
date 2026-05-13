@@ -52,6 +52,7 @@ type MicrocksClient interface {
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+	GetServices(page, size int) ([]ServiceSummary, error)
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -65,6 +66,14 @@ type TestResultSummary struct {
 	ElapsedTime    int32  `json:"elapsedTime"`
 	Success        bool   `json:"success"`
 	InProgress     bool   `json:"inProgress"`
+}
+
+// ServiceSummary represents a simple view on a Microcks Service
+type ServiceSummary struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Type    string `json:"type"`
 }
 
 // HeaderDTO represents an operation header passed for Test
@@ -533,6 +542,46 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	}
 
 	return string(respBody), err
+}
+
+func (c *microcksClient) GetServices(page, size int) ([]ServiceSummary, error) {
+	rel := &url.URL{
+		Path:     "services",
+		RawQuery: fmt.Sprintf("page=%d&size=%d", page, size),
+	}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	// Dump request if verbose required.
+	config.DumpRequestIfRequired("Microcks for listing services", req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Dump response if verbose required.
+	config.DumpResponseIfRequired("Microcks for listing services", resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var services []ServiceSummary
+	if err := json.Unmarshal(body, &services); err != nil {
+		return nil, fmt.Errorf("failed to parse services response: %w", err)
+	}
+
+	return services, nil
 }
 
 func ensureValidOperationsList(filteredOperations string) bool {
