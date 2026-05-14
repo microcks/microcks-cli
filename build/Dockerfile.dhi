@@ -1,5 +1,5 @@
 # Build binary
-FROM --platform=$BUILDPLATFORM dhi.io/golang:1.25.9-alpine3.23-dev AS build-env
+FROM --platform=$BUILDPLATFORM dhi.io/golang:1.25.10-alpine3.23-dev AS build-env
 ADD . /app
 WORKDIR /app
 ARG TARGETOS
