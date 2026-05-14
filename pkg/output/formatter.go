@@ -1,0 +1,54 @@
+package output
+
+import (
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/microcks/microcks-cli/pkg/connectors"
+)
+
+type Formatter interface {
+	FormatTestResult(result *connectors.TestResult) string
+	FormatTestCaseResult(testCase *connectors.TestCaseResult) string
+}
+
+type OutputFormat string
+
+const (
+	OutputFormatText OutputFormat = "text"
+	OutputFormatJSON OutputFormat = "json"
+	OutputFormatYAML OutputFormat = "yaml"
+)
+
+func NewFormatter(format OutputFormat) (Formatter, error) {
+	switch format {
+	case OutputFormatText:
+		return NewTextFormatter(), nil
+	case OutputFormatJSON:
+		return NewJSONFormatter(), nil
+	case OutputFormatYAML:
+		return NewYAMLFormatter(), nil
+	default:
+		return nil, fmt.Errorf("unsupported output format %q", format)
+	}
+}
+
+type Writer struct {
+	out io.Writer
+}
+
+func NewWriter(format OutputFormat) *Writer {
+	if format == OutputFormatText {
+		return &Writer{out: os.Stdout}
+	}
+	return &Writer{out: os.Stderr}
+}
+
+func (w *Writer) Infof(format string, args ...any) {
+	fmt.Fprintf(w.out, format, args...)
+}
+
+func (w *Writer) Progressf(format string, args ...any) {
+	fmt.Fprintf(w.out, format, args...)
+}
