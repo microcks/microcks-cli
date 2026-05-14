@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCommad() *cobra.Command {
+func NewCommand() *cobra.Command {
 
 	var clientOpts connectors.ClientOptions
 
