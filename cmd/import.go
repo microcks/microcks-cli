@@ -30,6 +30,7 @@ import (
 
 func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var watch bool
+	var verbose bool
 
 	var importCmd = &cobra.Command{
 		Use:   "import",
@@ -130,6 +131,9 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", pathAndMainArtifact[1])
 					}
 				}
+				if verbose {
+					fmt.Printf("Importing artifact '%s' (mainArtifact: %v)...\n", f, mainArtifact)
+				}
 
 				// Try uploading this artifact.
 				msg, err := mc.UploadArtifact(f, mainArtifact)
@@ -142,6 +146,9 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					action = "completed"
 				}
 				fmt.Printf("Microcks has %s '%s'\n", action, msg)
+				if verbose {
+					fmt.Printf("Server response: %s\n", msg)
+				}
 
 				// If watch flag is provided, update watch config.
 				if watch {
@@ -187,5 +194,6 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 	}
 
 	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change")
+	importCmd.Flags().BoolVar(&verbose, "verbose", false, "Print detailed output during import")
 	return importCmd
 }
