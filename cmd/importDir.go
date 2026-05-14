@@ -87,12 +87,21 @@ type ValidationError struct {
 	Message string
 }
 
+type ImportFailuresError struct {
+	FailedCount int
+	TotalFiles  int
+}
+
 func (e ImportError) Error() string {
 	return fmt.Sprintf("failed to import %s: %v", e.File, e.Err)
 }
 
 func (e ValidationError) Error() string {
 	return e.Message
+}
+
+func (e ImportFailuresError) Error() string {
+	return fmt.Sprintf("%d/%d files failed to import", e.FailedCount, e.TotalFiles)
 }
 
 func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
@@ -115,13 +124,8 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			microcks import-dir ./api-specs --recursive
 			microcks import-dir ./api-specs --pattern "*.yaml"
 			microcks import-dir ./api-specs --recursive --pattern "openapi.*"`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				fmt.Println("import-dir command requires a directory path")
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
-			}
-
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			dirPath := args[0]
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
@@ -130,13 +134,11 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			if err != nil {
-				fmt.Println(err)
-				return
+				return err
 			}
 
 			if localConfig == nil {
-				fmt.Println("Please login to perform operation...")
-				return
+				return fmt.Errorf("please login to perform operation")
 			}
 
 			if globalClientOpts.Context == "" {
@@ -146,8 +148,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			// Create client
 			mc, err := connectors.NewClient(*globalClientOpts)
 			if err != nil {
-				fmt.Printf("error %v", err)
-				return
+				return fmt.Errorf("error creating Microcks client: %w", err)
 			}
 
 			// Set up business logic dependencies
@@ -161,42 +162,11 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			// Execute business logic
 			result, err := ImportDirectory(mc, fs, dirPath, importConfig)
 			if err != nil {
-				if validationErr, ok := err.(*ValidationError); ok {
-					fmt.Println(validationErr.Message)
-					return
-				}
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 
-			// Display results
-			if verbose {
-				fmt.Printf("Found %d specification files to import...\n", result.TotalFiles)
-				for i, file := range result.SuccessFiles {
-					fmt.Printf("[%d/%d] ✓ Imported: %s\n", i+1, result.TotalFiles, file)
-				}
-				for i, file := range result.FailedFiles {
-					errorMsg := "Unknown error"
-					if i < len(result.Errors) {
-						errorMsg = result.Errors[i]
-					}
-					fmt.Printf("✗ Failed: %s - %s\n", file, errorMsg)
-				}
-			} else {
-				fmt.Println("\nImport results:")
-				for _, file := range result.SuccessFiles {
-					fmt.Printf("✓ Imported: %s\n", file)
-				}
-				for i, file := range result.FailedFiles {
-					errorMsg := "Unknown error"
-					if i < len(result.Errors) {
-						errorMsg = result.Errors[i]
-					}
-					fmt.Printf("✗ Failed: %s - %s\n", file, errorMsg)
-				}
-			}
-
-			fmt.Printf("\nImport completed: %d/%d files imported successfully\n", result.SuccessCount, result.TotalFiles)
+			printImportResults(result, verbose)
+			return importResultError(result)
 		},
 	}
 
@@ -205,6 +175,49 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	importDirCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed progress")
 
 	return importDirCmd
+}
+
+func printImportResults(result ImportResult, verbose bool) {
+	if verbose {
+		fmt.Printf("Found %d specification files to import...\n", result.TotalFiles)
+		for i, file := range result.SuccessFiles {
+			fmt.Printf("[%d/%d] ✓ Imported: %s\n", i+1, result.TotalFiles, file)
+		}
+		for i, file := range result.FailedFiles {
+			fmt.Printf("✗ Failed: %s - %s\n", file, importErrorMessage(result, i))
+		}
+	} else {
+		fmt.Println("\nImport results:")
+		for _, file := range result.SuccessFiles {
+			fmt.Printf("✓ Imported: %s\n", file)
+		}
+		for i, file := range result.FailedFiles {
+			fmt.Printf("✗ Failed: %s - %s\n", file, importErrorMessage(result, i))
+		}
+	}
+
+	if result.FailedCount > 0 {
+		fmt.Printf("\nSome imports failed: %d/%d files imported successfully (%d failed)\n", result.SuccessCount, result.TotalFiles, result.FailedCount)
+		return
+	}
+	fmt.Printf("\nImport completed: %d/%d files imported successfully\n", result.SuccessCount, result.TotalFiles)
+}
+
+func importErrorMessage(result ImportResult, index int) string {
+	if index < len(result.Errors) {
+		return result.Errors[index]
+	}
+	return "Unknown error"
+}
+
+func importResultError(result ImportResult) error {
+	if result.FailedCount == 0 {
+		return nil
+	}
+	return &ImportFailuresError{
+		FailedCount: result.FailedCount,
+		TotalFiles:  result.TotalFiles,
+	}
 }
 
 func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, config ImportConfig) (ImportResult, error) {

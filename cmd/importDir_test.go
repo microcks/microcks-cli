@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -397,6 +398,106 @@ func TestImportResult(t *testing.T) {
 	assert.Len(t, result.SuccessFiles, 3)
 	assert.Len(t, result.FailedFiles, 2)
 	assert.Len(t, result.Errors, 2)
+}
+
+func TestImportResultError(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      ImportResult
+		expectError bool
+	}{
+		{
+			name: "no error when all files import successfully",
+			result: ImportResult{
+				TotalFiles:   2,
+				SuccessCount: 2,
+				FailedCount:  0,
+			},
+			expectError: false,
+		},
+		{
+			name: "error when one or more files fail to import",
+			result: ImportResult{
+				TotalFiles:   2,
+				SuccessCount: 1,
+				FailedCount:  1,
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := importResultError(tt.result)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.IsType(t, &ImportFailuresError{}, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPrintImportResults(t *testing.T) {
+	tests := []struct {
+		name     string
+		result   ImportResult
+		expected string
+	}{
+		{
+			name: "success summary",
+			result: ImportResult{
+				TotalFiles:   1,
+				SuccessCount: 1,
+				SuccessFiles: []string{"/test/openapi.yaml"},
+			},
+			expected: "Import completed: 1/1 files imported successfully",
+		},
+		{
+			name: "failure summary",
+			result: ImportResult{
+				TotalFiles:   2,
+				SuccessCount: 1,
+				FailedCount:  1,
+				SuccessFiles: []string{"/test/openapi.yaml"},
+				FailedFiles:  []string{"/test/postman.json"},
+				Errors:       []string{"error importing /test/postman.json: upload failed"},
+			},
+			expected: "Some imports failed: 1/2 files imported successfully (1 failed)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := captureStdout(t, func() {
+				printImportResults(tt.result, false)
+			})
+
+			assert.Contains(t, output, tt.expected)
+		})
+	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	readPipe, writePipe, err := os.Pipe()
+	require.NoError(t, err)
+
+	os.Stdout = writePipe
+	fn()
+	require.NoError(t, writePipe.Close())
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(readPipe)
+	require.NoError(t, err)
+	require.NoError(t, readPipe.Close())
+
+	return buf.String()
 }
 
 // Benchmark tests for performance
