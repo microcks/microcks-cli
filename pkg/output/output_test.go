@@ -1,6 +1,7 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -13,8 +14,8 @@ func TestTextFormatter_FormatTestResult(t *testing.T) {
 	formatter := NewTextFormatter()
 
 	result := &connectors.TestResult{
-		ID:             "test-123",
-		Success:        true,
+		ID:      "test-123",
+		Success: true,
 		TestCases: []connectors.TestCaseResult{
 			{
 				Success:       true,
@@ -70,10 +71,10 @@ func TestJSONFormatter_FormatTestResult(t *testing.T) {
 	formatter := NewJSONFormatter()
 
 	result := &connectors.TestResult{
-		ID:             "test-789",
-		Version:        1,
-		TestNumber:     1,
-		Success:        true,
+		ID:         "test-789",
+		Version:    1,
+		TestNumber: 1,
+		Success:    true,
 		TestCases: []connectors.TestCaseResult{
 			{
 				Success:       true,
@@ -217,5 +218,23 @@ func TestNewFormatter(t *testing.T) {
 	formatter, err = NewFormatter(OutputFormat("csv"))
 	if err == nil || formatter != nil {
 		t.Fatalf("NewFormatter should fail on unknown format")
+	}
+}
+
+func TestWriterRouting(t *testing.T) {
+	textWriter := NewWriter(OutputFormatText)
+	var textBuf bytes.Buffer
+	textWriter.out = &textBuf
+	textWriter.Infof("hello %s", "text")
+	if textBuf.String() != "hello text" {
+		t.Fatalf("text writer should write to stdout buffer, got %q", textBuf.String())
+	}
+
+	jsonWriter := NewWriter(OutputFormatJSON)
+	var jsonBuf bytes.Buffer
+	jsonWriter.out = &jsonBuf
+	jsonWriter.Progressf("hello %s", "json")
+	if jsonBuf.String() != "hello json" {
+		t.Fatalf("json writer should write to stderr buffer, got %q", jsonBuf.String())
 	}
 }

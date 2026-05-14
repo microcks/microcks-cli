@@ -2,6 +2,8 @@ package output
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
 )
@@ -30,4 +32,23 @@ func NewFormatter(format OutputFormat) (Formatter, error) {
 	default:
 		return nil, fmt.Errorf("unsupported output format %q", format)
 	}
+}
+
+type Writer struct {
+	out io.Writer
+}
+
+func NewWriter(format OutputFormat) *Writer {
+	if format == OutputFormatText {
+		return &Writer{out: os.Stdout}
+	}
+	return &Writer{out: os.Stderr}
+}
+
+func (w *Writer) Infof(format string, args ...any) {
+	fmt.Fprintf(w.out, format, args...)
+}
+
+func (w *Writer) Progressf(format string, args ...any) {
+	fmt.Fprintf(w.out, format, args...)
 }

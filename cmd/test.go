@@ -40,7 +40,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
-		outputFormat       string
 	)
 	var testCmd = &cobra.Command{
 
@@ -79,11 +78,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				string(output.OutputFormatJSON): true,
 				string(output.OutputFormatYAML): true,
 			}
-			if !validOutputFormats[outputFormat] {
+			if !validOutputFormats[globalClientOpts.OutputFormat] {
 				fmt.Println("--output format is wrong. Accepted values are: text, json, yaml")
 				os.Exit(1)
 			}
-			isTextOutput := outputFormat == string(output.OutputFormatText)
+			isTextOutput := globalClientOpts.OutputFormat == string(output.OutputFormatText)
+			outputWriter := output.NewWriter(output.OutputFormat(globalClientOpts.OutputFormat))
 
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
 				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
@@ -194,29 +194,17 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				}
 				success = testResultSummary.Success
 				inProgress := testResultSummary.InProgress
-				if isTextOutput {
-					fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
-				} else {
-					fmt.Fprintf(os.Stderr, "MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
-				}
+				outputWriter.Progressf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
 
 				if !inProgress {
 					break
 				}
 
-				if isTextOutput {
-					fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
-				} else {
-					fmt.Fprintln(os.Stderr, "MicrocksTester waiting for 2 seconds before checking again or exiting.")
-				}
+				outputWriter.Progressf("MicrocksTester waiting for 2 seconds before checking again or exiting.\n")
 				time.Sleep(2 * time.Second)
 			}
 
-			if isTextOutput {
-				fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
-			} else {
-				fmt.Fprintf(os.Stderr, "Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
-			}
+			outputWriter.Infof("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
 			if !isTextOutput {
 				fullResult, err := mc.GetFullTestResult(testResultID)
@@ -224,7 +212,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 					fmt.Printf("Got error when retrieving full test result: %s", err)
 					os.Exit(1)
 				}
-				formatter, err := output.NewFormatter(output.OutputFormat(outputFormat))
+				formatter, err := output.NewFormatter(output.OutputFormat(globalClientOpts.OutputFormat))
 				if err != nil {
 					fmt.Printf("Got error when selecting output formatter: %s", err)
 					os.Exit(1)
@@ -246,7 +234,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
-	testCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text, json, or yaml")
 
 	return testCmd
 }
