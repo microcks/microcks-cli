@@ -85,18 +85,18 @@ type TestResult struct {
 
 // TestCaseResult represents results for a single operation/action within a test
 type TestCaseResult struct {
-	Success        bool             `json:"success"`
-	ElapsedTime    int64            `json:"elapsedTime"`
-	OperationName  string           `json:"operationName"`
+	Success         bool             `json:"success"`
+	ElapsedTime     int64            `json:"elapsedTime"`
+	OperationName   string           `json:"operationName"`
 	TestStepResults []TestStepResult `json:"testStepResults"`
 }
 
 // TestStepResult represents results for a single request/message within a test case
 type TestStepResult struct {
-	Success         bool   `json:"success"`
-	ElapsedTime     int64  `json:"elapsedTime"`
-	RequestName     string `json:"requestName"`
-	Message         string `json:"message"`
+	Success          bool   `json:"success"`
+	ElapsedTime      int64  `json:"elapsedTime"`
+	RequestName      string `json:"requestName"`
+	Message          string `json:"message"`
 	EventMessageName string `json:"eventMessageName"`
 }
 
@@ -123,6 +123,7 @@ type ClientOptions struct {
 	Context      string
 	ConfigPath   string
 	AuthToken    string
+	OutputFormat string
 	InsecureTLS  bool
 	Verbose      bool
 	CaCertPaths  string

@@ -59,6 +59,7 @@ func NewCommand() *cobra.Command {
 	command.PersistentFlags().StringVar(&clientOpts.ClientId, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
 	command.PersistentFlags().StringVar(&clientOpts.ClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL")
+	command.PersistentFlags().StringVar(&clientOpts.OutputFormat, "output", "text", "Output format: text, json, or yaml")
 	command.MarkFlagsRequiredTogether("keycloakClientId", "keycloakClientSecret")
 
 	return command
