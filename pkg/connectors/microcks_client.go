@@ -318,33 +318,52 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.AuthToken = oauthToken
 }
 
+// testResultRequest is the serializable body for the POST /tests endpoint.
+type testResultRequest struct {
+	ServiceID          string           `json:"serviceId"`
+	TestEndpoint       string           `json:"testEndpoint"`
+	RunnerType         string           `json:"runnerType"`
+	Timeout            int64            `json:"timeout"`
+	SecretName         string           `json:"secretName,omitempty"`
+	FilteredOperations *json.RawMessage `json:"filteredOperations,omitempty"`
+	OperationsHeaders  *json.RawMessage `json:"operationsHeaders,omitempty"`
+	OAuth2Context      *json.RawMessage `json:"oAuth2Context,omitempty"`
+}
+
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
 
-	// Prepare an input string as body.
-	var input = "{"
-	input += ("\"serviceId\": \"" + serviceID + "\", ")
-	input += ("\"testEndpoint\": \"" + testEndpoint + "\", ")
-	input += ("\"runnerType\": \"" + runnerType + "\", ")
-	input += ("\"timeout\":  " + strconv.FormatInt(timeout, 10))
-	if len(secretName) > 0 {
-		input += (", \"secretName\": \"" + secretName + "\"")
+	// Build the request body using proper JSON marshaling so that special
+	// characters in serviceID, testEndpoint, or secretName are safely escaped
+	// and cannot inject extra fields into the request object.
+	payload := testResultRequest{
+		ServiceID:    serviceID,
+		TestEndpoint: testEndpoint,
+		RunnerType:   runnerType,
+		Timeout:      timeout,
+		SecretName:   secretName,
 	}
 	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
-		input += (", \"filteredOperations\": " + filteredOperations)
+		raw := json.RawMessage(filteredOperations)
+		payload.FilteredOperations = &raw
 	}
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
-		input += (", \"operationsHeaders\": " + operationsHeaders)
+		raw := json.RawMessage(operationsHeaders)
+		payload.OperationsHeaders = &raw
 	}
 	if len(oAuth2Context) > 0 && ensureValidOAuth2Context(oAuth2Context) {
-		input += (", \"oAuth2Context\": " + oAuth2Context)
+		raw := json.RawMessage(oAuth2Context)
+		payload.OAuth2Context = &raw
 	}
 
-	input += "}"
+	input, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize test request: %w", err)
+	}
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(input))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(input))
 	if err != nil {
 		return "", err
 	}
@@ -367,16 +386,19 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read create test response: %w", err)
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse create test response: %w", err)
 	}
 
-	testID := createTestResp["id"].(string)
-	return testID, err
+	testID, ok := createTestResp["id"].(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected response: missing or non-string 'id' field")
+	}
+	return testID, nil
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
