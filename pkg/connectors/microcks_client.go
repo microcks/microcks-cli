@@ -329,33 +329,50 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.AuthToken = oauthToken
 }
 
+// testRequest represents a request for creating a new TestResult
+type testRequest struct {
+	ServiceID          string               `json:"serviceId"`
+	TestEndpoint       string               `json:"testEndpoint"`
+	RunnerType         string               `json:"runnerType"`
+	Timeout            int64                `json:"timeout"`
+	SecretName         string               `json:"secretName,omitempty"`
+	FilteredOperations json.RawMessage      `json:"filteredOperations,omitempty"`
+	OperationsHeaders  json.RawMessage      `json:"operationsHeaders,omitempty"`
+	OAuth2Context      *OAuth2ClientContext `json:"oAuth2Context,omitempty"`
+}
+
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
 
 	// Prepare an input struct as body.
-	testReq := testRequest{
+	request := testRequest{
 		ServiceID:    serviceID,
 		TestEndpoint: testEndpoint,
 		RunnerType:   runnerType,
 		Timeout:      timeout,
-		SecretName:   secretName,
+	}
+	if len(secretName) > 0 {
+		request.SecretName = secretName
 	}
 
 	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
-		testReq.FilteredOperations = json.RawMessage(filteredOperations)
+		request.FilteredOperations = json.RawMessage(filteredOperations)
 	}
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
-		testReq.OperationsHeaders = json.RawMessage(operationsHeaders)
+		request.OperationsHeaders = json.RawMessage(operationsHeaders)
 	}
-	if len(oAuth2Context) > 0 && ensureValidOAuth2Context(oAuth2Context) {
-		testReq.OAuth2Context = json.RawMessage(oAuth2Context)
+	if len(oAuth2Context) > 0 {
+		oContext, valid := ensureValidOAuth2Context(oAuth2Context)
+		if valid {
+			request.OAuth2Context = oContext
+		}
 	}
 
-	input, err := json.Marshal(testReq)
+	input, err := json.Marshal(request)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal test request: %w", err)
+		return "", err
 	}
 
 	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(input))
@@ -586,16 +603,17 @@ func ensureValidOperationsHeaders(operationsHeaders string) bool {
 	return true
 }
 
-func ensureValidOAuth2Context(oAuth2Context string) bool {
+func ensureValidOAuth2Context(oAuth2Context string) (*OAuth2ClientContext, bool) {
 	var oContext = OAuth2ClientContext{}
 	err := json.Unmarshal([]byte(oAuth2Context), &oContext)
 	if err != nil {
 		fmt.Println("Error parsing JSON in oAuth2Context: ", err)
-		return false
+		return nil, false
 	}
 	if !grantTypeChoices[oContext.GrantType] {
 		fmt.Println("grantType in oAuth2Context is not supported. OAuth2 is turned off.")
-		return false
+		return nil, false
 	}
-	return true
+	return &oContext, true
 }
+
