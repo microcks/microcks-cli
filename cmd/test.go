@@ -52,7 +52,20 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			testEndpoint := args[1]
 			runnerType := args[2]
 
-			if _, ok := runnerChoices[runnerType]; !ok {
+			// Validate presence and values of args.
+			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
+				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				os.Exit(1)
+			}
+			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
+				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				os.Exit(1)
+			}
+			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
+				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				os.Exit(1)
+			}
+			if _, validChoice := runnerChoices[runnerType]; !validChoice {
 				fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 				os.Exit(1)
 			}
