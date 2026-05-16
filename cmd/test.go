@@ -70,7 +70,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				os.Exit(1)
 			}
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
-				fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
+				fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 				os.Exit(1)
 			}
 
