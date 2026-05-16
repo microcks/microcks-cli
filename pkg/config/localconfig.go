@@ -312,7 +312,7 @@ func (l *LocalConfig) GetInstance(name string) (*Instance, error) {
 
 func (l *LocalConfig) UpsertInstance(instance Instance) {
 	for a, i := range l.Instances {
-		if i.ContainerID == instance.ContainerID {
+		if i.Name == instance.Name {
 			l.Instances[a] = instance
 			return
 		}

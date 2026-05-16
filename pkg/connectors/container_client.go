@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -20,6 +21,7 @@ type ContainerClient interface {
 	CreateContainer(opts ContainerOpts) (string, error)
 	StartContainer(containerId string) error
 	StopContainer(continerId string) error
+	GetContainer(name string) (string, string, error)
 	CloseClient() error
 }
 
@@ -143,6 +145,18 @@ func (cli *containerClient) StopContainer(containerId string) error {
 	fmt.Print("Stopping container ", containerId, "... ")
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully
 	return cli.cli.ContainerStop(ctx, containerId, container.StopOptions{Timeout: &noWaitTimeout})
+}
+
+func (cli *containerClient) GetContainer(name string) (string, string, error) {
+	ctx := context.Background()
+	c, err := cli.cli.ContainerInspect(ctx, name)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return "", "", nil
+		}
+		return "", "", err
+	}
+	return c.ID, c.State.Status, nil
 }
 
 func (cli *containerClient) CloseClient() error {
