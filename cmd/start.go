@@ -28,7 +28,7 @@ microcks start
 microcks start --port [Port you want]
 
 # Define your driver (by default docker)
-microcks start --driver [driver you wnat either 'docker' or 'podman']
+microcks start --driver [driver you want either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
