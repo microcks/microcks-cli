@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 	"testing"
-
+	"path/filepath"
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,9 +36,11 @@ users:
   auth-token: ""
   refresh-token: ""`
 
-const testConfigFilePath = "./testdata/local.config"
 
 func TestDeleteContext(t *testing.T) {
+	// create a temporary directory for the config file
+	tmpDir := t.TempDir()
+	testConfigFilePath := filepath.Join(tmpDir, "local.config")
 	//write the test config file
 	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
 	require.NoError(t, err)
