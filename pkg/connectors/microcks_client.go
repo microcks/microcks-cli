@@ -110,6 +110,17 @@ type microcksClient struct {
 	httpClient *http.Client
 }
 
+type testRequest struct {
+	ServiceID          string          `json:"serviceId"`
+	TestEndpoint       string          `json:"testEndpoint"`
+	RunnerType         string          `json:"runnerType"`
+	Timeout            int64           `json:"timeout"`
+	SecretName         string          `json:"secretName,omitempty"`
+	FilteredOperations json.RawMessage `json:"filteredOperations,omitempty"`
+	OperationsHeaders  json.RawMessage `json:"operationsHeaders,omitempty"`
+	OAuth2Context      json.RawMessage `json:"oAuth2Context,omitempty"`
+}
+
 func NewClient(opts ClientOptions) (MicrocksClient, error) {
 	var c microcksClient
 	localCfg, err := config.ReadLocalConfig(opts.ConfigPath)
@@ -323,28 +334,31 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	rel := &url.URL{Path: "tests"}
 	u := c.APIURL.ResolveReference(rel)
 
-	// Prepare an input string as body.
-	var input = "{"
-	input += ("\"serviceId\": \"" + serviceID + "\", ")
-	input += ("\"testEndpoint\": \"" + testEndpoint + "\", ")
-	input += ("\"runnerType\": \"" + runnerType + "\", ")
-	input += ("\"timeout\":  " + strconv.FormatInt(timeout, 10))
-	if len(secretName) > 0 {
-		input += (", \"secretName\": \"" + secretName + "\"")
+	// Prepare an input struct as body.
+	testReq := testRequest{
+		ServiceID:    serviceID,
+		TestEndpoint: testEndpoint,
+		RunnerType:   runnerType,
+		Timeout:      timeout,
+		SecretName:   secretName,
 	}
+
 	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
-		input += (", \"filteredOperations\": " + filteredOperations)
+		testReq.FilteredOperations = json.RawMessage(filteredOperations)
 	}
 	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
-		input += (", \"operationsHeaders\": " + operationsHeaders)
+		testReq.OperationsHeaders = json.RawMessage(operationsHeaders)
 	}
 	if len(oAuth2Context) > 0 && ensureValidOAuth2Context(oAuth2Context) {
-		input += (", \"oAuth2Context\": " + oAuth2Context)
+		testReq.OAuth2Context = json.RawMessage(oAuth2Context)
 	}
 
-	input += "}"
+	input, err := json.Marshal(testReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal test request: %w", err)
+	}
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(input))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(input))
 	if err != nil {
 		return "", err
 	}
