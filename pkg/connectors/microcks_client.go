@@ -247,16 +247,25 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 		panic(err)
 	}
 
-	// Retrieve auth server url and realm name.
-	enabled := configResp["enabled"].(bool)
-	authServerURL := configResp["auth-server-url"].(string)
-	realmName := configResp["realm"].(string)
-
-	// Return a proper URL or 'null' if Keycloak is disables.
-	if enabled {
-		return authServerURL + "/realms/" + realmName + "/", nil
+	// Retrieve auth server url and realm name using comma-ok assertions
+	// so a malformed response surfaces as a Go error instead of a panic.
+	enabled, ok := configResp["enabled"].(bool)
+	if !ok {
+		return "", fmt.Errorf("Microcks /api/keycloak/config response missing or invalid 'enabled' field")
 	}
-	return "null", nil
+	// Return 'null' if Keycloak is disabled.
+	if !enabled {
+		return "null", nil
+	}
+	authServerURL, ok := configResp["auth-server-url"].(string)
+	if !ok {
+		return "", fmt.Errorf("Microcks /api/keycloak/config response missing or invalid 'auth-server-url' field")
+	}
+	realmName, ok := configResp["realm"].(string)
+	if !ok {
+		return "", fmt.Errorf("Microcks /api/keycloak/config response missing or invalid 'realm' field")
+	}
+	return authServerURL + "/realms/" + realmName + "/", nil
 }
 
 func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName, configPath string) error {

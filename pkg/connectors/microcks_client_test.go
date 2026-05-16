@@ -102,3 +102,63 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 		t.Fatalf("expected response body %q, got %q", expectedBody, msg)
 	}
 }
+
+func TestGetKeycloakURL_Enabled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/keycloak/config" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"enabled": true, "auth-server-url": "https://kc", "realm": "microcks"}`))
+	}))
+	defer server.Close()
+
+	client := NewMicrocksClient(server.URL)
+
+	got, err := client.GetKeycloakURL()
+	if err != nil {
+		t.Fatalf("GetKeycloakURL returned error: %v", err)
+	}
+	if want := "https://kc/realms/microcks/"; got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestGetKeycloakURL_Disabled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"enabled": false}`))
+	}))
+	defer server.Close()
+
+	client := NewMicrocksClient(server.URL)
+
+	got, err := client.GetKeycloakURL()
+	if err != nil {
+		t.Fatalf("GetKeycloakURL returned error: %v", err)
+	}
+	if want := "null"; got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestGetKeycloakURL_MalformedResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	client := NewMicrocksClient(server.URL)
+
+	got, err := client.GetKeycloakURL()
+	if err == nil {
+		t.Fatalf("expected error for malformed response, got nil (result=%q)", got)
+	}
+	if got != "" {
+		t.Fatalf("expected empty string on error, got %q", got)
+	}
+}
