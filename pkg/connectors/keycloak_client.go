@@ -97,26 +97,32 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read token response: %w", err)
+	}
+
+	if resp.StatusCode/100 != 2 {
+		return "", fmt.Errorf("token request returned HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse token response: %w", err)
 	}
 
-	accessToken := openIDResp["access_token"].(string)
-	return accessToken, err
+	accessToken, ok := openIDResp["access_token"].(string)
+	if !ok {
+		return "", fmt.Errorf("token response missing required field \"access_token\"")
+	}
+	return accessToken, nil
 }
 
 func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 	rel := &url.URL{Path: ".well-known/openid-configuration"}
 	u := c.BaseURL.ResolveReference(rel)
 
-	// Create HTTP request
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		return nil, fmt.Errorf("failed to create OIDC config request: %w", err)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -127,16 +133,26 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read OIDC config response: %w", err)
+	}
+
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("OIDC config request returned HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to parse OIDC config response: %w", err)
 	}
 
-	authURL := openIDResp["authorization_endpoint"].(string)
-	tokenURL := openIDResp["token_endpoint"].(string)
+	authURL, ok := openIDResp["authorization_endpoint"].(string)
+	if !ok {
+		return nil, fmt.Errorf("OIDC config response missing required field \"authorization_endpoint\"")
+	}
+	tokenURL, ok := openIDResp["token_endpoint"].(string)
+	if !ok {
+		return nil, fmt.Errorf("OIDC config response missing required field \"token_endpoint\"")
+	}
 
 	return &oauth2.Config{
 		Endpoint: oauth2.Endpoint{
@@ -157,13 +173,11 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	data.Set("username", username)
 	data.Set("password", password)
 	data.Set("grant_type", "password")
-	// Create HTTP request
 	req, err := http.NewRequest("POST", u.String(), bytes.NewBufferString(data.Encode()))
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		return "", "", fmt.Errorf("failed to create password token request: %w", err)
 	}
 
-	// Set headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := c.httpClient.Do(req)
@@ -174,16 +188,26 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", "", fmt.Errorf("failed to read password token response: %w", err)
+	}
+
+	if resp.StatusCode/100 != 2 {
+		return "", "", fmt.Errorf("password token request returned HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", "", fmt.Errorf("failed to parse password token response: %w", err)
 	}
 
-	authToken := openIDResp["access_token"].(string)
-	refreshToken := openIDResp["refresh_token"].(string)
+	authToken, ok := openIDResp["access_token"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("password token response missing required field \"access_token\"")
+	}
+	refreshToken, ok := openIDResp["refresh_token"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("password token response missing required field \"refresh_token\"")
+	}
 
 	return authToken, refreshToken, nil
 }
