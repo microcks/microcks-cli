@@ -151,7 +151,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 
 		u, err := url.Parse(apiURL)
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("failed to parse API URL: %w", err)
 		}
 		c.APIURL = u
 
@@ -239,12 +239,12 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read keycloak config response body: %w", err)
 	}
 
 	var configResp map[string]interface{}
 	if err := json.Unmarshal(body, &configResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse keycloak config response: %w", err)
 	}
 
 	// Retrieve auth server url and realm name.
@@ -381,15 +381,18 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read create test response body: %w", err)
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse create test response: %w", err)
 	}
 
-	testID := createTestResp["id"].(string)
+	testID, ok := createTestResp["id"].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid response format: missing or non-string id")
+	}
 	return testID, err
 }
 
@@ -420,7 +423,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read test result response body: %w", err)
 	}
 
 	result := TestResultSummary{}
@@ -553,7 +556,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read upload artifact response body: %w", err)
 	}
 
 	// Raise exception if not created.
