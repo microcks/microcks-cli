@@ -35,7 +35,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/microcks/microcks-cli/pkg/config"
-	"github.com/microcks/microcks-cli/pkg/errors"
 	"golang.org/x/oauth2"
 )
 
@@ -239,24 +238,37 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read Keycloak config response: %w", err)
+	}
+
+	if resp.StatusCode/100 != 2 {
+		return "", fmt.Errorf("Keycloak config request returned HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	var configResp map[string]interface{}
 	if err := json.Unmarshal(body, &configResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse Keycloak config response: %w", err)
 	}
 
 	// Retrieve auth server url and realm name.
-	enabled := configResp["enabled"].(bool)
-	authServerURL := configResp["auth-server-url"].(string)
-	realmName := configResp["realm"].(string)
-
-	// Return a proper URL or 'null' if Keycloak is disables.
-	if enabled {
-		return authServerURL + "/realms/" + realmName + "/", nil
+	enabled, ok := configResp["enabled"].(bool)
+	if !ok {
+		return "", fmt.Errorf("Keycloak config response missing required field \"enabled\"")
 	}
-	return "null", nil
+	if !enabled {
+		return "null", nil
+	}
+
+	authServerURL, ok := configResp["auth-server-url"].(string)
+	if !ok {
+		return "", fmt.Errorf("Keycloak config response missing required field \"auth-server-url\"")
+	}
+	realmName, ok := configResp["realm"].(string)
+	if !ok {
+		return "", fmt.Errorf("Keycloak config response missing required field \"realm\"")
+	}
+
+	return authServerURL + "/realms/" + realmName + "/", nil
 }
 
 func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName, configPath string) error {
@@ -304,10 +316,15 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
 	keyCloakUrl, err := c.GetKeycloakURL()
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
+
 	kc := NewKeycloakClient(keyCloakUrl, "", "")
 	oauth2Conf, err := kc.GetOIDCConfig()
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
 	oauth2Conf.ClientID = auth.ClientId
 	oauth2Conf.ClientSecret = auth.ClientSecret
 
@@ -381,16 +398,23 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read create test response: %w", err)
+	}
+
+	if resp.StatusCode/100 != 2 {
+		return "", fmt.Errorf("create test request returned HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse create test response: %w", err)
 	}
 
-	testID := createTestResp["id"].(string)
-	return testID, err
+	testID, ok := createTestResp["id"].(string)
+	if !ok {
+		return "", fmt.Errorf("create test response missing required field \"id\"")
+	}
+	return testID, nil
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
@@ -420,7 +444,11 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read test result response: %w", err)
+	}
+
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("get test result request returned HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	result := TestResultSummary{}
@@ -553,7 +581,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read download artifact response: %w", err)
 	}
 
 	// Raise exception if not created.
