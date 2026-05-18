@@ -122,3 +122,4 @@ func printMicrocksContexts(configPath string) {
 		errors.CheckError(err)
 	}
 }
+
