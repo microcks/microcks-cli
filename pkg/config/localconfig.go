@@ -413,3 +413,4 @@ func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
 	}
 	return configUtil.MarshalLocalYAMLFile(cfgPath, &config)
 }
+
