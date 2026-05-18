@@ -29,3 +29,4 @@ func Fatal(exitcode int, args ...interface{}) {
 	log.Fatal(args...)
 	os.Exit(exitcode)
 }
+
