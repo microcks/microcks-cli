@@ -113,6 +113,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			var mc connectors.MicrocksClient
 			var serverAddr string
 
+			// kc and tokenExpiresAt are kept in scope so the polling loop can
+			// refresh the bearer token before it expires (headless mode only).
+			var kc connectors.KeycloakClient
+			var tokenExpiresAt int64
+			var headlessKeycloakEnabled bool
+
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
 
 				// create client with server address
@@ -128,13 +134,17 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					headlessKeycloakEnabled = true
+					kc = connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
-					oauthToken, err = kc.ConnectAndGetToken()
+					var expiresIn int
+					oauthToken, expiresIn, err = kc.ConnectAndGetToken()
 					if err != nil {
 						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
+					// Schedule refresh 30 seconds before actual expiry to avoid races.
+					tokenExpiresAt = nowInMilliseconds() + int64(expiresIn-30)*1000
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
@@ -186,6 +196,20 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			var success = false
 			for nowInMilliseconds() < future {
+				// Proactively refresh the bearer token before it expires so that
+				// long-running ASYNC_API_SCHEMA tests (whose --waitFor can exceed
+				// the Keycloak access token lifetime) do not get spurious 401s.
+				if headlessKeycloakEnabled && nowInMilliseconds() >= tokenExpiresAt {
+					freshToken, freshExpiresIn, refreshErr := kc.ConnectAndGetToken()
+					if refreshErr != nil {
+						fmt.Printf("Got error refreshing Keycloak token: %s\n", refreshErr)
+						os.Exit(1)
+					}
+					mc.SetOAuthToken(freshToken)
+					tokenExpiresAt = nowInMilliseconds() + int64(freshExpiresIn-30)*1000
+					fmt.Println("MicrocksTester refreshed OAuth token for continued polling.")
+				}
+
 				testResultSummary, err := mc.GetTestResult(testResultID)
 				if err != nil {
 					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)

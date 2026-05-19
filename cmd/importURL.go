@@ -62,7 +62,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
-					oauthToken, err = kc.ConnectAndGetToken()
+					oauthToken, _, err = kc.ConnectAndGetToken()
 					if err != nil {
 						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
