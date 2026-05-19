@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -129,7 +130,8 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					kc := connectors.NewKeycloakClient(keycloakUrl, "", "")
 					oauth2conf, err := kc.GetOIDCConfig()
 					errors.CheckError(err)
-					authToken, refreshToken = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					authToken, refreshToken, err = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					errors.CheckError(err)
 					authCfg.ClientId = "microcks-app-js"
 				}
 
@@ -188,7 +190,7 @@ func oauth2login(
 	port int,
 	oauth2conf *oauth2.Config,
 	ssoLaunchBrowser bool,
-) (string, string) {
+) (string, string, error) {
 	oauth2conf.ClientID = "microcks-app-js"
 	oauth2conf.RedirectURL = fmt.Sprintf("http://localhost:%d/auth/callback", port)
 
@@ -265,8 +267,12 @@ func oauth2login(
 		completionChan <- ""
 	}
 
-	srv := &http.Server{Addr: "localhost:" + strconv.Itoa(port)}
-	http.HandleFunc("/auth/callback", callbackHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
+	srv := &http.Server{
+		Addr:    "localhost:" + strconv.Itoa(port),
+		Handler: mux,
+	}
 
 	var url string
 	opts := []oauth2.AuthCodeOption{}
@@ -276,18 +282,26 @@ func oauth2login(
 	opts = append(opts, oauth2.SetAuthURLParam("code_challenge_method", "S256"))
 	url = oauth2conf.AuthCodeURL(stateNonce, opts...)
 
-	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", url)
-	time.Sleep(1 * time.Second)
-	ssoAuthFlow(url, ssoLaunchBrowser)
+	ln, listenErr := net.Listen("tcp", srv.Addr)
+	if listenErr != nil {
+		return "", "", fmt.Errorf("failed to bind callback port %s: %v (is another process using it?)", srv.Addr, listenErr)
+	}
+
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("Temporary HTTP server failed: %s", err)
+		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
+			completionChan <- fmt.Sprintf("Temporary HTTP server failed: %s", serveErr)
 		}
 	}()
+
+	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", url)
+	ssoAuthFlow(url, ssoLaunchBrowser)
 	errMsg := <-completionChan
 	if errMsg != "" {
-		log.Fatal(errMsg)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer shutdownCancel()
+		_ = srv.Shutdown(shutdownCtx)
+		return "", "", fmt.Errorf("%s", errMsg)
 	}
 	fmt.Printf("Authentication successful\n")
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -295,7 +309,7 @@ func oauth2login(
 	_ = srv.Shutdown(ctx)
 	log.Printf("Token: %s\n", tokenString)
 	log.Printf("Refresh Token: %s\n", refreshToken)
-	return tokenString, refreshToken
+	return tokenString, refreshToken, nil
 }
 
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
