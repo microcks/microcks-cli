@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -36,9 +37,9 @@ users:
   auth-token: ""
   refresh-token: ""`
 
-const testConfigFilePath = "./testdata/local.config"
-
 func TestDeleteContext(t *testing.T) {
+	testConfigFilePath := filepath.Join(t.TempDir(), "local.config")
+
 	//write the test config file
 	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
 	require.NoError(t, err)
