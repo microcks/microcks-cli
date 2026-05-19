@@ -34,8 +34,16 @@ var (
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
 
-	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
+	ConfigPath = defaultConfigPath()
 )
+
+func defaultConfigPath() string {
+	homeDir, err := getHomeDir()
+	if err != nil {
+		return filepath.Join(".microcks-cli", "config.yaml")
+	}
+	return filepath.Join(homeDir, ".microcks-cli", "config.yaml")
+}
 
 // CreateTLSConfig wraps the creation of tls.Config object for use with HTTP Client for example.
 func CreateTLSConfig() *tls.Config {
