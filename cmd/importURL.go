@@ -35,7 +35,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
 			if len(args) == 0 {
-				fmt.Println("import-url command require <specificationFile1URL[:primary],specificationFile2URL[:primary]> args")
+				fmt.Fprintln(os.Stderr, "import-url command require <specificationFile1URL[:primary],specificationFile2URL[:primary]> args")
 				os.Exit(1)
 			}
 
@@ -53,7 +53,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					fmt.Fprintf(os.Stderr, "Got error when invoking Microcks client retrieving config: %s", err)
 					os.Exit(1)
 				}
 
@@ -64,7 +64,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
+						fmt.Fprintf(os.Stderr, "Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)

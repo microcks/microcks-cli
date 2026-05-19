@@ -89,9 +89,10 @@ microcks [command] [flags]
 | `--microcksURL`          | Microcks API URL                            |
 
 
-## Installation
+
 
 ### Building from Source
+
 To build the CLI locally:
 
 ```bash

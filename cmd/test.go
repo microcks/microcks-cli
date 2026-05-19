@@ -48,7 +48,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			// Parse subcommand args first.
 			if len(os.Args) < 4 {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				fmt.Fprintln(os.Stderr, "test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
 
@@ -58,25 +58,25 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			// Validate presence and values of args.
 			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+			fmt.Fprintln(os.Stderr, "test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
 			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+			fmt.Fprintln(os.Stderr, "test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
 			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				fmt.Fprintln(os.Stderr, "test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
 			}
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
-				fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
+				fmt.Fprintln(os.Stderr, "<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 				os.Exit(1)
 			}
 
 			// Validate presence and values of flags.
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
+				fmt.Fprintln(os.Stderr, "--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")	
 				os.Exit(1)
 			}
 
@@ -90,21 +90,21 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			if strings.HasSuffix(waitFor, "milli") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
 				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
+					fmt.Fprintf(os.Stderr, "--waitFor value %q is not a valid number\n", waitFor)
 					os.Exit(1)
 				}
 				waitForMilliseconds = n
 			} else if strings.HasSuffix(waitFor, "sec") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
 				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
+					fmt.Fprintf(os.Stderr, "--waitFor value %q is not a valid number\n", waitFor)
 					os.Exit(1)
 				}
 				waitForMilliseconds = n * 1000
 			} else if strings.HasSuffix(waitFor, "min") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
 				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
+					fmt.Fprintf(os.Stderr, "--waitFor value %q is not a valid number\n", waitFor)
 					os.Exit(1)
 				}
 				waitForMilliseconds = n * 60 * 1000
@@ -121,7 +121,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					fmt.Fprintf(os.Stderr, "Got error when invoking Microcks client retrieving config: %s", err)
 					os.Exit(1)
 				}
 
@@ -132,7 +132,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
+						fmt.Fprintf(os.Stderr, "Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
 					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
@@ -144,12 +144,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			} else {
 				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 				if err != nil {
-					fmt.Println(err)
+					fmt.Fprintln(os.Stderr, err)
 					return
 				}
 
 				if localConfig == nil {
-					fmt.Println("Please login to perform operation...")
+					fmt.Fprintln(os.Stderr, "Please login to perform operation...")
 					return
 				}
 
@@ -159,7 +159,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
+					fmt.Fprintf(os.Stderr, "error %v", err)
 					return
 				}
 
@@ -172,7 +172,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			var testResultID string
 			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
-				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
+				fmt.Fprintf(os.Stderr, "Got error when invoking Microcks client creating Test: %s", err)
 				os.Exit(1)
 			}
 			//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
@@ -188,22 +188,22 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			for nowInMilliseconds() < future {
 				testResultSummary, err := mc.GetTestResult(testResultID)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
+					fmt.Fprintf(os.Stderr, "Got error when invoking Microcks client check TestResult: %s", err)
 					os.Exit(1)
 				}
 				success = testResultSummary.Success
 				inProgress := testResultSummary.InProgress
-				fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+				fmt.Fprintf(os.Stderr, "MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
 
 				if !inProgress {
 					break
 				}
 
-				fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
+					fmt.Fprintln(os.Stderr, "MicrocksTester waiting for 2 seconds before checking again or exiting.")
 				time.Sleep(2 * time.Second)
 			}
 
-			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+				fmt.Fprintf(os.Stderr, "Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
 			if !success {
 				os.Exit(1)
