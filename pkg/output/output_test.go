@@ -223,18 +223,30 @@ func TestNewFormatter(t *testing.T) {
 
 func TestWriterRouting(t *testing.T) {
 	textWriter := NewWriter(OutputFormatText)
-	var textBuf bytes.Buffer
-	textWriter.out = &textBuf
+	var textInfoBuf bytes.Buffer
+	var textProgressBuf bytes.Buffer
+	textWriter.infoWriter = &textInfoBuf
+	textWriter.progressWriter = &textProgressBuf
 	textWriter.Infof("hello %s", "text")
-	if textBuf.String() != "hello text" {
-		t.Fatalf("text writer should write to stdout buffer, got %q", textBuf.String())
+	textWriter.Progressf("progress %s", "text")
+	if textInfoBuf.String() != "hello text" {
+		t.Fatalf("text writer should write info to stdout buffer, got %q", textInfoBuf.String())
+	}
+	if textProgressBuf.String() != "progress text" {
+		t.Fatalf("text writer should write progress to stdout buffer, got %q", textProgressBuf.String())
 	}
 
 	jsonWriter := NewWriter(OutputFormatJSON)
-	var jsonBuf bytes.Buffer
-	jsonWriter.out = &jsonBuf
+	var jsonInfoBuf bytes.Buffer
+	var jsonProgressBuf bytes.Buffer
+	jsonWriter.infoWriter = &jsonInfoBuf
+	jsonWriter.progressWriter = &jsonProgressBuf
+	jsonWriter.Infof("hello %s", "json")
 	jsonWriter.Progressf("hello %s", "json")
-	if jsonBuf.String() != "hello json" {
-		t.Fatalf("json writer should write to stderr buffer, got %q", jsonBuf.String())
+	if jsonInfoBuf.String() != "hello json" {
+		t.Fatalf("json writer should write info to stderr buffer, got %q", jsonInfoBuf.String())
+	}
+	if jsonProgressBuf.String() != "hello json" {
+		t.Fatalf("json writer should write progress to stderr buffer, got %q", jsonProgressBuf.String())
 	}
 }

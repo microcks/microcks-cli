@@ -35,20 +35,27 @@ func NewFormatter(format OutputFormat) (Formatter, error) {
 }
 
 type Writer struct {
-	out io.Writer
+	infoWriter     io.Writer
+	progressWriter io.Writer
 }
 
 func NewWriter(format OutputFormat) *Writer {
 	if format == OutputFormatText {
-		return &Writer{out: os.Stdout}
+		return &Writer{
+			infoWriter:     os.Stdout,
+			progressWriter: os.Stdout,
+		}
 	}
-	return &Writer{out: os.Stderr}
+	return &Writer{
+		infoWriter:     os.Stderr,
+		progressWriter: os.Stderr,
+	}
 }
 
 func (w *Writer) Infof(format string, args ...any) {
-	fmt.Fprintf(w.out, format, args...)
+	fmt.Fprintf(w.infoWriter, format, args...)
 }
 
 func (w *Writer) Progressf(format string, args ...any) {
-	fmt.Fprintf(w.out, format, args...)
+	fmt.Fprintf(w.progressWriter, format, args...)
 }
