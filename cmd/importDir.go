@@ -131,12 +131,12 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 			if err != nil {
 				fmt.Println(err)
-				return
+				os.Exit(1)
 			}
 
 			if localConfig == nil {
 				fmt.Println("Please login to perform operation...")
-				return
+				os.Exit(1)
 			}
 
 			if globalClientOpts.Context == "" {
@@ -147,7 +147,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			mc, err := connectors.NewClient(*globalClientOpts)
 			if err != nil {
 				fmt.Printf("error %v", err)
-				return
+				os.Exit(1)
 			}
 
 			// Set up business logic dependencies
@@ -163,7 +163,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			if err != nil {
 				if validationErr, ok := err.(*ValidationError); ok {
 					fmt.Println(validationErr.Message)
-					return
+					os.Exit(1)
 				}
 				fmt.Printf("Error: %v\n", err)
 				os.Exit(1)
