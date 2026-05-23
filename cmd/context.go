@@ -45,6 +45,9 @@ microcks context http://localhost:8080 --delete`,
 				printMicrocksContexts(configPath)
 				return
 			}
+			if localCfg == nil {
+				log.Fatalf("No contexts defined in %s", configPath)
+			}
 
 			ctxName := args[0]
 			if localCfg.CurrentContext == ctxName {
@@ -122,3 +125,4 @@ func printMicrocksContexts(configPath string) {
 		errors.CheckError(err)
 	}
 }
+
