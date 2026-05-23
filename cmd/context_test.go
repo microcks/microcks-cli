@@ -36,9 +36,9 @@ users:
   auth-token: ""
   refresh-token: ""`
 
-func TestDeleteContext(t *testing.T) {
-	testConfigFilePath := "./testdata/local.config"
+const testConfigFilePath = "./testdata/local.config"
 
+func TestDeleteContext(t *testing.T) {
 	//write the test config file
 	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
 	require.NoError(t, err)
