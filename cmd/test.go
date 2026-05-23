@@ -42,15 +42,11 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	)
 	var testCmd = &cobra.Command{
 
-		Use:   "test",
+		Use:   "test <apiName:apiVersion> <testEndpoint> <runner>",
 		Short: "Run tests on Microcks",
 		Long:  `Run tests on Microcks`,
+		Args:  cobra.ExactArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			// Parse subcommand args first.
-			if len(os.Args) < 4 {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
-			}
 
 			serviceRef := args[0]
 			testEndpoint := args[1]
@@ -169,7 +165,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				serverAddr = ctx.Server.Server
 			}
 
-			var testResultID string
 			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
 				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
