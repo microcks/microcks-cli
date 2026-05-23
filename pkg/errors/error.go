@@ -26,6 +26,8 @@ func CheckError(err error) {
 
 // Fatal is a wrapper for log.Fatal() to exit with custom code
 func Fatal(exitcode int, args ...interface{}) {
-	log.Fatal(args...)
+	log.Println(args...)
 	os.Exit(exitcode)
 }
+
+
