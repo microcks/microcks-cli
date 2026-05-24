@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -39,6 +40,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		autoFileIssue      bool
+		githubToken        string
+		githubRepo         string
 	)
 	var testCmd = &cobra.Command{
 
@@ -205,6 +209,34 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
+			// Auto-file GitHub Issue if test failed and flag is set
+			if !success && autoFileIssue {
+				if githubToken == "" || githubRepo == "" {
+					fmt.Println("Warning: --auto-file-issue requires --github-token and --github-repo flags")
+				} else {
+					// Collect failed operations
+					var failedOps []string
+					testResultDetails, err := mc.GetTestResultDetails(testResultID)
+					if err == nil {
+						for _, tc := range testResultDetails.TestCaseResults {
+							if !tc.Success {
+								failedOps = append(failedOps, tc.OperationName)
+							}
+						}
+					}
+
+					title := fmt.Sprintf("[Microcks] Test Failed: %s", serviceRef)
+					body := connectors.BuildIssueBody(serviceRef, testEndpoint, runnerType, serverAddr, testResultID, failedOps)
+
+					err = connectors.CreateGitHubIssue(githubToken, githubRepo, title, body)
+					if err != nil {
+						fmt.Printf("Warning: Failed to create GitHub Issue: %s\n", err)
+					} else {
+						fmt.Printf("GitHub Issue created successfully in %s\n", githubRepo)
+					}
+				}
+			}
+
 			if !success {
 				os.Exit(1)
 			}
@@ -216,6 +248,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().BoolVar(&autoFileIssue, "auto-file-issue", false, "Automatically create a GitHub Issue when test fails")
+testCmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub personal access token for creating issues")
+testCmd.Flags().StringVar(&githubRepo, "github-repo", "", "GitHub repository in format 'owner/repo' for filing issues")
 
 	return testCmd
 }
