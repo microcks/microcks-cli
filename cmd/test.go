@@ -25,6 +25,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -39,6 +40,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		launchBrowser      bool
 	)
 	var testCmd = &cobra.Command{
 
@@ -189,7 +191,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				time.Sleep(2 * time.Second)
 			}
 
-			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			testResultURL := fmt.Sprintf("%s/#/tests/%s", serverAddr, testResultID)
+			fmt.Printf("Full TestResult details are available here: %s \n", testResultURL)
+			util.LaunchBrowser(testResultURL, launchBrowser)
 
 			if !success {
 				os.Exit(1)
@@ -202,6 +206,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().BoolVar(&launchBrowser, "launch-browser", true, "Automatically launch the system browser to the Microcks test result")
 
 	return testCmd
 }
