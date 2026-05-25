@@ -143,10 +143,10 @@ microcks start --name [name of you container/instance]`,
 			fmt.Printf("Microcks started successfully at %s\n", server)
 		},
 	}
-	startCmd.Flags().StringVar(&name, "name", "microcks", "name for you microcks instance")
-	startCmd.Flags().StringVar(&hostPort, "port", "8585", "")
+	startCmd.Flags().StringVar(&name, "name", "microcks", "name for your Microcks instance")
+	startCmd.Flags().StringVar(&hostPort, "port", "8585", "Host port to expose Microcks")
 	startCmd.Flags().StringVar(&imageName, "image", "quay.io/microcks/microcks-uber:latest-native", "image which will be used to create a container")
-	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of dokcer to automatically remove the container when it exits")
+	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of Docker to automatically remove the container when it exits")
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
 	return startCmd
 }
