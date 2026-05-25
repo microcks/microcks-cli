@@ -7,7 +7,6 @@ import (
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
-	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -29,29 +28,40 @@ microcks logout dev-context`,
 				os.Exit(1)
 			}
 
-			context := args[0]
-			localCfg, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-			errors.CheckError(err)
-			if localCfg == nil {
-				log.Fatalf("Nothing to logout from")
-			}
-
-			// Remove authToken
-			ok := localCfg.RemoveToken(context)
-			if !ok {
-				log.Fatalf("Context %s does not exist", context)
-			}
-
-			err = config.ValidateLocalConfig(*localCfg)
+			target := args[0]
+			err := logoutContext(target, globalClientOpts.ConfigPath)
 			if err != nil {
-				log.Fatalf("Error in loging out: %s", err)
+				log.Fatal(err)
 			}
-			err = config.WriteLocalConfig(*localCfg, globalClientOpts.ConfigPath)
-			errors.CheckError(err)
-
-			fmt.Printf("Logged out from '%s'\n", context)
+			fmt.Printf("Logged out from '%s'\n", target)
 		},
 	}
 
 	return logoutCmd
+}
+
+func logoutContext(target, configPath string) error {
+	localCfg, err := config.ReadLocalConfig(configPath)
+	if err != nil {
+		return err
+	}
+	if localCfg == nil {
+		return fmt.Errorf("Nothing to logout from")
+	}
+
+	userName := target
+	if ctx, err := localCfg.ResolveContext(target); err == nil {
+		userName = ctx.User.Name
+	}
+
+	if ok := localCfg.RemoveToken(userName); !ok {
+		return fmt.Errorf("Context %s does not exist", target)
+	}
+
+	err = config.ValidateLocalConfig(*localCfg)
+	if err != nil {
+		return fmt.Errorf("Error in loging out: %s", err)
+	}
+
+	return config.WriteLocalConfig(*localCfg, configPath)
 }
