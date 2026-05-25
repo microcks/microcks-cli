@@ -19,8 +19,8 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/util"
 	"github.com/microcks/microcks-cli/pkg/util/rand"
-	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 	"golang.org/x/term"
@@ -298,9 +298,7 @@ func oauth2login(
 
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
 	if ssoLaunchBrowser {
-		fmt.Printf("Opening system default browser for authentication\n")
-		err := open.Start(url)
-		errors.CheckError(err)
+		util.LaunchBrowser(url, ssoLaunchBrowser)
 	} else {
 		fmt.Printf("To authenticate, copy-and-paste the following URL into your preferred browser: %s\n", url)
 	}

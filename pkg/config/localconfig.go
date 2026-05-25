@@ -16,8 +16,16 @@ type LocalConfig struct {
 	Users          []User       `yaml:"users"`
 	Instances      []Instance   `yaml:"instances"`
 	Auths          []Auth       `yaml:"auths"`
+	LaunchBrowser  *bool        `yaml:"launch-browser,omitempty"`
 }
 
+// GetLaunchBrowser returns the global preference for launching browser. Default is true.
+func (l *LocalConfig) GetLaunchBrowser() bool {
+	if l.LaunchBrowser == nil {
+		return true
+	}
+	return *l.LaunchBrowser
+}
 type ContextRef struct {
 	Name     string `yaml:"name"`
 	Server   string `yaml:"server"`
