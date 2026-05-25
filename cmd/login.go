@@ -293,8 +293,6 @@ func oauth2login(
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
-	log.Printf("Token: %s\n", tokenString)
-	log.Printf("Refresh Token: %s\n", refreshToken)
 	return tokenString, refreshToken
 }
 

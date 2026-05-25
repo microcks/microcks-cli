@@ -1,4 +1,10 @@
 version: 2
+registries:
+  dhi:
+    type: docker-registry
+    url: dhi.io
+    username: ${{ secrets.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
 updates:
   - package-ecosystem: github-actions
     directory: /
@@ -19,5 +25,7 @@ updates:
     schedule:
       interval: monthly
       day: sunday
+    registries:
+    - dhi
     open-pull-requests-limit: 3
     rebase-strategy: disabled

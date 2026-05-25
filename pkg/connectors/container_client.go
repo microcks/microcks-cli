@@ -3,7 +3,6 @@ package connectors
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -12,8 +11,10 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/moby/term"
 )
 
 type ContainerClient interface {
@@ -112,8 +113,19 @@ func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) 
 		return "", err
 	}
 	defer out.Close()
-	io.Copy(os.Stdout, out)
 
+	fd, isTerminal := term.GetFdInfo(os.Stdout)
+
+	err = jsonmessage.DisplayJSONMessagesStream(
+		out,
+		os.Stdout,
+		fd,
+		isTerminal,
+		nil,
+	)
+	if err != nil {
+		return "", err
+	}
 	resp, err := cli.cli.ContainerCreate(
 		ctx,
 		&container.Config{
