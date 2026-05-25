@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	
 	errs "errors"
 	"fmt"
 	"io"
@@ -50,6 +51,7 @@ type MicrocksClient interface {
 	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
+	GetTestResultDetails(testResultID string) (*TestResult, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
@@ -66,7 +68,28 @@ type TestResultSummary struct {
 	Success        bool   `json:"success"`
 	InProgress     bool   `json:"inProgress"`
 }
+// TestStepResult represents a single step result in a test case
+type TestStepResult struct {
+	RequestName string `json:"requestName"`
+	Success     bool   `json:"success"`
+	Message     string `json:"message"`
+}
 
+// TestCaseResult represents results for one operation
+type TestCaseResult struct {
+	OperationName   string           `json:"operationName"`
+	Success         bool             `json:"success"`
+	TestStepResults []TestStepResult `json:"testStepResults"`
+}
+
+// TestResult represents the full detailed test result
+type TestResult struct {
+	ID              string           `json:"id"`
+	Success         bool             `json:"success"`
+	InProgress      bool             `json:"inProgress"`
+	TestedEndpoint  string           `json:"testedEndpoint"`
+	TestCaseResults []TestCaseResult `json:"testCaseResults"`
+}
 // HeaderDTO represents an operation header passed for Test
 type HeaderDTO struct {
 	Name   string `json:"name"`
@@ -598,4 +621,33 @@ func ensureValidOAuth2Context(oAuth2Context string) bool {
 		return false
 	}
 	return true
+}
+// GetTestResultDetails fetches full test result including per-operation results.
+func (c *microcksClient) GetTestResultDetails(testResultID string) (*TestResult, error) {
+	rel := &url.URL{Path: "tests/" + testResultID}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := TestResult{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse detailed test result: %w", err)
+	}
+	return &result, nil
 }
