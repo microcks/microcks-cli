@@ -71,10 +71,33 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			}
 
 			// Validate presence and values of flags.
-			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
-				os.Exit(1)
-			}
+if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
+    fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
+    os.Exit(1)
+}
+
+// Validate that numeric part of --waitFor is present and greater than zero.
+var numericPart string
+if strings.HasSuffix(waitFor, "milli") {
+	numericPart = waitFor[:len(waitFor)-5]
+} else if strings.HasSuffix(waitFor, "sec") {
+	numericPart = waitFor[:len(waitFor)-3]
+} else if strings.HasSuffix(waitFor, "min") {
+	numericPart = waitFor[:len(waitFor)-3]
+}
+if numericPart == "" {
+	fmt.Printf("--waitFor value %q is missing numeric part (e.g. 5sec, 500milli, 1min)\n", waitFor)
+	os.Exit(1)
+}
+numericVal, err := strconv.ParseInt(numericPart, 0, 64)
+if err != nil {
+	fmt.Printf("--waitFor value %q has invalid numeric part: must be a valid integer\n", waitFor)
+	os.Exit(1)
+}
+if numericVal <= 0 {
+	fmt.Printf("--waitFor value %q must be greater than zero\n", waitFor)
+	os.Exit(1)
+}
 
 			// Collect optional HTTPS transport flags.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
@@ -165,7 +188,8 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				serverAddr = ctx.Server.Server
 			}
 
-			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			var testResultID string
+			testResultID, err = mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
 			if err != nil {
 				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 				os.Exit(1)
