@@ -12,6 +12,7 @@ import (
 
 func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
+	var name string
 	var stopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "stop microcks instance",
@@ -27,7 +28,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				return
 			}
 
-			ctx, err := localConfig.ResolveContext("")
+			ctx, err := localConfig.ResolveContext(name)
 			errors.CheckError(err)
 			instance := ctx.Instance
 
@@ -45,7 +46,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				log.Fatalf("Failed to stop a container: %v", err)
 				return
 			}
-			fmt.Println("")
+			
 			log.Printf("Instance %s stopped successfully", instance.Name)
 
 			// update configs
@@ -72,6 +73,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			errors.CheckError(err)
 		},
 	}
+	stopCmd.Flags().StringVar(&name, "name", "", "Name of the Microcks instance to stop")
 
 	return stopCmd
 }
