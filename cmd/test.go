@@ -25,6 +25,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +48,15 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Long:  `Run tests on Microcks`,
 		Args:  cobra.ExactArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(os.Args) < 4 {
+				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				os.Exit(1)
+			}
 
 			serviceRef := args[0]
 			testEndpoint := args[1]
 			runnerType := args[2]
 
-			// Validate presence and values of args.
 			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
 				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
 				os.Exit(1)
@@ -70,18 +74,27 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				os.Exit(1)
 			}
 
-			// Validate presence and values of flags.
+			validOutputFormats := map[string]bool{
+				string(output.OutputFormatText): true,
+				string(output.OutputFormatJSON): true,
+				string(output.OutputFormatYAML): true,
+			}
+			if !validOutputFormats[globalClientOpts.OutputFormat] {
+				fmt.Println("--output format is wrong. Accepted values are: text, json, yaml")
+				os.Exit(1)
+			}
+			isTextOutput := globalClientOpts.OutputFormat == string(output.OutputFormatText)
+			outputWriter := output.NewWriter(output.OutputFormat(globalClientOpts.OutputFormat))
+
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
 				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
 				os.Exit(1)
 			}
 
-			// Collect optional HTTPS transport flags.
 			config.InsecureTLS = globalClientOpts.InsecureTLS
 			config.CaCertPaths = globalClientOpts.CaCertPaths
 			config.Verbose = globalClientOpts.Verbose
 
-			// Compute time to wait in milliseconds.
 			var waitForMilliseconds int64
 			if strings.HasSuffix(waitFor, "milli") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
@@ -111,7 +124,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
 
-				// create client with server address
 				serverAddr = globalClientOpts.ServerAddr
 				mc = connectors.NewMicrocksClient(serverAddr)
 
@@ -123,7 +135,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				var oauthToken string = "unauthenticated-token"
 				if keycloakURL != "null" {
-					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
 					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 
 					oauthToken, err = kc.ConnectAndGetToken()
@@ -131,10 +142,8 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 						fmt.Printf("Got error when invoking Keycloak client: %s", err)
 						os.Exit(1)
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
-				// Then - launch the test on Microcks Server.
 				mc.SetOAuthToken(oauthToken)
 
 			} else {
@@ -170,12 +179,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
 				os.Exit(1)
 			}
-			//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
 
-			// Finally - wait before checking and loop for some time
 			time.Sleep(1 * time.Second)
 
-			// Add 10.000ms to wait time as it's now representing the server timeout.
 			now := nowInMilliseconds()
 			future := now + waitForMilliseconds + 10000
 
@@ -188,17 +194,34 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				}
 				success = testResultSummary.Success
 				inProgress := testResultSummary.InProgress
-				fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+				outputWriter.Progressf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
 
 				if !inProgress {
 					break
 				}
 
-				fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
+				outputWriter.Progressf("MicrocksTester waiting for 2 seconds before checking again or exiting.\n")
 				time.Sleep(2 * time.Second)
 			}
 
-			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			outputWriter.Infof("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+
+			if !isTextOutput {
+				fullResult, err := mc.GetFullTestResult(testResultID)
+				if err != nil {
+					fmt.Printf("Got error when retrieving full test result: %s", err)
+					os.Exit(1)
+				}
+				formatter, err := output.NewFormatter(output.OutputFormat(globalClientOpts.OutputFormat))
+				if err != nil {
+					fmt.Printf("Got error when selecting output formatter: %s", err)
+					os.Exit(1)
+				}
+				outputStr := formatter.FormatTestResult(fullResult)
+				if outputStr != "" {
+					fmt.Println(outputStr)
+				}
+			}
 
 			if !success {
 				os.Exit(1)

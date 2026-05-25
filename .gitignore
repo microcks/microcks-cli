@@ -19,3 +19,4 @@ build/dist
 
 # test data files
 **/testdata/**
+.gocache/
