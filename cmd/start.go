@@ -7,6 +7,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,7 @@ func NewStartCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		imageName  string
 		autoRemove bool
 		driver     string
+		launchBrowser bool
 	)
 	var startCmd = &cobra.Command{
 		Use:   "start",
@@ -141,6 +143,7 @@ microcks start --name [name of you container/instance]`,
 			errors.CheckError(err)
 
 			fmt.Printf("Microcks started successfully at %s\n", server)
+			util.LaunchBrowser(server, launchBrowser)
 		},
 	}
 	startCmd.Flags().StringVar(&name, "name", "microcks", "name for your Microcks instance")
@@ -148,5 +151,6 @@ microcks start --name [name of you container/instance]`,
 	startCmd.Flags().StringVar(&imageName, "image", "quay.io/microcks/microcks-uber:latest-native", "image which will be used to create a container")
 	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of Docker to automatically remove the container when it exits")
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
+	startCmd.Flags().BoolVar(&launchBrowser, "launch-browser", true, "Automatically launch browser to the Microcks dashboard")
 	return startCmd
 }
