@@ -95,6 +95,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					return
 				}
 			}
+			var hasErrors bool
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
 				mainArtifact := true
@@ -120,10 +121,14 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
-					os.Exit(1)
+					fmt.Printf("Failed to import '%s': %s\n", f, err)
+					hasErrors = true
+					continue
 				}
 				fmt.Printf("Microcks has discovered '%s'\n", msg)
+			}
+			if hasErrors {
+				os.Exit(1)
 			}
 		},
 	}
