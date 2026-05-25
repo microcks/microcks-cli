@@ -65,8 +65,56 @@ func TestDeleteContext(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDeleteContextEmpty(t *testing.T) {
-	err := deleteContext("http://localhost:8080", "./testdata/non-existent-file.config")
-	require.EqualError(t, err, "Nothing to logout from")
-}
+func TestDeleteNamedContextRemovesReferencedUserAndAuth(t *testing.T) {
+	configPath := t.TempDir() + "/config"
+	localConfig := `current-context: staging
+contexts:
+- name: dev
+  server: http://localhost:8080
+  user: http://localhost:8080
+  instance: ""
+- name: staging
+  server: http://localhost:8083
+  user: http://localhost:8083
+  instance: ""
+servers:
+- name: ""
+  server: http://localhost:8080
+  insecureTLS: true
+  keycloakEnable: true
+- name: ""
+  server: http://localhost:8083
+  insecureTLS: true
+  keycloakEnable: true
+users:
+- name: http://localhost:8080
+  auth-token: stale-token
+  refresh-token: stale-refresh-token
+- name: http://localhost:8083
+  auth-token: ""
+  refresh-token: ""
+auths:
+- server: http://localhost:8080
+  clientid: my-client
+  clientsecret: my-secret
+`
 
+	err := os.WriteFile(configPath, []byte(localConfig), os.ModePerm)
+	require.NoError(t, err)
+	err = os.Chmod(configPath, 0o600)
+	require.NoError(t, err)
+
+	err = deleteContext("dev", configPath)
+	require.NoError(t, err)
+
+	localCfg, err := config.ReadLocalConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, localCfg)
+
+	assert.Equal(t, "staging", localCfg.CurrentContext)
+	assert.NotContains(t, localCfg.Contexts, config.ContextRef{Name: "dev", Server: "http://localhost:8080", User: "http://localhost:8080", Instance: ""})
+	assert.NotContains(t, localCfg.Servers, config.Server{Server: "http://localhost:8080", InsecureTLS: true, KeycloakEnable: true})
+	assert.NotContains(t, localCfg.Users, config.User{Name: "http://localhost:8080", AuthToken: "stale-token", RefreshToken: "stale-refresh-token"})
+	assert.NotContains(t, localCfg.Auths, config.Auth{Server: "http://localhost:8080", ClientId: "my-client", ClientSecret: "my-secret"})
+	assert.Contains(t, localCfg.Contexts, config.ContextRef{Name: "staging", Server: "http://localhost:8083", User: "http://localhost:8083", Instance: ""})
+}
