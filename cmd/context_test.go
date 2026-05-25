@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -36,9 +37,41 @@ users:
   auth-token: ""
   refresh-token: ""`
 
-const testConfigFilePath = "./testdata/local.config"
+const sharedServerConfig = `current-context: dev
+contexts:
+- name: dev
+  server: http://localhost:8585
+  user: http://localhost:8585
+  instance: microcks
+- name: qa
+  server: http://localhost:8585
+  user: http://localhost:8585
+  instance: microcks
+servers:
+- name: microcks
+  server: http://localhost:8585
+  insecureTLS: true
+  keycloakEnable: false
+users:
+- name: http://localhost:8585
+  auth-token: ""
+  refresh-token: ""
+instances:
+- name: microcks
+  image: quay.io/microcks/microcks-uber:latest-native
+  status: Running
+  port: "8585"
+  containerID: abc123
+  autoRemove: false
+  driver: docker
+auths:
+- server: http://localhost:8585
+  clientid: ""
+  clientsecret: ""`
 
 func TestDeleteContext(t *testing.T) {
+	testConfigFilePath := filepath.Join(t.TempDir(), "local.config")
+
 	//write the test config file
 	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
 	require.NoError(t, err)
@@ -63,4 +96,33 @@ func TestDeleteContext(t *testing.T) {
 	require.NoError(t, err)
 	_, err = config.ReadLocalConfig(testConfigFilePath)
 	require.NoError(t, err)
+}
+
+func TestDeleteContextSharedServerKeepsReferencedEntries(t *testing.T) {
+	testConfigFilePath := filepath.Join(t.TempDir(), "local.config")
+
+	err := os.WriteFile(testConfigFilePath, []byte(sharedServerConfig), os.ModePerm)
+	require.NoError(t, err)
+
+	err = os.Chmod(testConfigFilePath, 0o600)
+	require.NoError(t, err, "Could not change the file permission to 0600 %v", err)
+
+	err = deleteContext("dev", testConfigFilePath)
+	require.NoError(t, err)
+
+	localCfg, err := config.ReadLocalConfig(testConfigFilePath)
+	require.NoError(t, err)
+	require.NotNil(t, localCfg)
+
+	assert.Equal(t, "", localCfg.CurrentContext)
+	assert.Len(t, localCfg.Contexts, 1)
+	assert.Equal(t, "qa", localCfg.Contexts[0].Name)
+	assert.Len(t, localCfg.Servers, 1)
+	assert.Equal(t, "http://localhost:8585", localCfg.Servers[0].Server)
+	assert.Len(t, localCfg.Users, 1)
+	assert.Equal(t, "http://localhost:8585", localCfg.Users[0].Name)
+	assert.Len(t, localCfg.Instances, 1)
+	assert.Equal(t, "microcks", localCfg.Instances[0].Name)
+	assert.Len(t, localCfg.Auths, 1)
+	assert.Equal(t, "http://localhost:8585", localCfg.Auths[0].Server)
 }
