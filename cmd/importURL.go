@@ -53,7 +53,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
+					fmt.Printf("Got error when invoking Microcks client retrieving config: %s\n", err)
 					os.Exit(1)
 				}
 
@@ -64,10 +64,10 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
+						fmt.Printf("Got error when invoking Keycloak client: %s\n", err)
 						os.Exit(1)
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
+					//fmt.Printf("Retrieve OAuthToken: %s\n", oauthToken)
 				}
 
 				//Set Auth token
@@ -91,7 +91,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
+					fmt.Printf("error %v\n", err)
 					os.Exit(1)
 				}
 			}
@@ -120,7 +120,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
+					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s\n", err)
 					os.Exit(1)
 				}
 				fmt.Printf("Microcks has discovered '%s'\n", msg)
