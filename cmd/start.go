@@ -47,30 +47,34 @@ microcks start --name [name of you container/instance]`,
 				instance = &config.Instance{}
 			}
 
-			if instance.Status == "Running" {
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+			containerClient, err := connectors.NewContainerClient(driver)
+			errors.CheckError(err)
+			defer containerClient.CloseClient()
+
+			daemonID, daemonStatus, err := containerClient.GetContainer(name)
+			if err != nil {
+				log.Fatalf("failed to inspect container: %v", err)
 			}
 
-			switch instance.Status {
-			case "Running":
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
-			case "Exited":
-				containerClient, err := connectors.NewContainerClient(instance.Driver)
-				errors.CheckError(err)
-				defer containerClient.CloseClient()
-
-				if err := containerClient.StartContainer(instance.ContainerID); err != nil {
-					log.Fatalf("failed to start container: %v", err)
+			if daemonID != "" {
+				if daemonStatus == "running" {
+					fmt.Printf("Microcks instance with name %s is already running\n", name)
 					return
 				}
+				if err := containerClient.StartContainer(daemonID); err != nil {
+					log.Fatalf("failed to start container: %v", err)
+				}
+				instance.ContainerID = daemonID
+				instance.Name = name
+				if instance.Port == "" {
+					instance.Port = hostPort
+				}
+				if instance.Image == "" {
+					instance.Image = imageName
+				}
+				instance.Driver = driver
 				instance.Status = "Running"
-			default:
-				containerClient, err := connectors.NewContainerClient(driver)
-				errors.CheckError(err)
-				defer containerClient.CloseClient()
-
+			} else {
 				containerId, err := containerClient.CreateContainer(connectors.ContainerOpts{
 					Image:      imageName,
 					Port:       hostPort,
@@ -79,12 +83,10 @@ microcks start --name [name of you container/instance]`,
 				})
 				if err != nil {
 					log.Fatalf("Failed to create a container: %v", err)
-					return
 				}
 
 				if err := containerClient.StartContainer(containerId); err != nil {
 					log.Fatalf("failed to start container: %v", err)
-					return
 				}
 
 				instance.ContainerID = containerId
