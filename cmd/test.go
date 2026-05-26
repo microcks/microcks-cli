@@ -41,13 +41,23 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		oAuth2Context      string
 	)
 	var testCmd = &cobra.Command{
-
 		Use:   "test <apiName:apiVersion> <testEndpoint> <runner>",
 		Short: "Run tests on Microcks",
-		Long:  `Run tests on Microcks`,
-		Args:  cobra.ExactArgs(3),
-		Run: func(cmd *cobra.Command, args []string) {
+		Long: `Run a test on a Microcks server against a deployed implementation.
 
+Required arguments:
+  <apiName:apiVersion>  Service reference, e.g. "Beer Catalog API:0.9".
+  <testEndpoint>        URL of the deployed implementation under test.
+  <runner>              Test strategy. One of: HTTP, SOAP_HTTP, SOAP_UI,
+                        POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA,
+                        GRPC_PROTOBUF, GRAPHQL_SCHEMA.`,
+		Example: `  microcks test "Beer Catalog API:0.9" http://my-service/api/ POSTMAN \
+    --microcksURL=http://microcks.example.com/api \
+    --keycloakClientId=microcks-serviceaccount \
+    --keycloakClientSecret=<secret> \
+    --waitFor=10sec`,
+		Args: cobra.ExactArgs(3),
+		Run: func(cmd *cobra.Command, args []string) {
 			serviceRef := args[0]
 			testEndpoint := args[1]
 			runnerType := args[2]
