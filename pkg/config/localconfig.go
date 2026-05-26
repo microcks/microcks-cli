@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"slices"
 
 	configUtil "github.com/microcks/microcks-cli/pkg/util"
@@ -109,7 +109,7 @@ func DefaultConfigDir() (string, error) {
 		return "", nil
 	}
 
-	configDir = path.Join(homeDir, ".config", "microcks")
+	configDir = filepath.Join(homeDir, ".config", "microcks")
 
 	return configDir, nil
 }
@@ -130,7 +130,7 @@ func DefaultLocalConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return path.Join(dir, "config"), nil
+	return filepath.Join(dir, "config"), nil
 }
 
 // DefaultLocalWatchPath returns the local watch configuration path.
@@ -139,7 +139,7 @@ func DefaultLocalWatchPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return path.Join(dir, "watch"), nil
+	return filepath.Join(dir, "watch"), nil
 }
 
 // ValidateLocalConfig validates the local configuration.
@@ -155,7 +155,7 @@ func ValidateLocalConfig(config LocalConfig) error {
 
 // WriteLocalConfig writes a new local configuration file.
 func WriteLocalConfig(config LocalConfig, configPath string) error {
-	err := os.MkdirAll(path.Dir(configPath), os.ModePerm)
+	err := os.MkdirAll(filepath.Dir(configPath), os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -407,7 +407,7 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 
 // WriteLocalWatchConfig writes a new local watch configuration file.
 func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
-	err := os.MkdirAll(path.Dir(cfgPath), os.ModePerm)
+	err := os.MkdirAll(filepath.Dir(cfgPath), os.ModePerm)
 	if err != nil {
 		return err
 	}
