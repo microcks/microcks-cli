@@ -17,7 +17,7 @@ type WatchManager struct {
 	lock         sync.Mutex
 }
 
-func NewWatchManger(configPath string) (*WatchManager, error) {
+func NewWatchManager(configPath string) (*WatchManager, error) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
