@@ -3,7 +3,9 @@ package watcher
 import (
 	"fmt"
 	"log"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/microcks/microcks-cli/pkg/config"
@@ -81,7 +83,7 @@ func (wm *WatchManager) Run() {
 	for {
 		select {
 		case event := <-wm.fileWatcher.Events:
-			if event.Op&fsnotify.Write == fsnotify.Write {
+			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove) != 0 {
 				if event.Name == wm.configPath {
 					fmt.Println("[INFO] Reloading config...")
 					wm.lock.Lock()
@@ -95,7 +97,21 @@ func (wm *WatchManager) Run() {
 					entry, exists := wm.watchEntries[event.Name]
 					wm.lock.Unlock()
 					if exists {
-						go TriggerImport(entry)
+						// Re-establish watch if the file was replaced atomically (rename or remove).
+						if event.Op&(fsnotify.Rename|fsnotify.Remove) != 0 {
+							_ = wm.fileWatcher.Remove(event.Name)
+							time.Sleep(50 * time.Millisecond) // Let the OS complete the rename/replace operation
+							if _, err := os.Stat(event.Name); err == nil {
+								if err := wm.fileWatcher.Add(event.Name); err != nil {
+									time.Sleep(100 * time.Millisecond) // Retry once on slow file systems
+									_ = wm.fileWatcher.Add(event.Name)
+								}
+							}
+						}
+
+						if event.Op&fsnotify.Remove == 0 {
+							go TriggerImport(entry)
+						}
 					}
 				}
 			}
