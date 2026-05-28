@@ -219,7 +219,7 @@ func oauth2login(
 	// Authorization redirect callback from OAuth2 auth flow.
 	// Handles both implicit and authorization code flow
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Callback: %s\n", r.URL)
+		log.Printf("Callback received on: %s\n", r.URL.Path)
 
 		if formErr := r.FormValue("error"); formErr != "" {
 			handleErr(w, fmt.Sprintf("%s: %s", formErr, r.FormValue("error_description")))
@@ -276,7 +276,8 @@ func oauth2login(
 	opts = append(opts, oauth2.SetAuthURLParam("code_challenge_method", "S256"))
 	url = oauth2conf.AuthCodeURL(stateNonce, opts...)
 
-	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", url)
+	authBaseURL := strings.SplitN(url, "?", 2)[0]
+	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", authBaseURL)
 	time.Sleep(1 * time.Second)
 	ssoAuthFlow(url, ssoLaunchBrowser)
 	go func() {
@@ -293,6 +294,7 @@ func oauth2login(
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
+
 	return tokenString, refreshToken
 }
 
