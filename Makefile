@@ -28,3 +28,11 @@ build-binaries:
 .PHONY: build-watcher
 build-watcher:
 	go build -o ${DIST_DIR}/${BIN_NAME}-${WATCHER_NAME} ${PACKAGE}/watcher
+
+.PHONY: test
+test:
+	go test ./...
+
+.PHONY: vet
+vet:
+	go vet ./...
