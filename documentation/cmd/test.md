@@ -34,7 +34,7 @@ One of:
 | `--filteredOperations` | Comma-separated list of operations to test                                          |
 | `--operationsHeaders`  | Custom headers for operations as JSON string                                        |
 | `--oAuth2Context`      | OAuth2 client context as JSON string                                                |
-
+| `--output-format`      | Output format for test results. Supported: `plain` (default), `github-actions`     |
 
 ### Options Inherited from Parent Commands
 | Flag                     | Description                                 |
