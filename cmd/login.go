@@ -31,6 +31,8 @@ func NewLoginCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		ctxName          string
 		username         string
 		password         string
+		clientID         string
+		clientSecret     string
 		sso              bool
 		ssoLaunchBrowser bool
 		ssoProt          int
@@ -112,13 +114,18 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			} else {
 				if !sso {
 					//Check for the enviroment variables
-					clientID := os.Getenv("MICROCKS_CLIENT_ID")
-					clientSecret := os.Getenv("MICROCKS_CLIENT_SECRET")
-
+					// Use flag values if provided, otherwise fall back to environment variables
+					if clientID == "" {
+						clientID = os.Getenv("MICROCKS_CLIENT_ID")
+					}
+					if clientSecret == "" {
+						clientSecret = os.Getenv("MICROCKS_CLIENT_SECRET")
+					}
 					if clientID == "" || clientSecret == "" {
-						fmt.Printf("Please Set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' to perform password login\n")
+						fmt.Printf("Please provide client credentials via --client-id and --client-secret flags or set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' environment variables\n")
 						os.Exit(1)
 					}
+
 					//Perform login and retrive tokens
 					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
 					authCfg.ClientId = clientID
@@ -176,6 +183,8 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 	loginCmd.Flags().StringVar(&ctxName, "name", "", "Name to use for the context")
 	loginCmd.Flags().StringVar(&username, "username", "", "The username of an account to authenticate")
 	loginCmd.Flags().StringVar(&password, "password", "", "The password of an account to authenticate")
+	loginCmd.Flags().StringVar(&clientID, "client-id", "", "Keycloak client ID (overrides MICROCKS_CLIENT_ID env var)")
+    loginCmd.Flags().StringVar(&clientSecret, "client-secret", "", "Keycloak client secret (overrides MICROCKS_CLIENT_SECRET env var)")
 	loginCmd.Flags().BoolVar(&sso, "sso", false, "Perform SSO login")
 	loginCmd.Flags().BoolVar(&ssoLaunchBrowser, "sso-launch-browser", true, "Automatically launch the system default browser when performing SSO login")
 	loginCmd.Flags().IntVar(&ssoProt, "sso-port", 58085, "Port to run local OAuth2 login application")
