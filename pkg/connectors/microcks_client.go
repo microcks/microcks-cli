@@ -381,16 +381,24 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", err
+	}
+
+	// Raise exception if not created.
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return "", errs.New(string(body))
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", err
 	}
 
-	testID := createTestResp["id"].(string)
-	return testID, err
+	testID, ok := createTestResp["id"].(string)
+	if !ok {
+		return "", errs.New("Microcks response is missing 'id' field")
+	}
+	return testID, nil
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
