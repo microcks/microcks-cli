@@ -29,7 +29,8 @@ import (
 )
 
 var (
-	runnerChoices = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true, "GRPC_PROTOBUF": true, "GRAPHQL_SCHEMA": true}
+	runnerChoices       = map[string]bool{"HTTP": true, "SOAP_HTTP": true, "SOAP_UI": true, "POSTMAN": true, "OPEN_API_SCHEMA": true, "ASYNC_API_SCHEMA": true, "GRPC_PROTOBUF": true, "GRAPHQL_SCHEMA": true}
+	outputFormatChoices = map[string]bool{"plain": true, "github-actions": true}
 )
 
 func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
@@ -39,6 +40,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		outputFormat       string
 	)
 	var testCmd = &cobra.Command{
 
@@ -67,6 +69,10 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			}
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
 				fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
+				os.Exit(1)
+			}
+			if _, validChoice := outputFormatChoices[outputFormat]; !validChoice {
+				fmt.Println("--output-format should be one of: plain, github-actions")
 				os.Exit(1)
 			}
 
@@ -200,6 +206,14 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
+			if outputFormat == "github-actions" {
+				if success {
+					fmt.Printf("::notice title=Test Passed::%s tests PASSED for endpoint %s\n", serviceRef, testEndpoint)
+				} else {
+					fmt.Printf("::error title=Test Failed::%s tests FAILED for endpoint %s\n", serviceRef, testEndpoint)
+				}
+			}
+
 			if !success {
 				os.Exit(1)
 			}
@@ -211,6 +225,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().StringVar(&outputFormat, "output-format", "plain", "Output format for test results: plain, github-actions")
 
 	return testCmd
 }
