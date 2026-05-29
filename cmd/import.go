@@ -114,6 +114,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					os.Exit(1)
 				}
 			}
+			var hasErrors bool
 
 			// Handle multiple specification files separated by comma.
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
@@ -132,16 +133,17 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				}
 
 				// Try uploading this artifact.
-				msg, err := mc.UploadArtifact(f, mainArtifact)
-				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
-					os.Exit(1)
-				}
-				action := "discovered"
-				if !mainArtifact {
-					action = "completed"
-				}
-				fmt.Printf("Microcks has %s '%s'\n", action, msg)
+                msg, err := mc.UploadArtifact(f, mainArtifact)
+                if err != nil {
+                fmt.Printf("Failed to import '%s': %s\n", f, err)
+                hasErrors = true
+				continue
+			}
+			action := "discovered"
+			if !mainArtifact {
+				action = "completed"
+			}
+			fmt.Printf("Microcks has %s '%s'\n", action, msg)
 
 				// If watch flag is provided, update watch config.
 				if watch {
@@ -155,9 +157,8 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					}
 
 					// Normalize file path to match the watcher fsnotify events format.
-					if strings.HasPrefix(f, "./") {
-						f = strings.TrimPrefix(f, "./")
-					}
+					
+					f = strings.TrimPrefix(f, "./")
 
 					// Upsert entry.
 					watchCfg.UpsertEntry(config.WatchEntry{
@@ -170,6 +171,9 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					err = config.WriteLocalWatchConfig(*watchCfg, watchFile)
 					errors.CheckError(err)
 				}
+			}
+			if hasErrors {
+				os.Exit(1)
 			}
 
 			// Start watcher if --watch flag is provided.
