@@ -31,7 +31,9 @@ import (
 
 // KeycloakClient defines methods for cinteracting with Keycloak
 type KeycloakClient interface {
-	ConnectAndGetToken() (string, error)
+	// ConnectAndGetToken performs a client_credentials grant and returns the
+	// access token, its lifetime in seconds (expires_in), and any error.
+	ConnectAndGetToken() (string, int, error)
 	ConnectAndGetTokenAndRefreshToken(string, string) (string, string, error)
 	GetOIDCConfig() (*oauth2.Config, error)
 }
@@ -69,13 +71,13 @@ func NewKeycloakClient(realmURL string, username string, password string) Keyclo
 }
 
 // ConnectAndGetToken implementation on keycloakClient structure
-func (c *keycloakClient) ConnectAndGetToken() (string, error) {
+func (c *keycloakClient) ConnectAndGetToken() (string, int, error) {
 	rel := &url.URL{Path: "protocol/openid-connect/token"}
 	u := c.BaseURL.ResolveReference(rel)
 
 	req, err := http.NewRequest("POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	credential := base64.StdEncoding.EncodeToString([]byte(c.Username + ":" + c.Password))
@@ -88,7 +90,7 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer resp.Body.Close()
 
@@ -97,16 +99,30 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", 0, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", 0, fmt.Errorf("Keycloak returned HTTP %d when requesting token: %s", resp.StatusCode, string(body))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", 0, fmt.Errorf("failed to parse Keycloak token response: %w", err)
 	}
 
-	accessToken := openIDResp["access_token"].(string)
-	return accessToken, err
+	accessToken, ok := openIDResp["access_token"].(string)
+	if !ok {
+		return "", 0, fmt.Errorf("missing or invalid access_token in Keycloak response")
+	}
+
+	// Default to 5 minutes if expires_in is absent or unparseable.
+	expiresIn := 300
+	if v, ok := openIDResp["expires_in"].(float64); ok && v > 0 {
+		expiresIn = int(v)
+	}
+
+	return accessToken, expiresIn, nil
 }
 
 func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
