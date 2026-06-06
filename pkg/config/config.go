@@ -24,6 +24,8 @@ import (
 	"os"
 	"path/filepath"
 	strings "strings"
+
+	"github.com/microcks/microcks-cli/pkg/utils"
 )
 
 var (
@@ -76,7 +78,7 @@ func DumpRequestIfRequired(name string, req *http.Request, body bool) {
 		if err != nil {
 			fmt.Println("Got error while dumping request out")
 		}
-		fmt.Printf("%s", dump)
+		fmt.Printf("%s", utils.SanitizeString(string(dump)))
 	}
 }
 
@@ -88,7 +90,7 @@ func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
 		if err != nil {
 			fmt.Println("Got error while dumping response")
 		}
-		fmt.Printf("%s", dump)
+		fmt.Printf("%s", utils.SanitizeString(string(dump)))
 		if body {
 			fmt.Println("")
 		}

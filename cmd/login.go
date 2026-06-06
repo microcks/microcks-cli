@@ -20,6 +20,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/microcks/microcks-cli/pkg/util/rand"
+	"github.com/microcks/microcks-cli/pkg/utils"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -219,7 +220,7 @@ func oauth2login(
 	// Authorization redirect callback from OAuth2 auth flow.
 	// Handles both implicit and authorization code flow
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Callback: %s\n", r.URL)
+		log.Printf("Callback: %s\n", utils.SanitizeString(r.URL.String()))
 
 		if formErr := r.FormValue("error"); formErr != "" {
 			handleErr(w, fmt.Sprintf("%s: %s", formErr, r.FormValue("error_description")))
@@ -293,6 +294,8 @@ func oauth2login(
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
+	log.Printf("Token: %s\n", utils.MaskSecret(tokenString))
+	log.Printf("Refresh Token: %s\n", utils.MaskSecret(refreshToken))
 	return tokenString, refreshToken
 }
 
