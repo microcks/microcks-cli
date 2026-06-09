@@ -23,7 +23,8 @@ import (
 	"net/http/httputil"
 	"os"
 	"path/filepath"
-	strings "strings"
+	"regexp"
+	"strings"
 )
 
 var (
@@ -35,6 +36,13 @@ var (
 	Verbose bool = false
 
 	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
+)
+
+var sensitiveHeaderPattern = regexp.MustCompile(
+	`(?im)^(Authorization:\s*)(Bearer\s+)?(.+)$`,
+)
+var sensitiveParamPattern = regexp.MustCompile(
+	`(?i)(access_token|refresh_token|id_token|code)=([^&\s]+)`,
 )
 
 // CreateTLSConfig wraps the creation of tls.Config object for use with HTTP Client for example.
@@ -76,7 +84,7 @@ func DumpRequestIfRequired(name string, req *http.Request, body bool) {
 		if err != nil {
 			fmt.Println("Got error while dumping request out")
 		}
-		fmt.Printf("%s", dump)
+		fmt.Printf("%s", redactSensitiveContent(string(dump)))
 	}
 }
 
@@ -88,9 +96,16 @@ func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
 		if err != nil {
 			fmt.Println("Got error while dumping response")
 		}
-		fmt.Printf("%s", dump)
+		fmt.Printf("%s", redactSensitiveContent(string(dump)))
 		if body {
 			fmt.Println("")
 		}
 	}
+}
+
+// redactSensitiveContent masks OAuth tokens and credentials in HTTP dump output.
+func redactSensitiveContent(dump string) string {
+	redacted := sensitiveHeaderPattern.ReplaceAllString(dump, "${1}[REDACTED]")
+	redacted = sensitiveParamPattern.ReplaceAllString(redacted, "${1}=[REDACTED]")
+	return redacted
 }
