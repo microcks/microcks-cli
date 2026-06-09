@@ -54,15 +54,15 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			// Validate presence and values of args.
 			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				fmt.Fprintln(os.Stderr, "missing required argument: <apiName:apiVersion> (e.g. 'my-api:1.0')")
 				os.Exit(1)
 			}
 			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				fmt.Fprintln(os.Stderr, "missing required argument: <testEndpoint> (e.g. 'http://localhost:8080/api')")
 				os.Exit(1)
 			}
 			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
+				fmt.Fprintln(os.Stderr, "missing required argument: <runner> (e.g. 'HTTP', 'POSTMAN', 'OPEN_API_SCHEMA')")
 				os.Exit(1)
 			}
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
