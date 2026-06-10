@@ -376,21 +376,26 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 	}
 	defer resp.Body.Close()
 
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for creating test", resp, true)
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Check HTTP status before attempting to parse.
+	if resp.StatusCode != 201 {
+		return "", fmt.Errorf("microcks returned HTTP %d: %s (is the service '%s' registered?)", resp.StatusCode, strings.TrimSpace(string(body)), serviceID)
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse test creation response: %w", err)
 	}
 
-	testID := createTestResp["id"].(string)
-	return testID, err
+	testID, ok := createTestResp["id"].(string)
+	if !ok || testID == "" {
+		return "", fmt.Errorf("microcks response missing 'id' field")
+	}
+	return testID, nil
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
