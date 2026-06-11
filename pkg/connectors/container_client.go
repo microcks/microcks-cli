@@ -21,6 +21,7 @@ type ContainerClient interface {
 	CreateContainer(opts ContainerOpts) (string, error)
 	StartContainer(containerId string) error
 	StopContainer(continerId string) error
+	ContainerExists(containerId string) (bool, error)
 	CloseClient() error
 }
 
@@ -155,6 +156,21 @@ func (cli *containerClient) StopContainer(containerId string) error {
 	fmt.Print("Stopping container ", containerId, "... ")
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully
 	return cli.cli.ContainerStop(ctx, containerId, container.StopOptions{Timeout: &noWaitTimeout})
+}
+
+// ContainerExists reports whether the container is still known to the
+// runtime. "No such container" is a regular outcome here, not an error,
+// so callers can reconcile stale config entries.
+func (cli *containerClient) ContainerExists(containerId string) (bool, error) {
+	ctx := context.Background()
+	_, err := cli.cli.ContainerInspect(ctx, containerId)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (cli *containerClient) CloseClient() error {

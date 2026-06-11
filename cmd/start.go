@@ -47,9 +47,24 @@ microcks start --name [name of you container/instance]`,
 				instance = &config.Instance{}
 			}
 
-			if instance.Status == "Running" {
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+			// The recorded status can drift from reality: a system restart,
+			// autoRemove or a manual `docker rm` removes the container while
+			// the config still says Running/Exited. Reconcile before trusting it.
+			if instance.Status != "" && instance.ContainerID != "" {
+				instanceDriver := instance.Driver
+				if instanceDriver == "" {
+					instanceDriver = driver
+				}
+				containerClient, err := connectors.NewContainerClient(instanceDriver)
+				errors.CheckError(err)
+				exists, err := containerClient.ContainerExists(instance.ContainerID)
+				containerClient.CloseClient()
+				errors.CheckError(err)
+				if !exists {
+					fmt.Printf("Container for instance %s no longer exists, recreating it\n", name)
+					instance.Status = ""
+					instance.ContainerID = ""
+				}
 			}
 
 			switch instance.Status {
