@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -12,11 +14,13 @@ import (
 
 func NewStartCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var (
-		name       string
-		hostPort   string
-		imageName  string
-		autoRemove bool
-		driver     string
+		name         string
+		hostPort     string
+		imageName    string
+		autoRemove   bool
+		driver       string
+		readyTimeout time.Duration
+		noWait       bool
 	)
 	var startCmd = &cobra.Command{
 		Use:   "start",
@@ -140,6 +144,17 @@ microcks start --name [name of you container/instance]`,
 			err = config.WriteLocalConfig(*localConfig, configFile)
 			errors.CheckError(err)
 
+			// The container being up doesn't mean the Microcks server inside
+			// is serving traffic yet: wait until HTTP is actually answering
+			// so chained commands (import, test) don't race the boot.
+			if !noWait {
+				fmt.Printf("Waiting for Microcks to be ready at %s ...\n", server)
+				if err := waitForReady(server, readyTimeout); err != nil {
+					log.Fatalf("Microcks container is started but the server is not ready: %v. "+
+						"It may still be booting — retry shortly or raise --ready-timeout.", err)
+				}
+			}
+
 			fmt.Printf("Microcks started successfully at %s\n", server)
 		},
 	}
@@ -148,5 +163,28 @@ microcks start --name [name of you container/instance]`,
 	startCmd.Flags().StringVar(&imageName, "image", "quay.io/microcks/microcks-uber:latest-native", "image which will be used to create a container")
 	startCmd.Flags().BoolVar(&autoRemove, "rm", false, "mimic of '--rm' flag of Docker to automatically remove the container when it exits")
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
+	startCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 60*time.Second, "how long to wait for the Microcks server to be ready before failing")
+	startCmd.Flags().BoolVar(&noWait, "no-wait", false, "return as soon as the container is started, without waiting for the Microcks server to be ready")
 	return startCmd
+}
+
+// waitForReady polls the Microcks API until it answers with 200 or the
+// timeout elapses. HTTP being up is the signal users care about — the
+// Spring Boot app inside the container takes a while after the container
+// process itself is running.
+func waitForReady(serverURL string, timeout time.Duration) error {
+	url := serverURL + "/api/keycloak/config"
+	httpClient := &http.Client{Timeout: 2 * time.Second}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		resp, err := httpClient.Get(url)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("not ready after %s", timeout)
 }
