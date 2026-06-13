@@ -47,7 +47,7 @@ Visit the [Release page](https://github.com/microcks/microcks-cli/releases/tag/1
 OR you can use the [Homebrew](https://brew.sh/) package manager on Linux and MacOS that way:
 
 ```sh
-brew tap microcks/tap 
+brew tap microcks/tap
 brew install microcks/tap/microcks
 ```
 
@@ -89,7 +89,39 @@ microcks [command] [flags]
 | `--microcksURL`          | Microcks API URL                            |
 
 
+### Local contract testing without a server
 
+`microcks test --dry-run` runs a contract test with zero infrastructure: no running Microcks server, no Keycloak credentials, no upfront import. The CLI spins up an ephemeral Microcks container (via [Testcontainers](https://microcks.io/documentation/guides/usage/developing-testcontainers/)), imports your spec, runs the test against your endpoint, prints the result and tears the container down.
+
+```bash
+# One-shot: run once, tear down, exit (exit code 0/1 reflects the test result)
+microcks test --dry-run \
+  --artifact ./openapi.yaml \
+  "Pastry API:1.0.0" \
+  http://localhost:3000 \
+  OPEN_API_SCHEMA
+
+# Watch mode: keep the container alive, re-import + re-run on every save (TDD loop)
+microcks test --dry-run --watch \
+  --artifact ./openapi.yaml \
+  "Pastry API:1.0.0" \
+  http://localhost:3000 \
+  OPEN_API_SCHEMA
+```
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `--dry-run` | `false` | Activate the ephemeral-container path |
+| `--artifact` | _(required with `--dry-run`)_ | Local spec file imported as main artifact |
+| `--image` | `quay.io/microcks/microcks-uber:latest-native` | Uber image override (must be a `*-native` tag) |
+| `--ready-timeout` | `90s` | How long to wait for the container to be ready |
+| `--watch` | `false` | Re-run the test when the artifact file changes |
+
+Notes:
+
+- A `localhost`/`127.0.0.1` test endpoint is automatically reachable from inside the container — the CLI exposes the port and rewrites the endpoint for you.
+- The container is removed on every exit path, including `Ctrl+C` mid-test.
+- Docker is the primary runtime; Podman works through its Docker-compatible socket (`DOCKER_HOST`).
 
 ### Building from Source
 
