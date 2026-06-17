@@ -108,9 +108,10 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					if n > 2 {
 						val, err := strconv.ParseBool(urlAndMainAtrifactAndSecretName[2])
 						if err != nil {
-							fmt.Println(err)
+							fmt.Printf("Cannot parse '%s' as Bool, default to true\n", urlAndMainAtrifactAndSecretName[2])
+						} else {
+							mainArtifact = val
 						}
-						mainArtifact = val
 					}
 					if n > 3 {
 						secret = urlAndMainAtrifactAndSecretName[3]
