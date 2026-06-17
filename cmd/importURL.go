@@ -117,13 +117,17 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					}
 				}
 
-				// Try downloading the artifcat
+				// Try downloading the artifact
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
+					fmt.Fprintf(os.Stderr, "Got error when invoking Microcks client importing Artifact: %s\n", err)
 					os.Exit(1)
 				}
-				fmt.Printf("Microcks has discovered '%s'\n", msg)
+				action := "discovered"
+				if !mainArtifact {
+					action = "imported"
+				}
+				fmt.Printf("Microcks has %s '%s'\n", action, msg)
 			}
 		},
 	}
