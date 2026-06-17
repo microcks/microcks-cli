@@ -11,11 +11,17 @@ import (
 )
 
 func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var name string
 
 	var stopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "stop microcks instance",
 		Long:  "stop microcks instance",
+		Example: `# Stop the instance from the current context
+microcks stop
+
+# Stop by context name or instance name
+microcks stop --name myinstance`,
 		Run: func(cmd *cobra.Command, args []string) {
 
 			configFile := globalClientOpts.ConfigPath
@@ -27,8 +33,27 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				return
 			}
 
-			ctx, err := localConfig.ResolveContext("")
-			errors.CheckError(err)
+			var ctx *config.Context
+			if name != "" {
+				ctx, err = localConfig.ResolveContext(name)
+				if err != nil {
+					var ctxRef *config.ContextRef
+					for _, c := range localConfig.Contexts {
+						if c.Instance == name {
+							ctxRef = &c
+							break
+						}
+					}
+					if ctxRef == nil {
+						log.Fatalf("No context found for '%s'", name)
+					}
+					ctx, err = localConfig.ResolveContext(ctxRef.Name)
+					errors.CheckError(err)
+				}
+			} else {
+				ctx, err = localConfig.ResolveContext("")
+				errors.CheckError(err)
+			}
 			instance := ctx.Instance
 
 			if instance.Name == "" {
@@ -72,6 +97,8 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			errors.CheckError(err)
 		},
 	}
+
+	stopCmd.Flags().StringVar(&name, "name", "", "Name of the context or instance to stop (uses current context if empty)")
 
 	return stopCmd
 }
