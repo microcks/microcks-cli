@@ -226,6 +226,36 @@ func (l *LocalConfig) RemoveContext(serverName string) (string, bool) {
 	return "", false
 }
 
+func (l *LocalConfig) HasContextUsingServer(server string) bool {
+	for _, c := range l.Contexts {
+		if c.Server == server {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *LocalConfig) HasContextUsingUser(user string) bool {
+	for _, c := range l.Contexts {
+		if c.User == user {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *LocalConfig) HasContextUsingInstance(instance string) bool {
+	if instance == "" {
+		return false
+	}
+	for _, c := range l.Contexts {
+		if c.Instance == instance {
+			return true
+		}
+	}
+	return false
+}
+
 // RemoveToken and returns true if user was removed successfully
 func (l *LocalConfig) RemoveToken(serverName string) bool {
 	for i, u := range l.Users {

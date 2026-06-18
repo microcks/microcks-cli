@@ -72,12 +72,25 @@ func deleteContext(context, configPath string) error {
 	if localCfg == nil {
 		return fmt.Errorf("Nothing to logout from")
 	}
-	serverName, ok := localCfg.RemoveContext(context)
+	resolvedContext, err := localCfg.ResolveContext(context)
+	if err != nil {
+		return fmt.Errorf("Context %s does not exist", context)
+	}
+	_, ok := localCfg.RemoveContext(context)
 	if !ok {
 		return fmt.Errorf("Context %s does not exist", context)
 	}
-	_ = localCfg.RemoveUser(context)
-	_ = localCfg.RemoveServer(serverName)
+
+	if !localCfg.HasContextUsingUser(resolvedContext.User.Name) {
+		_ = localCfg.RemoveUser(resolvedContext.User.Name)
+	}
+	if !localCfg.HasContextUsingServer(resolvedContext.Server.Server) {
+		_ = localCfg.RemoveServer(resolvedContext.Server.Server)
+		_ = localCfg.RemoveAuth(resolvedContext.Server.Server)
+	}
+	if !localCfg.HasContextUsingInstance(resolvedContext.Instance.Name) {
+		_ = localCfg.RemoveInstance(resolvedContext.Instance.Name)
+	}
 
 	if localCfg.IsEmpty() {
 		err := localCfg.DeleteLocalConfig(configPath)
