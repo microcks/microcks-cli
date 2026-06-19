@@ -64,3 +64,9 @@ func TestDeleteContext(t *testing.T) {
 	_, err = config.ReadLocalConfig(testConfigFilePath)
 	require.NoError(t, err)
 }
+
+func TestDeleteContextEmpty(t *testing.T) {
+	err := deleteContext("http://localhost:8080", "./testdata/non-existent-file.config")
+	require.EqualError(t, err, "Nothing to logout from")
+}
+

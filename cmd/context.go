@@ -47,6 +47,7 @@ microcks context http://localhost:8080 --delete`,
 			}
 
 			ctxName := args[0]
+			errors.CheckConfigNil(localCfg == nil, configPath)
 			if localCfg.CurrentContext == ctxName {
 				fmt.Printf("Already at context '%s'\n", localCfg.CurrentContext)
 				return
@@ -100,9 +101,7 @@ func deleteContext(context, configPath string) error {
 func printMicrocksContexts(configPath string) {
 	localCfg, err := config.ReadLocalConfig(configPath)
 	errors.CheckError(err)
-	if localCfg == nil {
-		log.Fatalf("No contexts defined in %s", configPath)
-	}
+	errors.CheckConfigNil(localCfg == nil, configPath)
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() { _ = w.Flush() }()
 	columnNames := []string{"CURRENT", "NAME", "SERVER"}
