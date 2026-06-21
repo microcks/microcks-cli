@@ -24,6 +24,13 @@ func CheckError(err error) {
 	}
 }
 
+func CheckConfigNil(isNil bool, path string) {
+	if isNil {
+		Fatal(ErrorGeneric, "No contexts defined in "+path)
+	}
+}
+
+
 // Fatal is a wrapper for log.Fatal() to exit with custom code
 func Fatal(exitcode int, args ...interface{}) {
 	log.Println(args...)
