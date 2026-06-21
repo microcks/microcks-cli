@@ -38,9 +38,9 @@ microcks stop --name myinstance`,
 				ctx, err = localConfig.ResolveContext(name)
 				if err != nil {
 					var ctxRef *config.ContextRef
-					for _, c := range localConfig.Contexts {
-						if c.Instance == name {
-							ctxRef = &c
+					for i := range localConfig.Contexts {
+						if localConfig.Contexts[i].Instance == name {
+							ctxRef = &localConfig.Contexts[i]
 							break
 						}
 					}
