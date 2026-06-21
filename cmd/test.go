@@ -44,6 +44,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		image              string
 		readyTimeout       time.Duration
 		watch              bool
+		driver             string
 	)
 	var testCmd = &cobra.Command{
 
@@ -131,6 +132,10 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 					fmt.Println("--watch is only valid together with --dry-run")
 					os.Exit(1)
 				}
+				if driver != "" {
+					fmt.Println("--driver is only valid together with --dry-run")
+					os.Exit(1)
+				}
 			}
 
 			if dryRun {
@@ -140,6 +145,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 					image:        image,
 					readyTimeout: readyTimeout,
 					watch:        watch,
+					driver:       driver,
 					params:       params,
 				}) {
 					os.Exit(1)
@@ -230,6 +236,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&image, "image", defaultDryRunImage, "Microcks uber-native image used for --dry-run")
 	testCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 90*time.Second, "How long to wait for the ephemeral container to be ready (--dry-run only)")
 	testCmd.Flags().BoolVar(&watch, "watch", false, "Watch the artifact file and re-run the test on change (--dry-run only)")
+	testCmd.Flags().StringVar(&driver, "driver", "", "Container runtime for --dry-run: 'docker' or 'podman' (default: auto-detect)")
 
 	return testCmd
 }

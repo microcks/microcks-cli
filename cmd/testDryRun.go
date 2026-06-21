@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -44,7 +45,56 @@ type dryRunOptions struct {
 	image        string
 	readyTimeout time.Duration
 	watch        bool
+	driver       string
 	params       testParams
+}
+
+// configureDriver points testcontainers-go at the right container runtime.
+// Docker is its default (honoring DOCKER_HOST); Podman needs its socket wired
+// into DOCKER_HOST and Ryuk disabled. An empty driver auto-detects.
+func configureDriver(driver string) error {
+	switch driver {
+	case "podman":
+		return setupPodman()
+	case "docker":
+		return nil // testcontainers-go's default, via DOCKER_HOST
+	case "":
+		if shouldUsePodman() {
+			return setupPodman()
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported --driver %q (use 'docker' or 'podman')", driver)
+	}
+}
+
+// shouldUsePodman auto-detects podman only when it's clearly the intended
+// runtime: no explicit DOCKER_HOST, podman on PATH, and docker absent.
+func shouldUsePodman() bool {
+	if os.Getenv("DOCKER_HOST") != "" {
+		return false // respect an explicitly configured endpoint
+	}
+	_, podErr := exec.LookPath("podman")
+	_, dockErr := exec.LookPath("docker")
+	return podErr == nil && dockErr != nil
+}
+
+func setupPodman() error {
+	if err := connectors.ConfigurePodmanHost(); err != nil {
+		return err
+	}
+	// testcontainers-go silently falls back to Docker when the podman endpoint
+	// isn't reachable, which would make "--driver podman" a lie. Verify the
+	// connection now and fail loudly instead.
+	if err := connectors.PingDockerHost(); err != nil {
+		return fmt.Errorf("--driver podman selected but the podman endpoint is not reachable. "+
+			"Start it with 'podman machine start' (macOS/Windows) or "+
+			"'systemctl --user start podman.socket' (Linux). Underlying error: %w", err)
+	}
+	// Ryuk (Testcontainers' reaper) needs privileges rootless Podman doesn't
+	// grant; our signal-driven Terminate already guarantees cleanup, so disable
+	// it for the Podman path.
+	return os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
 }
 
 func validateDryRunOptions(opts dryRunOptions) error {
@@ -93,6 +143,12 @@ func rewriteLocalEndpoint(testEndpoint string) (string, int, bool) {
 
 func runDryRunTest(opts dryRunOptions) bool {
 	if err := validateDryRunOptions(opts); err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	// Select the container runtime (docker default, podman wired via DOCKER_HOST).
+	if err := configureDriver(opts.driver); err != nil {
 		fmt.Println(err)
 		return false
 	}
