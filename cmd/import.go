@@ -122,10 +122,11 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 				// Check if mainArtifact flag is provided.
 				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					if val, parseErr := strconv.ParseBool(pathAndMainArtifact[1]); parseErr != nil {
-						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", pathAndMainArtifact[1])
+					lastColon := strings.LastIndex(f, ":")
+					boolPart := f[lastColon+1:]
+					f = f[:lastColon]
+					if val, parseErr := strconv.ParseBool(boolPart); parseErr != nil {
+						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", boolPart)
 					} else {
 						mainArtifact = val
 					}
