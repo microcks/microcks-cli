@@ -59,7 +59,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				_ = localConfig.RemoveServer(ctx.Server.Server)
 				_ = localConfig.RemoveUser(ctx.User.Name)
 				_ = localConfig.RemoveAuth(ctx.Server.Server)
-				_ = localConfig.RemoveInstance(instance.Name)
+				_ = localConfig.RemoveInstance(instance.ContainerID)
 
 				localConfig.CurrentContext = ""
 				log.Printf("Instance %s removed successfully", instance.Name)
