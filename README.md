@@ -1,7 +1,7 @@
 # Microcks CLI
 
 Simple CLI for interacting with Microcks server APIs.
-It allows to launch tests or import API artifacts with minimal dependencies.
+It allows launching tests or import API artifacts with minimal dependencies.
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 [![Container](https://img.shields.io/badge/dynamic/json?color=blue&logo=docker&style=for-the-badge&label=Quay.io&query=tags[1].name&url=https://quay.io/api/v1/repository/microcks/microcks-cli/tag/?limit=10&page=1&onlyActiveTags=true)](https://quay.io/repository/microcks/microcks-cli?tab=tags)
@@ -78,7 +78,7 @@ microcks [command] [flags]
 
 | Flag                     | Description                                 |
 | ------------------------ | ------------------------------------------- |
-| `-h, --help`             | help for microck command                    |
+| `-h, --help`             | help for microcks command                    |
 | `--config`               | Path to Microcks config file                |
 | `--microcks-context`     | Name of the Microcks context to use         |
 | `--verbose`              | Produce dumps of HTTP exchanges             |
@@ -120,7 +120,7 @@ Binary releases for Linux, MacOS or Windows platform are available on the GitHub
 
 The `microcks-cli` is available as a container image. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is on Quay.io [here](https://quay.io/repository/microcks/microcks-cli).
 
-Below a sample on how using the image without getting the CLI binary:
+Below a sample on how to use the image without getting the CLI binary:
 
 ```
 $ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
@@ -129,4 +129,4 @@ $ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalo
 
 ## Tekton tasks
 
-This repository also contains different [Tekton](https://tekton.dev/) tasks definition and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.
+This repository also contains different [Tekton](https://tekton.dev/) tasks definitions and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.
