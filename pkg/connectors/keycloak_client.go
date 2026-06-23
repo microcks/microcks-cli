@@ -97,16 +97,23 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("keycloak returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse token response: %w", err)
 	}
 
-	accessToken := openIDResp["access_token"].(string)
-	return accessToken, err
+	accessToken, ok := openIDResp["access_token"].(string)
+	if !ok || accessToken == "" {
+		return "", fmt.Errorf("keycloak response missing 'access_token'")
+	}
+	return accessToken, nil
 }
 
 func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
@@ -127,16 +134,23 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("keycloak returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to parse OIDC config response: %w", err)
 	}
 
-	authURL := openIDResp["authorization_endpoint"].(string)
-	tokenURL := openIDResp["token_endpoint"].(string)
+	authURL, ok1 := openIDResp["authorization_endpoint"].(string)
+	tokenURL, ok2 := openIDResp["token_endpoint"].(string)
+	if !ok1 || !ok2 {
+		return nil, fmt.Errorf("OIDC config response missing 'authorization_endpoint' or 'token_endpoint'")
+	}
 
 	return &oauth2.Config{
 		Endpoint: oauth2.Endpoint{
@@ -174,16 +188,23 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("keycloak returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", "", fmt.Errorf("failed to parse token response: %w", err)
 	}
 
-	authToken := openIDResp["access_token"].(string)
-	refreshToken := openIDResp["refresh_token"].(string)
+	authToken, ok1 := openIDResp["access_token"].(string)
+	refreshToken, ok2 := openIDResp["refresh_token"].(string)
+	if !ok1 || !ok2 {
+		return "", "", fmt.Errorf("keycloak response missing 'access_token' or 'refresh_token'")
+	}
 
 	return authToken, refreshToken, nil
 }
