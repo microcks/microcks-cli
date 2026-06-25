@@ -39,6 +39,11 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		dryRun             bool
+		artifact           string
+		image              string
+		readyTimeout       time.Duration
+		watch              bool
 	)
 	var testCmd = &cobra.Command{
 
@@ -106,6 +111,42 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				waitForMilliseconds = n * 60 * 1000
 			}
 
+			params := testParams{
+				serviceRef:         serviceRef,
+				testEndpoint:       testEndpoint,
+				runnerType:         runnerType,
+				secretName:         secretName,
+				waitForMillis:      waitForMilliseconds,
+				filteredOperations: filteredOperations,
+				operationsHeaders:  operationsHeaders,
+				oAuth2Context:      oAuth2Context,
+			}
+
+			if !dryRun {
+				if artifact != "" {
+					fmt.Println("--artifact is only valid together with --dry-run")
+					os.Exit(1)
+				}
+				if watch {
+					fmt.Println("--watch is only valid together with --dry-run")
+					os.Exit(1)
+				}
+			}
+
+			if dryRun {
+				// Ephemeral path: no server, no Keycloak, no prior import needed.
+				if !runDryRunTest(dryRunOptions{
+					artifact:     artifact,
+					image:        image,
+					readyTimeout: readyTimeout,
+					watch:        watch,
+					params:       params,
+				}) {
+					os.Exit(1)
+				}
+				return
+			}
+
 			var mc connectors.MicrocksClient
 			var serverAddr string
 
@@ -165,37 +206,10 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				serverAddr = ctx.Server.Server
 			}
 
-			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			success, testResultID, err := runTestAndWait(mc, params)
 			if err != nil {
-				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
+				fmt.Print(err)
 				os.Exit(1)
-			}
-			//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
-
-			// Finally - wait before checking and loop for some time
-			time.Sleep(1 * time.Second)
-
-			// Add 10.000ms to wait time as it's now representing the server timeout.
-			now := nowInMilliseconds()
-			future := now + waitForMilliseconds + 10000
-
-			var success = false
-			for nowInMilliseconds() < future {
-				testResultSummary, err := mc.GetTestResult(testResultID)
-				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
-					os.Exit(1)
-				}
-				success = testResultSummary.Success
-				inProgress := testResultSummary.InProgress
-				fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
-
-				if !inProgress {
-					break
-				}
-
-				fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
-				time.Sleep(2 * time.Second)
 			}
 
 			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
@@ -211,10 +225,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run the test against an ephemeral local Microcks container instead of a server")
+	testCmd.Flags().StringVar(&artifact, "artifact", "", "Local spec file to import on the ephemeral server (required with --dry-run)")
+	testCmd.Flags().StringVar(&image, "image", defaultDryRunImage, "Microcks uber-native image used for --dry-run")
+	testCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 90*time.Second, "How long to wait for the ephemeral container to be ready (--dry-run only)")
+	testCmd.Flags().BoolVar(&watch, "watch", false, "Watch the artifact file and re-run the test on change (--dry-run only)")
 
 	return testCmd
 }
 
-func nowInMilliseconds() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
-}
