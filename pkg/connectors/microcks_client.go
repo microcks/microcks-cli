@@ -50,6 +50,7 @@ type MicrocksClient interface {
 	SetOAuthToken(oauthToken string)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
+	GetFullTestResult(testResultID string) (*TestResult, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
 }
@@ -65,6 +66,37 @@ type TestResultSummary struct {
 	ElapsedTime    int32  `json:"elapsedTime"`
 	Success        bool   `json:"success"`
 	InProgress     bool   `json:"inProgress"`
+}
+
+// TestResult represents a full Microcks TestResult including per-operation detail.
+type TestResult struct {
+	ID              string           `json:"id"`
+	Version         int32            `json:"version"`
+	TestNumber      int32            `json:"testNumber"`
+	TestDate        int64            `json:"testDate"`
+	TestedEndpoint  string           `json:"testedEndpoint"`
+	ServiceID       string           `json:"serviceId"`
+	ElapsedTime     int32            `json:"elapsedTime"`
+	Success         bool             `json:"success"`
+	InProgress      bool             `json:"inProgress"`
+	TestCaseResults []TestCaseResult `json:"testCaseResults"`
+}
+
+// TestCaseResult is the result for a single operation within a TestResult.
+type TestCaseResult struct {
+	Success         bool             `json:"success"`
+	ElapsedTime     int32            `json:"elapsedTime"`
+	OperationName   string           `json:"operationName"`
+	TestStepResults []TestStepResult `json:"testStepResults"`
+}
+
+// TestStepResult is the result for a single request/message within a TestCaseResult.
+type TestStepResult struct {
+	Success          bool   `json:"success"`
+	ElapsedTime      int32  `json:"elapsedTime"`
+	RequestName      string `json:"requestName"`
+	EventMessageName string `json:"eventMessageName"`
+	Message          string `json:"message"`
 }
 
 // HeaderDTO represents an operation header passed for Test
@@ -431,6 +463,43 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	result := TestResultSummary{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse test result response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetFullTestResult fetches the complete TestResult including per-operation
+// (testCaseResults) detail, used by the richer --output formatters.
+func (c *microcksClient) GetFullTestResult(testResultID string) (*TestResult, error) {
+	rel := &url.URL{Path: "tests/" + testResultID}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	config.DumpRequestIfRequired("Microcks for getting full test result", req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired("Microcks for getting full test result", resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := TestResult{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse full test result response: %w", err)
 	}
 
 	return &result, nil
