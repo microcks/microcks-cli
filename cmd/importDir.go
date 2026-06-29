@@ -197,6 +197,9 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 
 			fmt.Printf("\nImport completed: %d/%d files imported successfully\n", result.SuccessCount, result.TotalFiles)
+			if result.FailedCount > 0 {
+				os.Exit(1)
+			}
 		},
 	}
 
