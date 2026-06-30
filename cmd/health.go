@@ -368,48 +368,48 @@ func executeHealthCheck(writer io.Writer, client *http.Client, candidates []stri
 		} else if strings.Contains(friendlyErr, "timeout") {
 			friendlyErr = "Connection timed out"
 		}
-		fmt.Fprintf(writer, "✗ Unreachable (%s)\n", friendlyErr)
+		fmt.Fprintf(writer, "Unreachable (%s)\n", friendlyErr)
 		fmt.Fprintln(writer)
-		fmt.Fprintln(writer, "Overall Status: UNHEALTHY ❌")
+		fmt.Fprintln(writer, "Overall Status: UNHEALTHY")
 		return 1
 	}
 
-	fmt.Fprintf(writer, "✓ Reachable (HTTP %d, %v)\n", statusCode, latency.Round(time.Millisecond))
-	fmt.Fprintln(writer, "✓ API endpoint responding")
+	fmt.Fprintf(writer, "Reachable (HTTP %d, %v)\n", statusCode, latency.Round(time.Millisecond))
+	fmt.Fprintln(writer, "API endpoint responding")
 
 	if keycloakEnabled {
 		if keycloakReachable {
-			fmt.Fprintln(writer, "✓ Keycloak: enabled and reachable")
+			fmt.Fprintln(writer, "Keycloak: enabled and reachable")
 		} else {
-			fmt.Fprintf(writer, "✗ Keycloak: enabled but unreachable (%s)\n", kcURL)
+			fmt.Fprintf(writer, "Keycloak: enabled but unreachable (%s)\n", kcURL)
 		}
 	} else {
-		fmt.Fprintln(writer, "✓ Keycloak: disabled")
+		fmt.Fprintln(writer, "Keycloak: disabled")
 	}
 
 	if asyncConnected {
-		fmt.Fprintln(writer, "✓ Async Minion: connected")
+		fmt.Fprintln(writer, "Async Minion: connected")
 	} else {
-		fmt.Fprintln(writer, "✗ Async Minion: disconnected")
+		fmt.Fprintln(writer, "Async Minion: disconnected")
 	}
 
 	if dbConnected {
-		fmt.Fprintln(writer, "✓ Database: connected")
+		fmt.Fprintln(writer, "Database: connected")
 	} else {
-		fmt.Fprintln(writer, "✗ Database: disconnected")
+		fmt.Fprintln(writer, "Database: disconnected")
 	}
 
 	if version != "unknown" {
-		fmt.Fprintf(writer, "✓ Version: %s\n", version)
+		fmt.Fprintf(writer, "Version: %s\n", version)
 	}
 
 	fmt.Fprintln(writer)
 	if overallStatus == "HEALTHY" {
-		fmt.Fprintln(writer, "Overall Status: HEALTHY ✅")
+		fmt.Fprintln(writer, "Overall Status: HEALTHY")
 	} else if overallStatus == "DEGRADED" {
-		fmt.Fprintln(writer, "Overall Status: DEGRADED ⚠️")
+		fmt.Fprintln(writer, "Overall Status: DEGRADED")
 	} else {
-		fmt.Fprintln(writer, "Overall Status: UNHEALTHY ❌")
+		fmt.Fprintln(writer, "Overall Status: UNHEALTHY")
 	}
 
 	return exitCode
