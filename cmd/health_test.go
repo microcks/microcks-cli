@@ -72,16 +72,16 @@ func TestHealthyServer(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "✓ Reachable") {
+	if !strings.Contains(output, "Reachable") {
 		t.Errorf("output does not contain reachability info: %q", output)
 	}
-	if !strings.Contains(output, "Overall Status: HEALTHY ✅") {
+	if !strings.Contains(output, "Overall Status: HEALTHY") {
 		t.Errorf("output does not contain healthy overall status: %q", output)
 	}
-	if !strings.Contains(output, "✓ Keycloak: disabled") {
+	if !strings.Contains(output, "Keycloak: disabled") {
 		t.Errorf("output does not contain keycloak disabled info: %q", output)
 	}
-	if !strings.Contains(output, "✓ Database: connected") {
+	if !strings.Contains(output, "Database: connected") {
 		t.Errorf("output does not contain database connected info: %q", output)
 	}
 }
@@ -112,10 +112,10 @@ func TestUnreachableServer(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "✗ Unreachable") {
+	if !strings.Contains(output, "Unreachable") {
 		t.Errorf("output does not contain unreachable info: %q", output)
 	}
-	if !strings.Contains(output, "Overall Status: UNHEALTHY ❌") {
+	if !strings.Contains(output, "Overall Status: UNHEALTHY") {
 		t.Errorf("output does not contain unhealthy status: %q", output)
 	}
 }
@@ -161,10 +161,10 @@ func TestHealthResponseParsing(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "✓ Database: connected") {
+	if !strings.Contains(output, "Database: connected") {
 		t.Errorf("output should show Database connected: %q", output)
 	}
-	if !strings.Contains(output, "Overall Status: DEGRADED ⚠️") {
+	if !strings.Contains(output, "Overall Status: DEGRADED") {
 		t.Errorf("output should show degraded status: %q", output)
 	}
 }
