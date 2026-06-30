@@ -72,6 +72,7 @@ microcks [command] [flags]
 | `import-dir`  | Scan a directory and import API spec files.              | [`import-dir`](documentation/cmd/importDir.md)     |
 | `import-url` | Import API spec files directly from a remote URL         | [`import-url`](documentation/cmd/importUrl.md) |
 | `test`       | Run tests against a deployed API using selected runner   | [`test`](documentation/cmd/test.md)             |
+| `health`     | Check the health and diagnostics of the Microcks server  | [`health`](documentation/cmd/health.md)         |
 | `version`    | Print Microcks CLI version                               | [`version`](documentation/cmd/version.md)       |
 
 ### Options
