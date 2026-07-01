@@ -66,6 +66,7 @@ microcks [command] [flags]
 | `login`      | Log in to a Microcks instance using Keycloak credentials | [`login`](documentation/cmd/login.md)           |
 | `logout`     | Log out and remove authentication from a given context   | [`logout`](documentation/cmd/logout.md)         |
 | `context`    | Manage CLI contexts (list, use, delete)                  | [`context`](documentation/cmd/context.md)       |
+| `completion` | Generate shell completion scripts                         | [`completion`](documentation/cmd/completion.md) |
 | `start`      | Start a local Microcks instance via Docker/Podman        | [`start`](documentation/cmd/start.md)           |
 | `stop`       | Stop a local Microcks instance                           | [`stop`](documentation/cmd/stop.md)             |
 | `import`     | Import API spec files from local filesystem              | [`import`](documentation/cmd/import.md)         |
