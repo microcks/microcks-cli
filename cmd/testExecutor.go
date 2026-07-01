@@ -17,9 +17,12 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/output"
 )
 
 // testParams bundles the inputs needed to launch and poll a Microcks test.
@@ -33,11 +36,27 @@ type testParams struct {
 	filteredOperations string
 	operationsHeaders  string
 	oAuth2Context      string
+	outputFormat       string
+	artifactPath       string
 }
 
-// runTestAndWait creates a test on the Microcks server and polls its result
-// until completion or timeout. Shared by the regular and --dry-run paths.
+// progressWriter returns where human progress/diagnostics should go. For
+// machine-readable output formats they go to stderr, leaving stdout for the
+// formatted result only.
+func progressWriter(format string) io.Writer {
+	if format != "" && output.OutputFormat(format) != output.FormatText {
+		return os.Stderr
+	}
+	return os.Stdout
+}
+
+// runTestAndWait creates a test on the Microcks server, polls until completion
+// or timeout, then renders the result in the requested output format (result to
+// stdout, progress to stderr for machine formats). Shared by the regular and
+// --dry-run paths.
 func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, string, error) {
+	progress := progressWriter(params.outputFormat)
+
 	testResultID, err := mc.CreateTestResult(params.serviceRef, params.testEndpoint, params.runnerType, params.secretName,
 		params.waitForMillis, params.filteredOperations, params.operationsHeaders, params.oAuth2Context)
 	if err != nil {
@@ -59,17 +78,46 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 		}
 		success = testResultSummary.Success
 		inProgress := testResultSummary.InProgress
-		fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+		fmt.Fprintf(progress, "MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
 
 		if !inProgress {
 			break
 		}
 
-		fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
+		fmt.Fprintln(progress, "MicrocksTester waiting for 2 seconds before checking again or exiting.")
 		time.Sleep(2 * time.Second)
 	}
 
+	if err := renderTestResult(mc, testResultID, params.outputFormat, params.artifactPath); err != nil {
+		return false, testResultID, err
+	}
+
 	return success, testResultID, nil
+}
+
+// renderTestResult fetches the full result and writes it to stdout in the
+// requested format. artifactPath (when set) lets the github-actions formatter
+// map failures to file:line.
+func renderTestResult(mc connectors.MicrocksClient, testResultID, format, artifactPath string) error {
+	if format == "" {
+		format = string(output.FormatText)
+	}
+	full, err := mc.GetFullTestResult(testResultID)
+	if err != nil {
+		return fmt.Errorf("Got error when retrieving full test result: %s", err)
+	}
+	formatter, err := output.NewFormatter(output.OutputFormat(format), output.WithArtifactPath(artifactPath))
+	if err != nil {
+		return err
+	}
+	rendered, err := formatter.Format(full)
+	if err != nil {
+		return fmt.Errorf("Got error when formatting test result: %s", err)
+	}
+	if rendered != "" {
+		fmt.Println(rendered)
+	}
+	return nil
 }
 
 func nowInMilliseconds() int64 {

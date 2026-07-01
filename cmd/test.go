@@ -25,6 +25,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		readyTimeout       time.Duration
 		watch              bool
 		driver             string
+		outputFormat       string
 	)
 	var testCmd = &cobra.Command{
 
@@ -79,6 +81,11 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			// Validate presence and values of flags.
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
 				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
+				os.Exit(1)
+			}
+
+			if !output.IsValid(outputFormat) {
+				fmt.Fprintln(os.Stderr, "--output must be one of: text, json, yaml, github-actions")
 				os.Exit(1)
 			}
 
@@ -121,6 +128,8 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				filteredOperations: filteredOperations,
 				operationsHeaders:  operationsHeaders,
 				oAuth2Context:      oAuth2Context,
+				outputFormat:       outputFormat,
+				artifactPath:       artifact,
 			}
 
 			if !dryRun {
@@ -214,11 +223,11 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			success, testResultID, err := runTestAndWait(mc, params)
 			if err != nil {
-				fmt.Print(err)
+				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
 			}
 
-			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			fmt.Fprintf(progressWriter(outputFormat), "Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
 			if !success {
 				os.Exit(1)
@@ -237,6 +246,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 90*time.Second, "How long to wait for the ephemeral container to be ready (--dry-run only)")
 	testCmd.Flags().BoolVar(&watch, "watch", false, "Watch the artifact file and re-run the test on change (--dry-run only)")
 	testCmd.Flags().StringVar(&driver, "driver", "", "Container runtime for --dry-run: 'docker' or 'podman' (default: auto-detect)")
+	testCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text, json, yaml, or github-actions")
 
 	return testCmd
 }
