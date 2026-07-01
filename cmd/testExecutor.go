@@ -37,6 +37,7 @@ type testParams struct {
 	operationsHeaders  string
 	oAuth2Context      string
 	outputFormat       string
+	artifactPath       string
 }
 
 // progressWriter returns where human progress/diagnostics should go. For
@@ -87,7 +88,7 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 		time.Sleep(2 * time.Second)
 	}
 
-	if err := renderTestResult(mc, testResultID, params.outputFormat); err != nil {
+	if err := renderTestResult(mc, testResultID, params.outputFormat, params.artifactPath); err != nil {
 		return false, testResultID, err
 	}
 
@@ -95,8 +96,9 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 }
 
 // renderTestResult fetches the full result and writes it to stdout in the
-// requested format.
-func renderTestResult(mc connectors.MicrocksClient, testResultID, format string) error {
+// requested format. artifactPath (when set) lets the github-actions formatter
+// map failures to file:line.
+func renderTestResult(mc connectors.MicrocksClient, testResultID, format, artifactPath string) error {
 	if format == "" {
 		format = string(output.FormatText)
 	}
@@ -104,7 +106,7 @@ func renderTestResult(mc connectors.MicrocksClient, testResultID, format string)
 	if err != nil {
 		return fmt.Errorf("Got error when retrieving full test result: %s", err)
 	}
-	formatter, err := output.NewFormatter(output.OutputFormat(format))
+	formatter, err := output.NewFormatter(output.OutputFormat(format), output.WithArtifactPath(artifactPath))
 	if err != nil {
 		return err
 	}

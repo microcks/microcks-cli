@@ -129,6 +129,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				operationsHeaders:  operationsHeaders,
 				oAuth2Context:      oAuth2Context,
 				outputFormat:       outputFormat,
+				artifactPath:       artifact,
 			}
 
 			if !dryRun {
