@@ -27,7 +27,9 @@ import (
 // a collapsible ::group:: per operation, ::error:: annotations for failures
 // (and ::notice:: for passes when MICROCKS_ACTIONS_VERBOSE is set), plus a
 // markdown table appended to $GITHUB_STEP_SUMMARY.
-type GitHubActionsFormatter struct{}
+type GitHubActionsFormatter struct {
+	artifactPath string
+}
 
 func (f *GitHubActionsFormatter) Format(r *connectors.TestResult) (string, error) {
 	verbose := os.Getenv("MICROCKS_ACTIONS_VERBOSE") != ""
@@ -42,8 +44,8 @@ func (f *GitHubActionsFormatter) Format(r *connectors.TestResult) (string, error
 		for _, s := range tc.TestStepResults {
 			switch {
 			case !s.Success:
-				fmt.Fprintf(&b, "::error title=%s::%s\n",
-					escapeProperty(tc.OperationName), escapeData(stepMessage(s)))
+				fmt.Fprintf(&b, "::error %s::%s\n",
+					f.errorProperties(tc.OperationName), escapeData(stepMessage(s)))
 			case verbose:
 				fmt.Fprintf(&b, "::notice title=%s::%s passed\n",
 					escapeProperty(tc.OperationName), escapeData(s.RequestName))
@@ -65,6 +67,17 @@ func (f *GitHubActionsFormatter) Format(r *connectors.TestResult) (string, error
 	}
 
 	return b.String(), nil
+}
+
+func (f *GitHubActionsFormatter) errorProperties(operationName string) string {
+	props := []string{"title=" + escapeProperty(operationName)}
+	if f.artifactPath != "" {
+		props = append(props, "file="+escapeProperty(f.artifactPath))
+		if line := operationLine(f.artifactPath, operationName); line > 0 {
+			props = append(props, fmt.Sprintf("line=%d", line))
+		}
+	}
+	return strings.Join(props, ",")
 }
 
 // stepMessage returns the failure message, or a sensible default when empty.
