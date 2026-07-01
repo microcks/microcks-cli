@@ -153,3 +153,81 @@ func TestEscaping(t *testing.T) {
 		t.Errorf("escapeProperty = %q", got)
 	}
 }
+
+const specFixture = `openapi: 3.0.0
+info:
+  title: X
+  version: 1.0.0
+paths:
+  /products:
+    get:
+      operationId: getProducts
+      responses:
+        "200":
+          description: ok
+  /orders:
+    post:
+      operationId: placeOrder
+      responses:
+        "201":
+          description: created
+`
+
+func writeSpec(t *testing.T) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "spec.yaml")
+	if err := os.WriteFile(p, []byte(specFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestOperationLine(t *testing.T) {
+	spec := writeSpec(t)
+	cases := map[string]int{
+		"GET /products":    7,  // line of "get:" under /products
+		"POST /orders":     13, // line of "post:" under /orders
+		"GET /nonexistent": 0,
+		"weird":            0, // no method/path split
+	}
+	for op, want := range cases {
+		if got := operationLine(spec, op); got != want {
+			t.Errorf("operationLine(%q) = %d, want %d", op, got, want)
+		}
+	}
+	if got := operationLine("/no/such/file.yaml", "GET /products"); got != 0 {
+		t.Errorf("missing file = %d, want 0", got)
+	}
+}
+
+func TestGitHubActionsFileLineAnnotation(t *testing.T) {
+	spec := writeSpec(t)
+	result := &connectors.TestResult{
+		Success: false,
+		TestCaseResults: []connectors.TestCaseResult{
+			{Success: false, OperationName: "GET /products", TestStepResults: []connectors.TestStepResult{
+				{Success: false, RequestName: "r", Message: "boom"},
+			}},
+		},
+	}
+	formatter, err := NewFormatter(FormatGitHubActions, WithArtifactPath(spec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := formatter.Format(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"title=GET /products", "file=" + spec, "line=7"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("annotation missing %q\n%s", want, out)
+		}
+	}
+
+	// Without an artifact path, no file/line properties.
+	plain, _ := NewFormatter(FormatGitHubActions)
+	out2, _ := plain.Format(result)
+	if strings.Contains(out2, "file=") || strings.Contains(out2, "line=") {
+		t.Errorf("did not expect file/line without artifact path:\n%s", out2)
+	}
+}

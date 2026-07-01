@@ -42,8 +42,23 @@ type Formatter interface {
 	Format(result *connectors.TestResult) (string, error)
 }
 
+// Option configures a Formatter.
+type Option func(*config)
+
+type config struct {
+	artifactPath string
+}
+
+func WithArtifactPath(path string) Option {
+	return func(c *config) { c.artifactPath = path }
+}
+
 // NewFormatter returns the Formatter for the given format.
-func NewFormatter(format OutputFormat) (Formatter, error) {
+func NewFormatter(format OutputFormat, opts ...Option) (Formatter, error) {
+	c := &config{}
+	for _, o := range opts {
+		o(c)
+	}
 	switch format {
 	case FormatText:
 		return &TextFormatter{}, nil
@@ -52,7 +67,7 @@ func NewFormatter(format OutputFormat) (Formatter, error) {
 	case FormatYAML:
 		return &YAMLFormatter{}, nil
 	case FormatGitHubActions:
-		return &GitHubActionsFormatter{}, nil
+		return &GitHubActionsFormatter{artifactPath: c.artifactPath}, nil
 	default:
 		return nil, fmt.Errorf("unsupported output format %q (use: text, json, yaml, github-actions)", format)
 	}
