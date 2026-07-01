@@ -18,6 +18,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -69,8 +70,6 @@ func configureDriver(driver string) error {
 	}
 }
 
-// shouldUsePodman auto-detects podman only when it's clearly the intended
-// runtime: no explicit DOCKER_HOST, podman on PATH, and docker absent.
 func shouldUsePodman() bool {
 	if os.Getenv("DOCKER_HOST") != "" {
 		return false // respect an explicitly configured endpoint
@@ -143,6 +142,10 @@ func rewriteLocalEndpoint(testEndpoint string) (string, int, bool) {
 }
 
 func runDryRunTest(opts dryRunOptions) error {
+	// Progress/diagnostics go to stderr for machine output formats so stdout
+	// carries only the formatted result.
+	progress := progressWriter(opts.params.outputFormat)
+
 	if err := validateDryRunOptions(opts); err != nil {
 		return errors.Wrap(errors.KindUsage, err)
 	}
@@ -163,30 +166,30 @@ func runDryRunTest(opts dryRunOptions) error {
 	// A localhost test endpoint refers to the user's machine, not the
 	// container: expose the port and point Microcks at the host gateway.
 	if rewritten, hostPort, ok := rewriteLocalEndpoint(opts.params.testEndpoint); ok {
-		fmt.Printf("Test endpoint %s is local: reaching it from the container as %s\n", opts.params.testEndpoint, rewritten)
+		fmt.Fprintf(progress, "Test endpoint %s is local: reaching it from the container as %s\n", opts.params.testEndpoint, rewritten)
 		opts.params.testEndpoint = rewritten
 		containerOpts = append(containerOpts, testcontainers.WithHostPortAccess(hostPort))
 	}
 
-	fmt.Printf("Starting ephemeral Microcks container (%s)...\n", opts.image)
+	fmt.Fprintf(progress, "Starting ephemeral Microcks container (%s)...\n", opts.image)
 	startCtx, startCancel := context.WithTimeout(ctx, opts.readyTimeout)
 	defer startCancel()
 
 	container, err := microcks.Run(startCtx, opts.image, containerOpts...)
 	if err != nil {
 		if container != nil {
-			terminateContainer(container)
+			terminateContainer(container, progress)
 		}
 		return errors.Wrapf(errors.KindEnvironment, "failed to start ephemeral Microcks container: %v. "+
 			"Check that the container runtime is running, the port is free and the image is reachable (or raise --ready-timeout)", err)
 	}
-	defer terminateContainer(container)
+	defer terminateContainer(container, progress)
 
 	endpoint, err := container.HttpEndpoint(ctx)
 	if err != nil {
 		return errors.Wrapf(errors.KindEnvironment, "failed to resolve ephemeral Microcks endpoint: %v", err)
 	}
-	fmt.Printf("Ephemeral Microcks is ready at %s\n", endpoint)
+	fmt.Fprintf(progress, "Ephemeral Microcks is ready at %s\n", endpoint)
 
 	// The uber-native image runs without Keycloak: a headless client with
 	// the unauthenticated token is enough.
@@ -207,20 +210,22 @@ func runDryRunTest(opts dryRunOptions) error {
 		}
 		return errors.ErrTestFailed
 	}
-	printDetailsLink(endpoint, testResultID)
+	printDetailsLink(progress, endpoint, testResultID)
 	return watchAndRerun(ctx, mc, endpoint, opts)
 }
 
-func terminateContainer(container *microcks.MicrocksContainer) {
+func terminateContainer(container *microcks.MicrocksContainer, progress io.Writer) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	fmt.Println("Tearing down ephemeral Microcks container...")
+	fmt.Fprintln(progress, "Tearing down ephemeral Microcks container...")
 	if err := container.Terminate(ctx); err != nil {
-		fmt.Printf("Failed to terminate container %s: %s\n", container.GetContainerID(), err)
+		fmt.Fprintf(os.Stderr, "Failed to terminate container %s: %s\n", container.GetContainerID(), err)
 	}
 }
 
 func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr string, opts dryRunOptions) error {
+	progress := progressWriter(opts.params.outputFormat)
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("failed to create file watcher: %w", err)
@@ -237,7 +242,7 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 		return fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err)
 	}
 
-	fmt.Printf("\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact)
+	fmt.Fprintf(progress, "\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact)
 
 	rerun := make(chan struct{}, 1)
 	var debounce *time.Timer
@@ -245,7 +250,7 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("\nStopping watch mode.")
+			fmt.Fprintln(progress, "\nStopping watch mode.")
 			return nil
 
 		case event, ok := <-watcher.Events:
@@ -274,32 +279,32 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 			if !ok {
 				return nil
 			}
-			fmt.Printf("Watch error: %s\n", err)
+			fmt.Fprintf(os.Stderr, "Watch error: %s\n", err)
 
 		case <-rerun:
-			fmt.Println(strings.Repeat("-", 60))
-			fmt.Printf("Artifact changed, re-importing %s ...\n", opts.artifact)
+			fmt.Fprintln(progress, strings.Repeat("-", 60))
+			fmt.Fprintf(progress, "Artifact changed, re-importing %s ...\n", opts.artifact)
 			if _, err := mc.UploadArtifact(opts.artifact, true); err != nil {
 				// Invalid spec mid-edit is normal in a TDD loop: report and
 				// keep watching, the next valid save recovers.
-				fmt.Printf("Re-import failed, waiting for next change: %s\n", err)
+				fmt.Fprintf(os.Stderr, "Re-import failed, waiting for next change: %s\n", err)
 				continue
 			}
 			success, testResultID, err := runTestAndWait(mc, opts.params)
 			if err != nil {
-				fmt.Printf("Test run failed, waiting for next change: %s\n", err)
+				fmt.Fprintf(os.Stderr, "Test run failed, waiting for next change: %s\n", err)
 				continue
 			}
-			printDetailsLink(serverAddr, testResultID)
+			printDetailsLink(progress, serverAddr, testResultID)
 			if success {
-				fmt.Println("Contract test PASSED — waiting for next change.")
+				fmt.Fprintln(progress, "Contract test PASSED — waiting for next change.")
 			} else {
-				fmt.Println("Contract test FAILED — waiting for next change.")
+				fmt.Fprintln(progress, "Contract test FAILED — waiting for next change.")
 			}
 		}
 	}
 }
 
-func printDetailsLink(serverAddr, testResultID string) {
-	fmt.Printf("Test details (live while watching): %s/#/tests/%s\n", serverAddr, testResultID)
+func printDetailsLink(progress io.Writer, serverAddr, testResultID string) {
+	fmt.Fprintf(progress, "Test details (live while watching): %s/#/tests/%s\n", serverAddr, testResultID)
 }
