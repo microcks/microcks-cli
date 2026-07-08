@@ -545,7 +545,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
 
 	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for uploading artifact", req, true)
+	config.DumpRequestIfRequired("Microcks for downloading artifact", req, true)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -554,7 +554,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	defer resp.Body.Close()
 
 	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for uploading artifact", resp, true)
+	config.DumpResponseIfRequired("Microcks for downloading artifact", resp, true)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
