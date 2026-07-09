@@ -46,12 +46,14 @@ type keycloakClient struct {
 }
 
 // NewKeycloakClient build a new KeycloakClient implementation
-func NewKeycloakClient(realmURL string, username string, password string) (KeycloakClient, error) {
+func NewKeycloakClient(realmURL string, username string, password string) KeycloakClient {
 	kc := keycloakClient{}
 
 	u, err := url.Parse(realmURL)
 	if err != nil {
-		return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid Keycloak URL %q: %w", realmURL, err))
+		// url.Parse only fails on a malformed URL; returning it needs a
+		// signature change, done with the RunE command migration.
+		panic(err)
 	}
 	kc.BaseURL = u
 	kc.Username = username
@@ -66,7 +68,7 @@ func NewKeycloakClient(realmURL string, username string, password string) (Keycl
 	} else {
 		kc.httpClient = http.DefaultClient
 	}
-	return &kc, nil
+	return &kc
 }
 
 // ConnectAndGetToken implementation on keycloakClient structure
