@@ -57,14 +57,13 @@ microcks login http://localhost:8080 --sso --sso-port
 # Get OAuth URI instead of getting redirect to browser for SSO login
 microcks login http://localhost:8080 --sso --sso-launch-browser=false
 `,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			var server string
 
 			//Check if server name is provided or not
 			if len(args) != 1 {
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "login requires exactly one SERVER argument")
 			}
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS
@@ -72,11 +71,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			config.Verbose = globalClientOpts.Verbose
 
 			server = args[0]
-			mc := connectors.NewMicrocksClient(server)
-			keycloakUrl, err := mc.GetKeycloakURL()
-
+			mc, err := connectors.NewMicrocksClient(server)
 			if err != nil {
-				log.Fatal(err)
+				return err
+			}
+			keycloakUrl, err := mc.GetKeycloakURL()
+			if err != nil {
+				return err
 			}
 
 			if ctxName == "" {
@@ -94,9 +95,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			}
 
 			configFile, err := config.DefaultLocalConfigPath()
-			errors.CheckError(err)
+			if err != nil {
+				return err
+			}
 			localConfig, err := config.ReadLocalConfig(configFile)
-			errors.CheckError(err)
+			if err != nil {
+				return err
+			}
 
 			if localConfig == nil {
 				localConfig = &config.LocalConfig{}
@@ -116,20 +121,30 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 					clientSecret := os.Getenv("MICROCKS_CLIENT_SECRET")
 
 					if clientID == "" || clientSecret == "" {
-						fmt.Printf("Please Set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' to perform password login\n")
-						os.Exit(1)
+						return errors.Wrapf(errors.KindUsage, "please set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' to perform password login")
 					}
 					//Perform login and retrive tokens
-					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					authToken, refreshToken, err = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					if err != nil {
+						return err
+					}
 					authCfg.ClientId = clientID
 					authCfg.ClientSecret = clientSecret
 				} else {
 					httpClient := mc.HttpClient()
 					ctx = oidc.ClientContext(ctx, httpClient)
-					kc := connectors.NewKeycloakClient(keycloakUrl, "", "")
+					kc, err := connectors.NewKeycloakClient(keycloakUrl, "", "")
+					if err != nil {
+						return err
+					}
 					oauth2conf, err := kc.GetOIDCConfig()
-					errors.CheckError(err)
-					authToken, refreshToken = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					if err != nil {
+						return err
+					}
+					authToken, refreshToken, err = oauth2login(ctx, ssoProt, oauth2conf, ssoLaunchBrowser)
+					if err != nil {
+						return err
+					}
 					authCfg.ClientId = "microcks-app-js"
 				}
 
@@ -166,10 +181,12 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				User:   server,
 			})
 
-			err = config.WriteLocalConfig(*localConfig, configFile)
-			errors.CheckError(err)
+			if err := config.WriteLocalConfig(*localConfig, configFile); err != nil {
+				return err
+			}
 
 			fmt.Printf("Context '%s' updated\n", ctxName)
+			return nil
 		},
 	}
 
@@ -188,7 +205,7 @@ func oauth2login(
 	port int,
 	oauth2conf *oauth2.Config,
 	ssoLaunchBrowser bool,
-) (string, string) {
+) (string, string, error) {
 	oauth2conf.ClientID = "microcks-app-js"
 	oauth2conf.RedirectURL = fmt.Sprintf("http://localhost:%d/auth/callback", port)
 
@@ -198,7 +215,9 @@ func oauth2login(
 	completionChan := make(chan string)
 
 	stateNonce, err := rand.String(24)
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
 	var tokenString string
 	var refreshToken string
 
@@ -212,7 +231,9 @@ func oauth2login(
 		43,
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~",
 	)
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
 	codeChallengeHash := sha256.Sum256([]byte(codeVerifier))
 	codeChallenge := base64.RawURLEncoding.EncodeToString(codeChallengeHash[:])
 
@@ -279,76 +300,93 @@ func oauth2login(
 	authBaseURL := strings.SplitN(url, "?", 2)[0]
 	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", authBaseURL)
 	time.Sleep(1 * time.Second)
-	ssoAuthFlow(url, ssoLaunchBrowser)
+	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
+		return "", "", err
+	}
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("Temporary HTTP server failed: %s", err)
+			completionChan <- fmt.Sprintf("temporary HTTP server failed: %s", err)
 		}
 	}()
 	errMsg := <-completionChan
 	if errMsg != "" {
-		log.Fatal(errMsg)
+		return "", "", errors.Wrapf(errors.KindGeneric, "%s", errMsg)
 	}
 	fmt.Printf("Authentication successful\n")
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
 
-	return tokenString, refreshToken
+	return tokenString, refreshToken, nil
 }
 
-func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
+func ssoAuthFlow(url string, ssoLaunchBrowser bool) error {
 	if ssoLaunchBrowser {
 		fmt.Printf("Opening system default browser for authentication\n")
-		err := open.Start(url)
-		errors.CheckError(err)
+		if err := open.Start(url); err != nil {
+			return err
+		}
 	} else {
 		fmt.Printf("To authenticate, copy-and-paste the following URL into your preferred browser: %s\n", url)
 	}
+	return nil
 }
 
-func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string) {
-	kc := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret)
-	username, password := promptCredentials(Username, Password)
-
-	authToken, refreshToken, err := kc.ConnectAndGetTokenAndRefreshToken(username, password)
-
+func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string, error) {
+	kc, err := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret)
 	if err != nil {
-		panic(err)
+		return "", "", err
+	}
+	username, password, err := promptCredentials(Username, Password)
+	if err != nil {
+		return "", "", err
 	}
 
-	return authToken, refreshToken
+	authToken, refreshToken, err := kc.ConnectAndGetTokenAndRefreshToken(username, password)
+	if err != nil {
+		return "", "", err
+	}
+
+	return authToken, refreshToken, nil
 }
 
-func promptCredentials(username, password string) (string, string) {
-	return promptUserName(username), promptPassword(password)
+func promptCredentials(username, password string) (string, string, error) {
+	u, err := promptUserName(username)
+	if err != nil {
+		return "", "", err
+	}
+	p, err := promptPassword(password)
+	if err != nil {
+		return "", "", err
+	}
+	return u, p, nil
 }
 
-func promptUserName(value string) string {
+func promptUserName(value string) (string, error) {
 	for value == "" {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Username" + ": ")
 		valueRaw, err := reader.ReadString('\n')
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 		value = strings.TrimSpace(valueRaw)
 	}
-	return value
+	return value, nil
 }
 
-func promptPassword(password string) string {
+func promptPassword(password string) (string, error) {
 	for password == "" {
 		fmt.Print("Password: ")
 		passwordRaw, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 		password = string(passwordRaw)
 		fmt.Print("\n")
 	}
-	return password
+	return password, nil
 }
 
 func StringField(claims jwt.MapClaims, fieldName string) string {

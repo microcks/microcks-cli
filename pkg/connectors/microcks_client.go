@@ -182,7 +182,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 }
 
 // NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
-func NewMicrocksClient(apiURL string) MicrocksClient {
+func NewMicrocksClient(apiURL string) (MicrocksClient, error) {
 	mc := microcksClient{}
 
 	if strings.HasSuffix(apiURL, "/api") {
@@ -194,9 +194,7 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 
 	u, err := url.Parse(apiURL)
 	if err != nil {
-		// url.Parse only fails on a malformed URL; returning it needs a
-		// signature change, done with the RunE command migration.
-		panic(err)
+		return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid server URL %q: %w", apiURL, err))
 	}
 	mc.APIURL = u
 
@@ -209,7 +207,7 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 	} else {
 		mc.httpClient = http.DefaultClient
 	}
-	return &mc
+	return &mc, nil
 }
 func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
@@ -314,7 +312,10 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	if err != nil {
 		return "", "", err
 	}
-	kc := NewKeycloakClient(keyCloakUrl, "", "")
+	kc, err := NewKeycloakClient(keyCloakUrl, "", "")
+	if err != nil {
+		return "", "", err
+	}
 	oauth2Conf, err := kc.GetOIDCConfig()
 	if err != nil {
 		return "", "", err
