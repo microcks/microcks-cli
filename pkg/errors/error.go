@@ -3,47 +3,7 @@ package errors
 import (
 	stderrors "errors"
 	"fmt"
-	"log"
-	"os"
 )
-
-// Deprecated: these numeric codes and the Check*/Fatal helpers below are the
-// legacy exit mechanism. New code classifies failures with a Kind (see Wrap) and
-// lets cmd.Handle map Kind -> exit code. Kept as a shim until every call site is
-// migrated, then removed.
-const (
-	// ErrorCommandSpecific is reserved for command specific indications
-	ErrorCommandSpecific = 1
-	// ErrorConnectionFailure is returned on connection failure to API endpoint
-	ErrorConnectionFailure = 11
-	// ErrorAPIResponse is returned on unexpected API response, i.e. authorization failure
-	ErrorAPIResponse = 12
-	// ErrorResourceDoesNotExist is returned when the requested resource does not exist
-	ErrorResourceDoesNotExist = 13
-	// ErrorGeneric is returned for generic error
-	ErrorGeneric = 20
-)
-
-// Deprecated: return errors.Wrap(kind, err) from a RunE command instead.
-func CheckError(err error) {
-	if err != nil {
-		Fatal(ErrorGeneric, err)
-	}
-}
-
-// Deprecated: return a KindNotFound-wrapped error instead.
-func CheckConfigNil(isNil bool, path string) {
-	if isNil {
-		Fatal(ErrorGeneric, "No contexts defined in "+path)
-	}
-}
-
-// Deprecated: only main/cmd.Handle should exit the process. Fatal is a wrapper
-// for log.Fatal() to exit with a custom code.
-func Fatal(exitcode int, args ...interface{}) {
-	log.Println(args...)
-	os.Exit(exitcode)
-}
 
 // Kind classifies why an operation failed. The library returns kinds; the cmd
 // layer maps them to exit codes, so pkg/* never depends on exit codes and stays
