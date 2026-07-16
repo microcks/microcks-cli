@@ -35,25 +35,11 @@ microcks stop --name myinstance`,
 
 			var ctx *config.Context
 			if name != "" {
-				ctx, err = localConfig.ResolveContext(name)
-				if err != nil {
-					var ctxRef *config.ContextRef
-					for i := range localConfig.Contexts {
-						if localConfig.Contexts[i].Instance == name {
-							ctxRef = &localConfig.Contexts[i]
-							break
-						}
-					}
-					if ctxRef == nil {
-						log.Fatalf("No context found for '%s'", name)
-					}
-					ctx, err = localConfig.ResolveContext(ctxRef.Name)
-					errors.CheckError(err)
-				}
+				ctx, err = resolveStopTarget(name, localConfig)
 			} else {
 				ctx, err = localConfig.ResolveContext("")
-				errors.CheckError(err)
 			}
+			errors.CheckError(err)
 			instance := ctx.Instance
 
 			if instance.Name == "" {
@@ -101,4 +87,21 @@ microcks stop --name myinstance`,
 	stopCmd.Flags().StringVar(&name, "name", "", "Name of the context or instance to stop (uses current context if empty)")
 
 	return stopCmd
+}
+
+// resolveStopTarget resolves a stop target by name.
+// Context name is checked first because it is the explicit user-assigned
+// identifier. Instance name is a secondary label (from start --name) —
+// used as fallback when no context with the given name exists.
+func resolveStopTarget(name string, cfg *config.LocalConfig) (*config.Context, error) {
+	ctx, err := cfg.ResolveContext(name)
+	if err == nil {
+		return ctx, nil
+	}
+	for i := range cfg.Contexts {
+		if cfg.Contexts[i].Instance == name {
+			return cfg.ResolveContext(cfg.Contexts[i].Name)
+		}
+	}
+	return nil, fmt.Errorf("no context found for '%s'", name)
 }
