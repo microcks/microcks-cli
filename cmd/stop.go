@@ -40,6 +40,14 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			errors.CheckError(err)
 			defer containerClient.CloseClient()
 
+			exists, _ := containerClient.ContainerExists(instance.ContainerID)
+			errors.CheckError(err)
+			if !exists {
+				fmt.Printf("Container for instance %s no longer exists\n", instance.Name)
+				fmt.Printf("Run 'microcks start --name %s' to bring the container back\n", instance.Name)
+				return
+			}
+
 			err = containerClient.StopContainer(instance.ContainerID)
 			if err != nil {
 				log.Fatalf("Failed to stop a container: %v", err)
@@ -59,7 +67,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				_ = localConfig.RemoveServer(ctx.Server.Server)
 				_ = localConfig.RemoveUser(ctx.User.Name)
 				_ = localConfig.RemoveAuth(ctx.Server.Server)
-				_ = localConfig.RemoveInstance(instance.ContainerID)
+				_ = localConfig.RemoveInstance(instance.Name)
 
 				localConfig.CurrentContext = ""
 				log.Printf("Instance %s removed successfully", instance.Name)
