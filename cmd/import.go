@@ -124,11 +124,11 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				if strings.Contains(f, ":") {
 					lastColon := strings.LastIndex(f, ":")
 					boolPart := f[lastColon+1:]
-					f = f[:lastColon]
 					if val, parseErr := strconv.ParseBool(boolPart); parseErr != nil {
 						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", boolPart)
 					} else {
 						mainArtifact = val
+						f = f[:lastColon]
 					}
 				}
 

@@ -100,23 +100,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				mainArtifact := true
 				secret := ""
 
-				// Check if URL starts with https or http
-				if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
-					urlAndMainAtrifactAndSecretName := strings.Split(f, ":")
-					n := len(urlAndMainAtrifactAndSecretName)
-					f = urlAndMainAtrifactAndSecretName[0] + ":" + urlAndMainAtrifactAndSecretName[1]
-					if n > 2 {
-						val, err := strconv.ParseBool(urlAndMainAtrifactAndSecretName[2])
-						if err != nil {
-							fmt.Printf("Cannot parse '%s' as Bool, default to true\n", urlAndMainAtrifactAndSecretName[2])
-						} else {
-							mainArtifact = val
-						}
-					}
-					if n > 3 {
-						secret = urlAndMainAtrifactAndSecretName[3]
-					}
-				}
+				f, mainArtifact, secret = parseImportURLArg(f)
 
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
@@ -130,4 +114,26 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	}
 
 	return importURLCmd
+}
+
+func parseImportURLArg(f string) (string, bool, string) {
+	mainArtifact := true
+	secret := ""
+
+	if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
+		parts := strings.Split(f, ":")
+		n := len(parts)
+
+		for i := n - 1; i >= 2; i-- {
+			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
+				mainArtifact = val
+				if i+1 < n {
+					secret = strings.Join(parts[i+1:], ":")
+				}
+				f = strings.Join(parts[:i], ":")
+				break
+			}
+		}
+	}
+	return f, mainArtifact, secret
 }
