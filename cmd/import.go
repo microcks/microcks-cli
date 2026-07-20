@@ -119,15 +119,16 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
 				mainArtifact := true
-				var err error
 
 				// Check if mainArtifact flag is provided.
 				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", pathAndMainArtifact[1])
+					lastColon := strings.LastIndex(f, ":")
+					boolPart := f[lastColon+1:]
+					if val, parseErr := strconv.ParseBool(boolPart); parseErr != nil {
+						fmt.Printf("Cannot parse '%s' as Bool, default to true\n", boolPart)
+					} else {
+						mainArtifact = val
+						f = f[:lastColon]
 					}
 				}
 
