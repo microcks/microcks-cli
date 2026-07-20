@@ -97,25 +97,9 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
-				secret := ""
-
-				// Check if URL starts with https or http
-				if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
-					urlAndMainAtrifactAndSecretName := strings.Split(f, ":")
-					n := len(urlAndMainAtrifactAndSecretName)
-					f = urlAndMainAtrifactAndSecretName[0] + ":" + urlAndMainAtrifactAndSecretName[1]
-					if n > 2 {
-						val, err := strconv.ParseBool(urlAndMainAtrifactAndSecretName[2])
-						if err != nil {
-							fmt.Println(err)
-						}
-						mainArtifact = val
-					}
-					if n > 3 {
-						secret = urlAndMainAtrifactAndSecretName[3]
-					}
-				}
+				var mainArtifact bool
+				var secret string
+				f, mainArtifact, secret = parseImportURLArg(f)
 
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
@@ -129,4 +113,47 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	}
 
 	return importURLCmd
+}
+
+func parseImportURLArg(f string) (string, bool, string) {
+	mainArtifact := true
+	secret := ""
+
+	// Check if URL starts with https or http
+	if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
+		parts := strings.Split(f, ":")
+		n := len(parts)
+
+		hasSecret := false
+		hasMain := false
+
+		if n >= 3 {
+			// Check if parts[n-2] is a boolean. If it is, then parts[n-1] is the secret,
+			// and parts[n-2] is mainArtifact.
+			if val, err := strconv.ParseBool(parts[n-2]); err == nil {
+				mainArtifact = val
+				secret = parts[n-1]
+				hasSecret = true
+				hasMain = true
+			}
+		}
+
+		if !hasSecret && n >= 2 {
+			// Check if parts[n-1] is a boolean. If it is, then parts[n-1] is mainArtifact.
+			if val, err := strconv.ParseBool(parts[n-1]); err == nil {
+				mainArtifact = val
+				hasMain = true
+			}
+		}
+
+		// Reconstruct the URL
+		if hasSecret {
+			f = strings.Join(parts[:n-2], ":")
+		} else if hasMain {
+			f = strings.Join(parts[:n-1], ":")
+		} else {
+			f = strings.Join(parts, ":")
+		}
+	}
+	return f, mainArtifact, secret
 }
