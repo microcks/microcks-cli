@@ -102,3 +102,38 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 		t.Fatalf("expected response body %q, got %q", expectedBody, msg)
 	}
 }
+
+func TestUnexpectedServerResponseHandling(t *testing.T) {
+	// Create a test server that returns HTML / Bad Gateway
+	const htmlError = `<html><body>502 Bad Gateway</body></html>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(htmlError))
+	}))
+	defer server.Close()
+
+	client := NewMicrocksClient(server.URL)
+
+	// Test GetKeycloakURL
+	_, err := client.GetKeycloakURL()
+	if err == nil {
+		t.Error("expected GetKeycloakURL to return error on Bad Gateway response, got nil")
+	} else if !strings.Contains(err.Error(), "502") {
+		t.Errorf("expected error message to contain HTTP status code '502', got: %v", err)
+	}
+
+	// Test GetTestResult
+	_, err = client.GetTestResult("some-id")
+	if err == nil {
+		t.Error("expected GetTestResult to return error on Bad Gateway response, got nil")
+	} else if !strings.Contains(err.Error(), "502") {
+		t.Errorf("expected error message to contain HTTP status code '502', got: %v", err)
+	}
+
+	// Test DownloadArtifact
+	_, err = client.DownloadArtifact("https://example.com/openapi.yaml", true, "")
+	if err == nil {
+		t.Error("expected DownloadArtifact to return error on Bad Gateway response, got nil")
+	}
+}
+

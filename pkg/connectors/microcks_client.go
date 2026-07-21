@@ -239,21 +239,26 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("microcks returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var configResp map[string]interface{}
 	if err := json.Unmarshal(body, &configResp); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse keycloak config response (is the server URL correct?): %w", err)
 	}
 
 	// Retrieve auth server url and realm name.
-	enabled := configResp["enabled"].(bool)
-	authServerURL := configResp["auth-server-url"].(string)
-	realmName := configResp["realm"].(string)
-
-	// Return a proper URL or 'null' if Keycloak is disables.
+	enabled, _ := configResp["enabled"].(bool)
 	if enabled {
+		authServerURL, ok1 := configResp["auth-server-url"].(string)
+		realmName, ok2 := configResp["realm"].(string)
+		if !ok1 || !ok2 {
+			return "", fmt.Errorf("invalid keycloak config response (missing 'auth-server-url' or 'realm')")
+		}
 		return authServerURL + "/realms/" + realmName + "/", nil
 	}
 	return "null", nil
@@ -425,7 +430,11 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("microcks returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	result := TestResultSummary{}
@@ -558,7 +567,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	// Raise exception if not created.
@@ -566,7 +575,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 		return "", errs.New(string(respBody))
 	}
 
-	return string(respBody), err
+	return string(respBody), nil
 }
 
 func ensureValidOperationsList(filteredOperations string) bool {
