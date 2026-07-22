@@ -89,6 +89,28 @@ microcks [command] [flags]
 | `--microcksURL`          | Microcks API URL                            |
 
 
+### Exit codes
+
+`microcks` returns a distinct exit code per outcome, so CI can branch on *why* a
+run failed — for example retry a flaky runner but fail the build on a broken
+contract:
+
+| Code | Meaning |
+| ---- | ------- |
+| 0  | Success, or the contract test conformed |
+| 1  | Contract test failed — a clean run whose result did not conform |
+| 2  | Usage — bad arguments or flags |
+| 11 | Connection — could not reach the Microcks or Keycloak endpoint |
+| 12 | API — a server rejected the request or returned an unusable response |
+| 13 | Not found — a requested resource does not exist |
+| 14 | Environment — a local precondition failed (container runtime, image, readiness) |
+| 20 | Generic — an unclassified failure |
+
+`1` means the tool ran fine and the API violated its contract — not that the tool
+errored. Codes `0`/`1`/`2` follow the common [Unix exit-status convention](https://en.wikipedia.org/wiki/Exit_status);
+`11`–`20` are Microcks-CLI–specific. See [documentation/error-handling.md](documentation/error-handling.md).
+
+
 ### Local contract testing without a server
 
 `microcks test --dry-run` runs a contract test with zero infrastructure: no running Microcks server, no Keycloak credentials, no upfront import. The CLI spins up an ephemeral Microcks container (via [Testcontainers](https://microcks.io/documentation/guides/usage/developing-testcontainers/)), imports your spec, runs the test against your endpoint, prints the result and tears the container down.

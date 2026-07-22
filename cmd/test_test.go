@@ -38,8 +38,11 @@ func TestTestCommandMissingRunnerWithGlobalFlagsDoesNotPanic(t *testing.T) {
 			"http://localhost:3000",
 		}
 
-		err := NewCommand().Execute()
+		command, err := NewCommand()
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := command.Execute(); err != nil {
 			t.Fatal(err)
 		}
 		return
