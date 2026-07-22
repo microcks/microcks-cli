@@ -30,6 +30,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/testcontainers/testcontainers-go"
 	microcks "microcks.io/testcontainers-go"
 )
@@ -64,7 +65,7 @@ func configureDriver(driver string) error {
 		}
 		return nil
 	default:
-		return fmt.Errorf("unsupported --driver %q (use 'docker' or 'podman')", driver)
+		return errors.Wrapf(errors.KindUsage, "unsupported --driver %q (use 'docker' or 'podman')", driver)
 	}
 }
 
@@ -81,15 +82,15 @@ func shouldUsePodman() bool {
 
 func setupPodman() error {
 	if err := connectors.ConfigurePodmanHost(); err != nil {
-		return err
+		return errors.Wrap(errors.KindEnvironment, err)
 	}
 	// testcontainers-go silently falls back to Docker when the podman endpoint
 	// isn't reachable, which would make "--driver podman" a lie. Verify the
 	// connection now and fail loudly instead.
 	if err := connectors.PingDockerHost(); err != nil {
-		return fmt.Errorf("--driver podman selected but the podman endpoint is not reachable. "+
+		return errors.Wrapf(errors.KindEnvironment, "--driver podman selected but the podman endpoint is not reachable. "+
 			"Start it with 'podman machine start' (macOS/Windows) or "+
-			"'systemctl --user start podman.socket' (Linux). Underlying error: %w", err)
+			"'systemctl --user start podman.socket' (Linux). Underlying error: %v", err)
 	}
 	// Ryuk (Testcontainers' reaper) needs privileges rootless Podman doesn't
 	// grant; our signal-driven Terminate already guarantees cleanup, so disable
@@ -141,16 +142,14 @@ func rewriteLocalEndpoint(testEndpoint string) (string, int, bool) {
 	return u.String(), port, true
 }
 
-func runDryRunTest(opts dryRunOptions) bool {
+func runDryRunTest(opts dryRunOptions) error {
 	if err := validateDryRunOptions(opts); err != nil {
-		fmt.Println(err)
-		return false
+		return errors.Wrap(errors.KindUsage, err)
 	}
 
 	// Select the container runtime (docker default, podman wired via DOCKER_HOST).
 	if err := configureDriver(opts.driver); err != nil {
-		fmt.Println(err)
-		return false
+		return err
 	}
 
 	// Ctrl+C / SIGTERM cancels the context so teardown still runs.
@@ -175,35 +174,38 @@ func runDryRunTest(opts dryRunOptions) bool {
 
 	container, err := microcks.Run(startCtx, opts.image, containerOpts...)
 	if err != nil {
-		fmt.Printf("Failed to start ephemeral Microcks container: %s\n", err)
-		fmt.Println("Check that the container runtime is running, the port is free and the image is reachable (or raise --ready-timeout).")
 		if container != nil {
 			terminateContainer(container)
 		}
-		return false
+		return errors.Wrapf(errors.KindEnvironment, "failed to start ephemeral Microcks container: %v. "+
+			"Check that the container runtime is running, the port is free and the image is reachable (or raise --ready-timeout)", err)
 	}
 	defer terminateContainer(container)
 
 	endpoint, err := container.HttpEndpoint(ctx)
 	if err != nil {
-		fmt.Printf("Failed to resolve ephemeral Microcks endpoint: %s\n", err)
-		return false
+		return errors.Wrapf(errors.KindEnvironment, "failed to resolve ephemeral Microcks endpoint: %v", err)
 	}
 	fmt.Printf("Ephemeral Microcks is ready at %s\n", endpoint)
 
 	// The uber-native image runs without Keycloak: a headless client with
 	// the unauthenticated token is enough.
-	mc := connectors.NewMicrocksClient(endpoint)
+	mc, err := connectors.NewMicrocksClient(endpoint)
+	if err != nil {
+		return err
+	}
 	mc.SetOAuthToken("unauthenticated-token")
 
 	success, testResultID, err := runTestAndWait(mc, opts.params)
 	if err != nil {
-		fmt.Println(err)
-		return false
+		return err
 	}
 
 	if !opts.watch {
-		return success
+		if success {
+			return nil
+		}
+		return errors.ErrTestFailed
 	}
 	printDetailsLink(endpoint, testResultID)
 	return watchAndRerun(ctx, mc, endpoint, opts)
@@ -218,11 +220,10 @@ func terminateContainer(container *microcks.MicrocksContainer) {
 	}
 }
 
-func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr string, opts dryRunOptions) bool {
+func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr string, opts dryRunOptions) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		fmt.Printf("Failed to create file watcher: %s\n", err)
-		return false
+		return fmt.Errorf("failed to create file watcher: %w", err)
 	}
 	defer watcher.Close()
 
@@ -230,12 +231,10 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 	// (rename + create), which silently drops a watch set on the file itself.
 	artifactPath, err := filepath.Abs(opts.artifact)
 	if err != nil {
-		fmt.Printf("Failed to resolve artifact path: %s\n", err)
-		return false
+		return fmt.Errorf("failed to resolve artifact path: %w", err)
 	}
 	if err := watcher.Add(filepath.Dir(artifactPath)); err != nil {
-		fmt.Printf("Failed to watch %s: %s\n", filepath.Dir(artifactPath), err)
-		return false
+		return fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err)
 	}
 
 	fmt.Printf("\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact)
@@ -247,11 +246,11 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 		select {
 		case <-ctx.Done():
 			fmt.Println("\nStopping watch mode.")
-			return true
+			return nil
 
 		case event, ok := <-watcher.Events:
 			if !ok {
-				return true
+				return nil
 			}
 			eventPath, err := filepath.Abs(event.Name)
 			if err != nil || eventPath != artifactPath {
@@ -273,7 +272,7 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				return true
+				return nil
 			}
 			fmt.Printf("Watch error: %s\n", err)
 

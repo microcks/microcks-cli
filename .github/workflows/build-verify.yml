@@ -41,6 +41,19 @@ jobs:
           make clean
           make build-binaries
 
+      - name: Run tests
+        run: go test ./...
+
+      - name: Guard against stray process exits
+        run: |
+          # pkg/* and cmd/* (except cmd/exit.go) must return a classified error,
+          # never exit or panic. Only the main entrypoints exit the process.
+          # See documentation/error-handling.md.
+          if grep -rnE '(os\.Exit|log\.Fatal|panic\()' --include='*.go' cmd pkg | grep -vE '_test\.go|cmd/exit\.go'; then
+            echo "::error::os.Exit/log.Fatal/panic found outside cmd/exit.go — return errors.Wrap(kind, err) instead."
+            exit 1
+          fi
+
       - name: Set environment for branch
         run: |
           set -x

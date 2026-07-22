@@ -2,18 +2,24 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/microcks/microcks-cli/pkg/config"
-	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/microcks/microcks-cli/pkg/watcher"
 )
 
 func main() {
 	watchFile, err := config.DefaultLocalWatchPath()
-	errors.CheckError(err)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	wm, err := watcher.NewWatchManger(watchFile)
-	errors.CheckError(err)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	fmt.Println("[INFO] microcks-watcher started...")
 	wm.Run()
