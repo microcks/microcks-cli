@@ -11,11 +11,17 @@ import (
 )
 
 func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var name string
 
 	var stopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "stop microcks instance",
 		Long:  "stop microcks instance",
+		Example: `# Stop the instance from the current context
+microcks stop
+
+# Stop by context name or instance name
+microcks stop --name myinstance`,
 		Run: func(cmd *cobra.Command, args []string) {
 
 			configFile := globalClientOpts.ConfigPath
@@ -27,7 +33,12 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				return
 			}
 
-			ctx, err := localConfig.ResolveContext("")
+			var ctx *config.Context
+			if name != "" {
+				ctx, err = resolveStopTarget(name, localConfig)
+			} else {
+				ctx, err = localConfig.ResolveContext("")
+			}
 			errors.CheckError(err)
 			instance := ctx.Instance
 
@@ -73,5 +84,24 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		},
 	}
 
+	stopCmd.Flags().StringVar(&name, "name", "", "Name of the context or instance to stop (uses current context if empty)")
+
 	return stopCmd
+}
+
+// resolveStopTarget resolves a stop target by name.
+// Context name is checked first because it is the explicit user-assigned
+// identifier. Instance name is a secondary label (from start --name) —
+// used as fallback when no context with the given name exists.
+func resolveStopTarget(name string, cfg *config.LocalConfig) (*config.Context, error) {
+	ctx, err := cfg.ResolveContext(name)
+	if err == nil {
+		return ctx, nil
+	}
+	for i := range cfg.Contexts {
+		if cfg.Contexts[i].Instance == name {
+			return cfg.ResolveContext(cfg.Contexts[i].Name)
+		}
+	}
+	return nil, fmt.Errorf("no context found for '%s'", name)
 }
