@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -34,8 +33,6 @@ var (
 	CaCertPaths string
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
-
-	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
 )
 
 var sensitiveHeaderPattern = regexp.MustCompile(
