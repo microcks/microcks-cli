@@ -215,15 +215,15 @@ func (l *LocalConfig) UpsertContext(context ContextRef) {
 	l.Contexts = append(l.Contexts, context)
 }
 
-// RemoveContext and returns server name and true if context was removed successfully
-func (l *LocalConfig) RemoveContext(serverName string) (string, bool) {
+// RemoveContext removes a context reference and returns it if context was removed successfully.
+func (l *LocalConfig) RemoveContext(name string) (ContextRef, bool) {
 	for i, c := range l.Contexts {
-		if c.Name == serverName {
+		if c.Name == name {
 			l.Contexts = append(l.Contexts[:i], l.Contexts[i+1:]...)
-			return c.Server, true
+			return c, true
 		}
 	}
-	return "", false
+	return ContextRef{}, false
 }
 
 // RemoveToken and returns true if user was removed successfully
