@@ -29,7 +29,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// KeycloakClient defines methods for cinteracting with Keycloak
+// KeycloakClient defines methods for interacting with Keycloak
 type KeycloakClient interface {
 	ConnectAndGetToken() (string, error)
 	ConnectAndGetTokenAndRefreshToken(string, string) (string, string, error)
