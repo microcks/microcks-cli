@@ -12,7 +12,7 @@ func main() {
 	watchFile, err := config.DefaultLocalWatchPath()
 	errors.CheckError(err)
 
-	wm, err := watcher.NewWatchManger(watchFile)
+	wm, err := watcher.NewWatchManager(watchFile)
 	errors.CheckError(err)
 
 	fmt.Println("[INFO] microcks-watcher started...")
