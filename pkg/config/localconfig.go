@@ -321,12 +321,12 @@ func (l *LocalConfig) UpsertInstance(instance Instance) {
 }
 
 // Returns true if server was removed successfully
-func (l *LocalConfig) RemoveInstance(instanceName string) bool {
-	if instanceName == "" {
+func (l *LocalConfig) RemoveInstance(instanceID string) bool {
+	if instanceID == "" {
 		return true
 	}
 	for a, i := range l.Instances {
-		if i.Name == instanceName {
+		if i.ContainerID == instanceID {
 			l.Instances = append(l.Instances[:a], l.Instances[a+1:]...)
 			return true
 		}
