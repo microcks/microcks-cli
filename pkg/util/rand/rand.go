@@ -15,6 +15,9 @@ func String(n int) (string, error) {
 
 // StringFromCharset generates, from a given charset, a cryptographically-secure pseudo-random string of a given length.
 func StringFromCharset(n int, charset string) (string, error) {
+	if n > 0 && len(charset) == 0 {
+		return "", fmt.Errorf("charset must not be empty when n > 0")
+	}
 	b := make([]byte, n)
 	maxIdx := big.NewInt(int64(len(charset)))
 	for i := 0; i < n; i++ {
@@ -22,7 +25,6 @@ func StringFromCharset(n int, charset string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to generate random string: %w", err)
 		}
-		// randIdx is necessarily safe to convert to int, because the max came from an int.
 		randIdxInt := int(randIdx.Int64())
 		b[i] = charset[randIdxInt]
 	}
