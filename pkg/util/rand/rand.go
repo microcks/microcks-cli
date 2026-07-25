@@ -15,6 +15,9 @@ func String(n int) (string, error) {
 
 // StringFromCharset generates, from a given charset, a cryptographically-secure pseudo-random string of a given length.
 func StringFromCharset(n int, charset string) (string, error) {
+	if n<0{
+		return "", fmt.Errorf("n must be greater than 0")
+	}
 	if n > 0 && len(charset) == 0 {
 		return "", fmt.Errorf("charset must not be empty when n > 0")
 	}

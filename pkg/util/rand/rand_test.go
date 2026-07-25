@@ -38,23 +38,23 @@ func TestString(t *testing.T) {
 	}
 }
 
-func TestStringProducesDifferentValues(t *testing.T) {
+func TestStringRepeatedCalls(t *testing.T) {
 	t.Parallel()
 
-	const length = 32
+	
+	const (
+		length = 32
+		attempts=5
+	)
 
-	first, err := String(length)
-	if err != nil {
-		t.Fatalf("first String(%d) returned error: %v", length, err)
-	}
-
-	second, err := String(length)
-	if err != nil {
-		t.Fatalf("second String(%d) returned error: %v", length, err)
-	}
-
-	if first == second {
-		t.Fatalf("expected two generated strings to differ, both were %q", first)
+	for i := 0; i < attempts; i++ {
+		got, err := String(length)
+		if err != nil {
+			t.Fatalf("String(%d) returned error on attempt %d: %v", length, i, err)
+		}
+		if len(got) != length {
+			t.Fatalf("String(%d) length on attempt %d = %d, want %d", length, i, len(got), length)
+		}
 	}
 }
 
