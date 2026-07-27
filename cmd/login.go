@@ -63,7 +63,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 
 			//Check if server name is provided or not
 			if len(args) != 1 {
-				return errors.Wrapf(errors.KindUsage, "login requires exactly one SERVER argument")
+				return usageErrorf(cmd, "login requires exactly one SERVER argument")
 			}
 
 			config.InsecureTLS = globalClientOpts.InsecureTLS

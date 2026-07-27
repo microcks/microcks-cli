@@ -18,6 +18,7 @@ package cmd
 import (
 	stderrors "errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/microcks/microcks-cli/pkg/errors"
@@ -59,8 +60,17 @@ func Handle(err error) {
 	if err == nil {
 		return
 	}
-	if !stderrors.Is(err, errors.ErrTestFailed) {
-		fmt.Fprintln(os.Stderr, err)
-	}
+	printError(os.Stderr, err)
 	os.Exit(ExitCodeFor(err))
+}
+
+func printError(w io.Writer, err error) {
+	if err == nil || stderrors.Is(err, errors.ErrTestFailed) {
+		return
+	}
+	var usageErr *usageError
+	if stderrors.As(err, &usageErr) && usageErr.usage != "" {
+		fmt.Fprint(w, usageErr.usage)
+	}
+	fmt.Fprintln(w, err)
 }

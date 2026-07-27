@@ -38,7 +38,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse subcommand args first.
 			if len(args) == 0 {
-				return errors.Wrapf(errors.KindUsage, "import requires a <specificationFile1[:primary],specificationFile2[:primary]> argument")
+				return usageErrorf(cmd, "import requires a <specificationFile1[:primary],specificationFile2[:primary]> argument")
 			}
 
 			specificationFiles := args[0]

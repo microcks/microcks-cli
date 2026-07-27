@@ -16,8 +16,10 @@
 package cmd
 
 import (
+	"bytes"
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/errors"
@@ -43,5 +45,37 @@ func TestExitCodeFor(t *testing.T) {
 		if got := ExitCodeFor(c.err); got != c.want {
 			t.Errorf("%s: ExitCodeFor = %d, want %d", c.name, got, c.want)
 		}
+	}
+}
+
+func TestPrintErrorIncludesUsageFromUsageError(t *testing.T) {
+	cmd, err := NewCommand()
+	if err != nil {
+		t.Fatalf("NewCommand returned error: %v", err)
+	}
+	importCmd, _, err := cmd.Find([]string{"import"})
+	if err != nil {
+		t.Fatalf("could not find import command: %v", err)
+	}
+
+	var out bytes.Buffer
+	printError(&out, usageErrorf(importCmd, "import requires a file"))
+
+	got := out.String()
+	if !strings.Contains(got, "Usage:") {
+		t.Fatalf("printError did not include usage: %q", got)
+	}
+	if !strings.Contains(got, "microcks import") {
+		t.Fatalf("printError did not include import usage: %q", got)
+	}
+	if !strings.Contains(got, "import requires a file") {
+		t.Fatalf("printError did not include error: %q", got)
+	}
+}
+
+func TestUsageErrorIsKindUsage(t *testing.T) {
+	err := usageErrorf(nil, "bad args")
+	if got := errors.KindOf(err); got != errors.KindUsage {
+		t.Fatalf("KindOf = %v, want KindUsage", got)
 	}
 }

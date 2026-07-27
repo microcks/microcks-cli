@@ -191,7 +191,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 
 			fmt.Printf("\nImport completed: %d/%d files imported successfully\n", result.SuccessCount, result.TotalFiles)
-			return nil
+			return importDirectoryPartialFailure(result)
 		},
 	}
 
@@ -200,6 +200,13 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	importDirCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed progress")
 
 	return importDirCmd
+}
+
+func importDirectoryPartialFailure(result ImportResult) error {
+	if result.FailedCount == 0 {
+		return nil
+	}
+	return errors.Wrapf(errors.KindAPI, "%d/%d files failed to import", result.FailedCount, result.TotalFiles)
 }
 
 func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, config ImportConfig) (ImportResult, error) {

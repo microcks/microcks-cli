@@ -251,8 +251,12 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 		return "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak config response: %w", err))
 	}
 
+	enabled, ok := configResp["enabled"].(bool)
+	if !ok {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak config response missing or invalid enabled field")
+	}
 	// Return 'null' if Keycloak is disabled.
-	if enabled, _ := configResp["enabled"].(bool); !enabled {
+	if !enabled {
 		return "null", nil
 	}
 

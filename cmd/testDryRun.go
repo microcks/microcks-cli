@@ -223,7 +223,7 @@ func terminateContainer(container *microcks.MicrocksContainer) {
 func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr string, opts dryRunOptions) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("failed to create file watcher: %w", err)
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to create file watcher: %w", err))
 	}
 	defer watcher.Close()
 
@@ -231,10 +231,10 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 	// (rename + create), which silently drops a watch set on the file itself.
 	artifactPath, err := filepath.Abs(opts.artifact)
 	if err != nil {
-		return fmt.Errorf("failed to resolve artifact path: %w", err)
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("failed to resolve artifact path: %w", err))
 	}
 	if err := watcher.Add(filepath.Dir(artifactPath)); err != nil {
-		return fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err)
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err))
 	}
 
 	fmt.Printf("\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact)
