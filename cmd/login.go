@@ -120,7 +120,11 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 						os.Exit(1)
 					}
 					//Perform login and retrive tokens
-					authToken, refreshToken = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					var loginErr error
+					authToken, refreshToken, loginErr = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					if loginErr != nil {
+						log.Fatal(loginErr)
+					}
 					authCfg.ClientId = clientID
 					authCfg.ClientSecret = clientSecret
 				} else {
@@ -308,17 +312,16 @@ func ssoAuthFlow(url string, ssoLaunchBrowser bool) {
 	}
 }
 
-func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string) {
+func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string, error) {
 	kc := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret)
 	username, password := promptCredentials(Username, Password)
 
 	authToken, refreshToken, err := kc.ConnectAndGetTokenAndRefreshToken(username, password)
-
 	if err != nil {
-		panic(err)
+		return "", "", err
 	}
 
-	return authToken, refreshToken
+	return authToken, refreshToken, nil
 }
 
 func promptCredentials(username, password string) (string, string) {

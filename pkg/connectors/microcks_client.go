@@ -253,14 +253,22 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 		return "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak config response: %w", err))
 	}
 
-	// Return 'null' if Keycloak is disabled.
-	if enabled, _ := configResp["enabled"].(bool); !enabled {
+	// Retrieve auth server url and realm name.
+	enabledVal, exists := configResp["enabled"]
+	if !exists {
+		return "", errors.Wrapf(errors.KindAPI, "invalid keycloak config response (missing 'enabled' field)")
+	}
+	enabled, ok := enabledVal.(bool)
+	if !ok {
+		return "", errors.Wrapf(errors.KindAPI, "invalid keycloak config response ('enabled' field is not a boolean)")
+	}
+	if !enabled {
 		return "null", nil
 	}
 
-	authServerURL, _ := configResp["auth-server-url"].(string)
-	realmName, _ := configResp["realm"].(string)
-	if authServerURL == "" || realmName == "" {
+	authServerURL, ok1 := configResp["auth-server-url"].(string)
+	realmName, ok2 := configResp["realm"].(string)
+	if !ok1 || !ok2 || authServerURL == "" || realmName == "" {
 		return "", errors.Wrapf(errors.KindAPI, "Keycloak config response missing auth-server-url or realm")
 	}
 	return authServerURL + "/realms/" + realmName + "/", nil
@@ -441,6 +449,10 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(errors.KindConnection, fmt.Errorf("reading test result response: %w", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Wrapf(errors.KindAPI, "Microcks returned HTTP %d for test result: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	result := TestResultSummary{}
