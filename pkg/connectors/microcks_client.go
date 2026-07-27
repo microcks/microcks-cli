@@ -151,7 +151,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 
 		u, err := url.Parse(apiURL)
 		if err != nil {
-			panic(err)
+			return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid server URL %q: %w", apiURL, err))
 		}
 		c.APIURL = u
 
@@ -194,6 +194,8 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 
 	u, err := url.Parse(apiURL)
 	if err != nil {
+		// url.Parse only fails on a malformed URL; returning it needs a
+		// signature change, done with the RunE command migration.
 		panic(err)
 	}
 	mc.APIURL = u
@@ -230,7 +232,7 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -239,24 +241,29 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading Keycloak config response: %w", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", errors.Wrapf(errors.KindAPI, "Microcks returned HTTP %d for Keycloak config: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var configResp map[string]interface{}
 	if err := json.Unmarshal(body, &configResp); err != nil {
-		panic(err)
+		return "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak config response: %w", err))
 	}
 
-	// Retrieve auth server url and realm name.
-	enabled := configResp["enabled"].(bool)
-	authServerURL := configResp["auth-server-url"].(string)
-	realmName := configResp["realm"].(string)
-
-	// Return a proper URL or 'null' if Keycloak is disables.
-	if enabled {
-		return authServerURL + "/realms/" + realmName + "/", nil
+	// Return 'null' if Keycloak is disabled.
+	if enabled, _ := configResp["enabled"].(bool); !enabled {
+		return "null", nil
 	}
-	return "null", nil
+
+	authServerURL, _ := configResp["auth-server-url"].(string)
+	realmName, _ := configResp["realm"].(string)
+	if authServerURL == "" || realmName == "" {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak config response missing auth-server-url or realm")
+	}
+	return authServerURL + "/realms/" + realmName + "/", nil
 }
 
 func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName, configPath string) error {
@@ -304,10 +311,14 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
 	keyCloakUrl, err := c.GetKeycloakURL()
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
 	kc := NewKeycloakClient(keyCloakUrl, "", "")
 	oauth2Conf, err := kc.GetOIDCConfig()
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
 	oauth2Conf.ClientID = auth.ClientId
 	oauth2Conf.ClientSecret = auth.ClientSecret
 
@@ -372,18 +383,22 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading test creation response: %w", err))
 	}
 
 	// Check HTTP status before attempting to parse.
 	if resp.StatusCode != 201 {
-		return "", fmt.Errorf("microcks returned HTTP %d: %s (is the service '%s' registered?)", resp.StatusCode, strings.TrimSpace(string(body)), serviceID)
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return "", errors.Wrapf(kind, "Microcks returned HTTP %d: %s (is the service '%s' registered?)", resp.StatusCode, strings.TrimSpace(string(body)), serviceID)
 	}
 
 	var createTestResp map[string]interface{}
@@ -416,7 +431,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -425,7 +440,7 @@ func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, errors.Wrap(errors.KindConnection, fmt.Errorf("reading test result response: %w", err))
 	}
 
 	result := TestResultSummary{}
@@ -440,7 +455,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	// Ensure file exists on fs.
 	file, err := os.Open(specificationFilePath)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindUsage, fmt.Errorf("cannot read artifact %q: %w", specificationFilePath, err))
 	}
 	defer file.Close()
 
@@ -490,7 +505,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -509,7 +524,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	// Raise exception if not created.
 	if resp.StatusCode != 201 {
-		return "", errs.New(string(respBody))
+		return "", errors.Wrap(errors.KindAPI, errs.New(strings.TrimSpace(string(respBody))))
 	}
 
 	return string(respBody), nil
@@ -549,7 +564,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -558,15 +573,15 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading download response: %w", err))
 	}
 
 	// Raise exception if not created.
 	if resp.StatusCode != 201 {
-		return "", errs.New(string(respBody))
+		return "", errors.Wrap(errors.KindAPI, errs.New(strings.TrimSpace(string(respBody))))
 	}
 
-	return string(respBody), err
+	return string(respBody), nil
 }
 
 func ensureValidOperationsList(filteredOperations string) bool {
