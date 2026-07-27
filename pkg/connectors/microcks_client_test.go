@@ -137,3 +137,80 @@ func TestUnexpectedServerResponseHandling(t *testing.T) {
 	}
 }
 
+func TestGetKeycloakURLConfigValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		responseBody  string
+		expectedURL   string
+		expectError   bool
+		wantErrSubstr string
+	}{
+		{
+			name:         "Valid Keycloak enabled config",
+			responseBody: `{"enabled": true, "auth-server-url": "http://localhost:8080/auth", "realm": "microcks"}`,
+			expectedURL:  "http://localhost:8080/auth/realms/microcks/",
+			expectError:  false,
+		},
+		{
+			name:         "Valid Keycloak disabled config",
+			responseBody: `{"enabled": false}`,
+			expectedURL:  "null",
+			expectError:  false,
+		},
+		{
+			name:          "Missing enabled field",
+			responseBody:  `{"auth-server-url": "http://localhost:8080/auth", "realm": "microcks"}`,
+			expectError:   true,
+			wantErrSubstr: "missing 'enabled' field",
+		},
+		{
+			name:          "Invalid type for enabled field",
+			responseBody:  `{"enabled": "true", "auth-server-url": "http://localhost:8080/auth", "realm": "microcks"}`,
+			expectError:   true,
+			wantErrSubstr: "'enabled' field is not a boolean",
+		},
+		{
+			name:          "Enabled but missing auth-server-url",
+			responseBody:  `{"enabled": true, "realm": "microcks"}`,
+			expectError:   true,
+			wantErrSubstr: "missing auth-server-url or realm",
+		},
+		{
+			name:          "Enabled but missing realm",
+			responseBody:  `{"enabled": true, "auth-server-url": "http://localhost:8080/auth"}`,
+			expectError:   true,
+			wantErrSubstr: "missing auth-server-url or realm",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/keycloak/config" {
+					t.Fatalf("unexpected path: %s", r.URL.Path)
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
+
+			client := NewMicrocksClient(server.URL)
+			url, err := client.GetKeycloakURL()
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error, got nil")
+				} else if !strings.Contains(err.Error(), tt.wantErrSubstr) {
+					t.Errorf("expected error containing %q, got: %v", tt.wantErrSubstr, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if url != tt.expectedURL {
+					t.Errorf("expected URL %q, got %q", tt.expectedURL, url)
+				}
+			}
+		})
+	}
+}
