@@ -66,8 +66,8 @@ microcks start --name [name of you container/instance]`,
 				errors.CheckError(err)
 				if !exists {
 					fmt.Printf("Container for instance %s no longer exists, recreating it\n", name)
+					localConfig.RemoveInstance(instance.ContainerID)
 					instance.Status = ""
-					instance.ContainerID = ""
 				}
 			}
 
