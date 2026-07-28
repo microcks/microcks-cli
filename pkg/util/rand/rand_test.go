@@ -47,7 +47,15 @@ func TestStringRepeatedCalls(t *testing.T) {
 		attempts=5
 	)
 
-	for i := 0; i < attempts; i++ {
+	first, err := String(length)
+ 	if err != nil {
+ 		t.Fatalf("String(%d) returned error on attempt 0: %v", length, err)
+ 	}
+ 	if len(first) != length {
+ 		t.Fatalf("String(%d) length on attempt 0 = %d, want %d", length, len(first), length)
+ 	}
+ 	allSame := true
+ 	for i := 1; i < attempts; i++ {
 		got, err := String(length)
 		if err != nil {
 			t.Fatalf("String(%d) returned error on attempt %d: %v", length, i, err)
@@ -55,8 +63,15 @@ func TestStringRepeatedCalls(t *testing.T) {
 		if len(got) != length {
 			t.Fatalf("String(%d) length on attempt %d = %d, want %d", length, i, len(got), length)
 		}
+		if got != first {
+			allSame = false
+		}
 	}
-}
+		if allSame {
+			t.Fatalf("String(%d) returned the same value for %d consecutive calls; expected at least one differing result", length, attempts)
+		}
+	}
+
 
 func TestStringFromCharset(t *testing.T) {
 	t.Parallel()
