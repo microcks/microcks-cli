@@ -159,6 +159,51 @@ $ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalo
 ```
 
 
+## Machine-readable test output
+
+`microcks test` accepts `--output` to control how the result is rendered:
+
+| Value | Output |
+| --- | --- |
+| `text` (default) | Human-readable summary |
+| `json` | The full `TestResult` as JSON |
+| `yaml` | The full `TestResult` as YAML |
+| `github-actions` | GitHub Actions workflow commands (annotations + log groups + step summary) |
+
+For machine formats (`json`/`yaml`/`github-actions`), progress goes to **stderr**
+and only the formatted result is written to **stdout**, so it can be piped or
+parsed cleanly:
+
+```bash
+microcks test "Pastry API:1.0.0" http://localhost:8080/api OPEN_API_SCHEMA \
+  --microcksURL=http://localhost:8585/api --output=json > result.json
+```
+
+### GitHub Actions
+
+With `--output=github-actions`, failures surface as `::error::` annotations,
+each operation is wrapped in a collapsible `::group::`, and a per-operation table
+is appended to the job summary (`$GITHUB_STEP_SUMMARY`). Set
+`MICROCKS_ACTIONS_VERBOSE=true` to also emit `::notice::` for passing operations.
+
+```yaml
+# .github/workflows/contract-test.yml
+name: contract-test
+on: [pull_request]
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Microcks contract test
+        run: |
+          microcks test "Pastry API:1.0.0" "${{ env.API_URL }}" OPEN_API_SCHEMA \
+            --microcksURL=${{ secrets.MICROCKS_URL }} \
+            --keycloakClientId=${{ secrets.MICROCKS_CLIENT_ID }} \
+            --keycloakClientSecret=${{ secrets.MICROCKS_CLIENT_SECRET }} \
+            --output=github-actions
+```
+
 ## Tekton tasks
 
 This repository also contains different [Tekton](https://tekton.dev/) tasks definitions and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.
