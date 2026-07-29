@@ -7,7 +7,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/microcks/microcks-cli/pkg/config"
-	"github.com/microcks/microcks-cli/pkg/errors"
 )
 
 type WatchManager struct {
@@ -88,7 +87,9 @@ func (wm *WatchManager) Run() {
 					err := wm.Reload()
 					wm.lock.Unlock()
 					if err != nil {
-						errors.CheckError(err)
+						// A bad config edit shouldn't kill the watcher; log and
+						// keep the previous config until the next valid save.
+						log.Printf("[ERROR] Config reload failed, keeping previous config: %v", err)
 					}
 				} else {
 					wm.lock.Lock()
