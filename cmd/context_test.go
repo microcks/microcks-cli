@@ -40,6 +40,7 @@ const testConfigFilePath = "./testdata/local.config"
 
 func TestDeleteContext(t *testing.T) {
 	//write the test config file
+	require.NoError(t, os.MkdirAll("./testdata", 0o750))
 	err := os.WriteFile(testConfigFilePath, []byte(testConfig), os.ModePerm)
 	require.NoError(t, err)
 
@@ -52,7 +53,7 @@ func TestDeleteContext(t *testing.T) {
 
 	//Delete non-existing context
 	err = deleteContext("microcks.io", testConfigFilePath)
-	require.EqualError(t, err, "Context microcks.io does not exist")
+	require.EqualError(t, err, `context "microcks.io" does not exist`)
 
 	//Delete non-current context
 	err = deleteContext("http://localhost:8080", testConfigFilePath)
@@ -67,6 +68,5 @@ func TestDeleteContext(t *testing.T) {
 
 func TestDeleteContextEmpty(t *testing.T) {
 	err := deleteContext("http://localhost:8080", "./testdata/non-existent-file.config")
-	require.EqualError(t, err, "Nothing to logout from")
+	require.EqualError(t, err, "nothing to delete")
 }
-

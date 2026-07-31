@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -22,18 +21,17 @@ microcks logout http://localhost:8080
 # Log out from a named context
 microcks logout dev-context`,
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "logout requires a CONTEXT or server URL argument")
 			}
 
 			target := args[0]
-			err := logoutContext(target, globalClientOpts.ConfigPath)
-			if err != nil {
-				log.Fatal(err)
+			if err := logoutContext(target, globalClientOpts.ConfigPath); err != nil {
+				return err
 			}
 			fmt.Printf("Logged out from '%s'\n", target)
+			return nil
 		},
 	}
 
@@ -46,7 +44,7 @@ func logoutContext(target, configPath string) error {
 		return err
 	}
 	if localCfg == nil {
-		return fmt.Errorf("Nothing to logout from")
+		return errors.Wrapf(errors.KindUsage, "nothing to log out from")
 	}
 
 	userName := target
@@ -55,7 +53,7 @@ func logoutContext(target, configPath string) error {
 	}
 
 	if ok := localCfg.RemoveToken(userName); !ok {
-		return fmt.Errorf("Context %s does not exist", target)
+		return errors.Wrapf(errors.KindNotFound, "context %q does not exist", target)
 	}
 
 	err = config.ValidateLocalConfig(*localCfg)

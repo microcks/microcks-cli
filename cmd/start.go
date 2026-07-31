@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -36,11 +35,13 @@ microcks start --driver [driver you wnat either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
-			errors.CheckError(err)
+			if err != nil {
+				return err
+			}
 
 			if localConfig == nil {
 				localConfig = &config.LocalConfig{}
@@ -60,10 +61,14 @@ microcks start --name [name of you container/instance]`,
 					instanceDriver = driver
 				}
 				containerClient, err := connectors.NewContainerClient(instanceDriver)
-				errors.CheckError(err)
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				exists, err := containerClient.ContainerExists(instance.ContainerID)
 				containerClient.CloseClient()
-				errors.CheckError(err)
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				if !exists {
 					fmt.Printf("Container for instance %s no longer exists, recreating it\n", name)
 					instance.Status = ""
@@ -74,20 +79,23 @@ microcks start --name [name of you container/instance]`,
 			switch instance.Status {
 			case "Running":
 				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+				return nil
 			case "Exited":
 				containerClient, err := connectors.NewContainerClient(instance.Driver)
-				errors.CheckError(err)
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				defer containerClient.CloseClient()
 
 				if err := containerClient.StartContainer(instance.ContainerID); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to start container: %w", err))
 				}
 				instance.Status = "Running"
 			default:
 				containerClient, err := connectors.NewContainerClient(driver)
-				errors.CheckError(err)
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				defer containerClient.CloseClient()
 
 				containerId, err := containerClient.CreateContainer(connectors.ContainerOpts{
@@ -97,13 +105,11 @@ microcks start --name [name of you container/instance]`,
 					AutoRemove: autoRemove,
 				})
 				if err != nil {
-					log.Fatalf("Failed to create a container: %v", err)
-					return
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to create container: %w", err))
 				}
 
 				if err := containerClient.StartContainer(containerId); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to start container: %w", err))
 				}
 
 				instance.ContainerID = containerId
@@ -156,8 +162,9 @@ microcks start --name [name of you container/instance]`,
 			})
 
 			// Save configs to config file
-			err = config.WriteLocalConfig(*localConfig, configFile)
-			errors.CheckError(err)
+			if err := config.WriteLocalConfig(*localConfig, configFile); err != nil {
+				return err
+			}
 
 			// The container being up doesn't mean the Microcks server inside
 			// is serving traffic yet: wait until HTTP is actually answering
@@ -165,12 +172,13 @@ microcks start --name [name of you container/instance]`,
 			if !noWait {
 				fmt.Printf("Waiting for Microcks to be ready at %s ...\n", server)
 				if err := waitForReady(server, readyTimeout); err != nil {
-					log.Fatalf("Microcks container is started but the server is not ready: %v. "+
-						"It may still be booting — retry shortly or raise --ready-timeout.", err)
+					return errors.Wrapf(errors.KindEnvironment, "Microcks container is started but the server is not ready: %v. "+
+						"It may still be booting — retry shortly or raise --ready-timeout", err)
 				}
 			}
 
 			fmt.Printf("Microcks started successfully at %s\n", server)
+			return nil
 		},
 	}
 	startCmd.Flags().StringVar(&name, "name", "microcks", "name for your Microcks instance")

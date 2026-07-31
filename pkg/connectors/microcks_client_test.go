@@ -58,7 +58,10 @@ func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewMicrocksClient(server.URL)
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
 	msg, err := client.UploadArtifact(specPath, true)
 	if err != nil {
 		t.Fatalf("UploadArtifact returned error: %v", err)
@@ -92,7 +95,10 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewMicrocksClient(server.URL)
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
 
 	msg, err := client.DownloadArtifact("https://example.com/openapi.yaml", true, "")
 	if err != nil {

@@ -41,7 +41,7 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 	testResultID, err := mc.CreateTestResult(params.serviceRef, params.testEndpoint, params.runnerType, params.secretName,
 		params.waitForMillis, params.filteredOperations, params.operationsHeaders, params.oAuth2Context)
 	if err != nil {
-		return false, "", fmt.Errorf("Got error when invoking Microcks client creating Test: %s", err)
+		return false, "", fmt.Errorf("creating test: %w", err)
 	}
 
 	// Finally - wait before checking and loop for some time
@@ -55,7 +55,7 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 	for nowInMilliseconds() < future {
 		testResultSummary, err := mc.GetTestResult(testResultID)
 		if err != nil {
-			return false, "", fmt.Errorf("Got error when invoking Microcks client check TestResult: %s", err)
+			return false, "", fmt.Errorf("checking test result: %w", err)
 		}
 		success = testResultSummary.Success
 		inProgress := testResultSummary.InProgress
