@@ -33,6 +33,7 @@ func TriggerImport(entry config.WatchEntry) {
 			mc, err = connectors.NewClient(*globalClientOpts)
 			if err != nil {
 				fmt.Printf("[ERROR] Cannot connect to Microcks client: %v in context '%s'\n", err, context)
+				continue
 			}
 		} else {
 			// We have no config file, so just create a client with context as server URL.
