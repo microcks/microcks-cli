@@ -438,7 +438,11 @@ func TestImportDirCommandPartialFailureExitCode(t *testing.T) {
 			dirPath,
 		}
 
-		err := NewCommand().Execute()
+		cmd, err := NewCommand()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cmd.Execute()
 		if err != nil {
 			t.Fatal(err)
 		}

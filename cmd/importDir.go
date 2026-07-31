@@ -194,6 +194,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			if result.FailedCount > 0 {
 				os.Exit(1)
 			}
+			return nil
 		},
 	}
 
