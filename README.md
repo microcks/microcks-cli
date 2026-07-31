@@ -1,7 +1,7 @@
 # Microcks CLI
 
 Simple CLI for interacting with Microcks server APIs.
-It allows to launch tests or import API artifacts with minimal dependencies.
+It allows launching tests or import API artifacts with minimal dependencies.
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-cli/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-cli/actions)
 [![Container](https://img.shields.io/badge/dynamic/json?color=blue&logo=docker&style=for-the-badge&label=Quay.io&query=tags[1].name&url=https://quay.io/api/v1/repository/microcks/microcks-cli/tag/?limit=10&page=1&onlyActiveTags=true)](https://quay.io/repository/microcks/microcks-cli?tab=tags)
@@ -47,7 +47,7 @@ Visit the [Release page](https://github.com/microcks/microcks-cli/releases/tag/1
 OR you can use the [Homebrew](https://brew.sh/) package manager on Linux and MacOS that way:
 
 ```sh
-brew tap microcks/tap 
+brew tap microcks/tap
 brew install microcks/tap/microcks
 ```
 
@@ -78,7 +78,7 @@ microcks [command] [flags]
 
 | Flag                     | Description                                 |
 | ------------------------ | ------------------------------------------- |
-| `-h, --help`             | help for microck command                    |
+| `-h, --help`             | help for microcks command                    |
 | `--config`               | Path to Microcks config file                |
 | `--microcks-context`     | Name of the Microcks context to use         |
 | `--verbose`              | Produce dumps of HTTP exchanges             |
@@ -89,7 +89,61 @@ microcks [command] [flags]
 | `--microcksURL`          | Microcks API URL                            |
 
 
+### Exit codes
 
+`microcks` returns a distinct exit code per outcome, so CI can branch on *why* a
+run failed — for example retry a flaky runner but fail the build on a broken
+contract:
+
+| Code | Meaning |
+| ---- | ------- |
+| 0  | Success, or the contract test conformed |
+| 1  | Contract test failed — a clean run whose result did not conform |
+| 2  | Usage — bad arguments or flags |
+| 11 | Connection — could not reach the Microcks or Keycloak endpoint |
+| 12 | API — a server rejected the request or returned an unusable response |
+| 13 | Not found — a requested resource does not exist |
+| 14 | Environment — a local precondition failed (container runtime, image, readiness) |
+| 20 | Generic — an unclassified failure |
+
+`1` means the tool ran fine and the API violated its contract — not that the tool
+errored. Codes `0`/`1`/`2` follow the common [Unix exit-status convention](https://en.wikipedia.org/wiki/Exit_status);
+`11`–`20` are Microcks-CLI–specific. See [documentation/error-handling.md](documentation/error-handling.md).
+
+
+### Local contract testing without a server
+
+`microcks test --dry-run` runs a contract test with zero infrastructure: no running Microcks server, no Keycloak credentials, no upfront import. The CLI spins up an ephemeral Microcks container (via [Testcontainers](https://microcks.io/documentation/guides/usage/developing-testcontainers/)), imports your spec, runs the test against your endpoint, prints the result and tears the container down.
+
+```bash
+# One-shot: run once, tear down, exit (exit code 0/1 reflects the test result)
+microcks test --dry-run \
+  --artifact ./openapi.yaml \
+  "Pastry API:1.0.0" \
+  http://localhost:3000 \
+  OPEN_API_SCHEMA
+
+# Watch mode: keep the container alive, re-import + re-run on every save (TDD loop)
+microcks test --dry-run --watch \
+  --artifact ./openapi.yaml \
+  "Pastry API:1.0.0" \
+  http://localhost:3000 \
+  OPEN_API_SCHEMA
+```
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `--dry-run` | `false` | Activate the ephemeral-container path |
+| `--artifact` | _(required with `--dry-run`)_ | Local spec file imported as main artifact |
+| `--image` | `quay.io/microcks/microcks-uber:latest-native` | Uber image override (must be a `*-native` tag) |
+| `--ready-timeout` | `90s` | How long to wait for the container to be ready |
+| `--watch` | `false` | Re-run the test when the artifact file changes |
+
+Notes:
+
+- A `localhost`/`127.0.0.1` test endpoint is automatically reachable from inside the container — the CLI exposes the port and rewrites the endpoint for you.
+- The container is removed on every exit path, including `Ctrl+C` mid-test.
+- Docker is the primary runtime; Podman works through its Docker-compatible socket (`DOCKER_HOST`).
 
 ### Building from Source
 
@@ -120,7 +174,7 @@ Binary releases for Linux, MacOS or Windows platform are available on the GitHub
 
 The `microcks-cli` is available as a container image. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is on Quay.io [here](https://quay.io/repository/microcks/microcks-cli).
 
-Below a sample on how using the image without getting the CLI binary:
+Below a sample on how to use the image without getting the CLI binary:
 
 ```
 $ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
@@ -129,4 +183,4 @@ $ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalo
 
 ## Tekton tasks
 
-This repository also contains different [Tekton](https://tekton.dev/) tasks definition and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.
+This repository also contains different [Tekton](https://tekton.dev/) tasks definitions and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.

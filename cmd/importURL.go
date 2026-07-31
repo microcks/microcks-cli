@@ -18,12 +18,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -32,11 +32,10 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 		Use:   "import-url",
 		Short: "import API artifacts from URL on Microcks server",
 		Long:  `import API artifacts from URL on Microcks server`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse subcommand args first.
 			if len(args) == 0 {
-				fmt.Println("import-url command require <specificationFile1URL[:primary],specificationFile2URL[:primary]> args")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "import-url requires a <specificationFileURL[:primary[:secret]]> argument")
 			}
 
 			specificationFiles := args[0]
@@ -49,25 +48,29 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
 				// create client with server address
-				mc = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
+				var err error
+				mc, err = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
+				if err != nil {
+					return err
+				}
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
-					os.Exit(1)
+					return err
 				}
 
-				var oauthToken string = "unauthenticated-token"
+				oauthToken := "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					if err != nil {
+						return err
+					}
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
-						os.Exit(1)
+						return err
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
 				//Set Auth token
@@ -76,13 +79,11 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					return err
 				}
 
 				if localConfig == nil {
-					fmt.Println("Please login to perform operation...")
-					os.Exit(1)
+					return errors.Wrapf(errors.KindUsage, "please login to perform this operation")
 				}
 
 				if globalClientOpts.Context == "" {
@@ -91,8 +92,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
-					os.Exit(1)
+					return err
 				}
 			}
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
@@ -100,33 +100,41 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				mainArtifact := true
 				secret := ""
 
-				// Check if URL starts with https or http
-				if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
-					urlAndMainAtrifactAndSecretName := strings.Split(f, ":")
-					n := len(urlAndMainAtrifactAndSecretName)
-					f = urlAndMainAtrifactAndSecretName[0] + ":" + urlAndMainAtrifactAndSecretName[1]
-					if n > 2 {
-						val, err := strconv.ParseBool(urlAndMainAtrifactAndSecretName[2])
-						if err != nil {
-							fmt.Println(err)
-						}
-						mainArtifact = val
-					}
-					if n > 3 {
-						secret = urlAndMainAtrifactAndSecretName[3]
-					}
-				}
+				f, mainArtifact, secret = parseImportURLArg(f)
 
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client importing Artifact: %s", err)
-					os.Exit(1)
+					return err
 				}
 				fmt.Printf("Microcks has discovered '%s'\n", msg)
 			}
+			return nil
 		},
 	}
 
 	return importURLCmd
+}
+
+func parseImportURLArg(f string) (string, bool, string) {
+	mainArtifact := true
+	secret := ""
+
+	// Check if URL starts with https or http
+	if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
+		parts := strings.Split(f, ":")
+		n := len(parts)
+
+		for i := n - 1; i >= 2; i-- {
+			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
+				mainArtifact = val
+				if i+1 < n {
+					secret = strings.Join(parts[i+1:], ":")
+				}
+				f = strings.Join(parts[:i], ":")
+				break
+			}
+		}
+	}
+	return f, mainArtifact, secret
 }

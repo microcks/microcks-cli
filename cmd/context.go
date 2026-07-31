@@ -27,38 +27,40 @@ microcks context http://localhost:8080
 
 # Delete Microcks context
 microcks context http://localhost:8080 --delete`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath := globalClientOpts.ConfigPath
 			localCfg, err := config.ReadLocalConfig(configPath)
-			errors.CheckError(err)
+			if err != nil {
+				return err
+			}
 			if delete {
 				if len(args) == 0 {
-					cmd.HelpFunc()(cmd, args)
-					os.Exit(1)
+					return errors.Wrapf(errors.KindUsage, "context --delete requires a CONTEXT argument")
 				}
-				err := deleteContext(args[0], configPath)
-				errors.CheckError(err)
-				return
+				return deleteContext(args[0], configPath)
 			}
 
 			if len(args) == 0 {
-				printMicrocksContexts(configPath)
-				return
+				return printMicrocksContexts(configPath)
 			}
 
 			ctxName := args[0]
-			errors.CheckConfigNil(localCfg == nil, configPath)
+			if localCfg == nil {
+				return errors.Wrapf(errors.KindUsage, "no contexts defined in %s", configPath)
+			}
 			if localCfg.CurrentContext == ctxName {
 				fmt.Printf("Already at context '%s'\n", localCfg.CurrentContext)
-				return
+				return nil
 			}
 			if _, err = localCfg.ResolveContext(ctxName); err != nil {
-				log.Fatal(err)
+				return errors.Wrap(errors.KindNotFound, err)
 			}
 			localCfg.CurrentContext = ctxName
-			err = config.WriteLocalConfig(*localCfg, configPath)
-			errors.CheckError(err)
+			if err := config.WriteLocalConfig(*localCfg, configPath); err != nil {
+				return err
+			}
 			fmt.Printf("Switched to context '%s'\n", localCfg.CurrentContext)
+			return nil
 		},
 	}
 
@@ -69,44 +71,52 @@ microcks context http://localhost:8080 --delete`,
 
 func deleteContext(context, configPath string) error {
 	localCfg, err := config.ReadLocalConfig(configPath)
-	errors.CheckError(err)
+	if err != nil {
+		return err
+	}
 	if localCfg == nil {
-		return fmt.Errorf("Nothing to logout from")
+		return errors.Wrapf(errors.KindUsage, "nothing to delete")
 	}
 	serverName, ok := localCfg.RemoveContext(context)
 	if !ok {
-		return fmt.Errorf("Context %s does not exist", context)
+		return errors.Wrapf(errors.KindNotFound, "context %q does not exist", context)
 	}
 	_ = localCfg.RemoveUser(context)
 	_ = localCfg.RemoveServer(serverName)
 
 	if localCfg.IsEmpty() {
-		err := localCfg.DeleteLocalConfig(configPath)
-		errors.CheckError(err)
+		if err := localCfg.DeleteLocalConfig(configPath); err != nil {
+			return err
+		}
 	} else {
 		if localCfg.CurrentContext == context {
 			localCfg.CurrentContext = ""
 		}
-		err = config.ValidateLocalConfig(*localCfg)
-		if err != nil {
-			return fmt.Errorf("Error in logging out")
+		if err := config.ValidateLocalConfig(*localCfg); err != nil {
+			return err
 		}
-		err = config.WriteLocalConfig(*localCfg, configPath)
-		errors.CheckError(err)
+		if err := config.WriteLocalConfig(*localCfg, configPath); err != nil {
+			return err
+		}
 	}
 	fmt.Printf("Context '%s' deleted\n", context)
 	return nil
 }
 
-func printMicrocksContexts(configPath string) {
+func printMicrocksContexts(configPath string) error {
 	localCfg, err := config.ReadLocalConfig(configPath)
-	errors.CheckError(err)
-	errors.CheckConfigNil(localCfg == nil, configPath)
+	if err != nil {
+		return err
+	}
+	if localCfg == nil {
+		return errors.Wrapf(errors.KindUsage, "no contexts defined in %s", configPath)
+	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() { _ = w.Flush() }()
 	columnNames := []string{"CURRENT", "NAME", "SERVER"}
-	_, err = fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t"))
-	errors.CheckError(err)
+	if _, err = fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
+		return err
+	}
 
 	for _, contextRef := range localCfg.Contexts {
 		context, err := localCfg.ResolveContext(contextRef.Name)
@@ -117,7 +127,9 @@ func printMicrocksContexts(configPath string) {
 		if localCfg.CurrentContext == context.Name {
 			prefix = "*"
 		}
-		_, err = fmt.Fprintf(w, "%s\t%s\t%s\n", prefix, context.Name, context.Server.Server)
-		errors.CheckError(err)
+		if _, err = fmt.Fprintf(w, "%s\t%s\t%s\n", prefix, context.Name, context.Server.Server); err != nil {
+			return err
+		}
 	}
+	return nil
 }

@@ -16,22 +16,25 @@
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/microcks/microcks-cli/version"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-func NewVersionCommand() *cobra.Command {
-	var command = &cobra.Command{
-		Use:   "version",
-		Short: "Print the version number of microcks CLI",
-		Long:  `Print the version number of microcks CLI`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("Microcks-CLI %s\n", version.Version)
-			return nil
-		},
-	}
+type usageError struct {
+	err   error
+	usage string
+}
 
-	return command
+func (e *usageError) Error() string { return e.err.Error() }
+func (e *usageError) Unwrap() error { return e.err }
+
+func usageErrorf(cmd *cobra.Command, format string, a ...any) error {
+	usage := ""
+	if cmd != nil {
+		usage = cmd.UsageString()
+	}
+	return &usageError{
+		err:   errors.Wrapf(errors.KindUsage, format, a...),
+		usage: usage,
+	}
 }

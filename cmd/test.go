@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +38,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		dryRun             bool
+		artifact           string
+		image              string
+		readyTimeout       time.Duration
+		watch              bool
+		driver             string
 	)
 	var testCmd = &cobra.Command{
 
@@ -46,7 +51,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Short: "Run tests on Microcks",
 		Long:  `Run tests on Microcks`,
 		Args:  cobra.ExactArgs(3),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			serviceRef := args[0]
 			testEndpoint := args[1]
@@ -54,26 +59,21 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			// Validate presence and values of args.
 			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
-				fmt.Fprintln(os.Stderr, "missing required argument: <apiName:apiVersion> (e.g. 'my-api:1.0')")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "missing required argument: <apiName:apiVersion> (e.g. 'my-api:1.0')")
 			}
 			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
-				fmt.Fprintln(os.Stderr, "missing required argument: <testEndpoint> (e.g. 'http://localhost:8080/api')")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "missing required argument: <testEndpoint> (e.g. 'http://localhost:8080/api')")
 			}
 			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
-				fmt.Fprintln(os.Stderr, "missing required argument: <runner> (e.g. 'HTTP', 'POSTMAN', 'OPEN_API_SCHEMA')")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "missing required argument: <runner> (e.g. 'HTTP', 'POSTMAN', 'OPEN_API_SCHEMA')")
 			}
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
-				fmt.Println("<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 			}
 
 			// Validate presence and values of flags.
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
 			}
 
 			// Collect optional HTTPS transport flags.
@@ -86,24 +86,56 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			if strings.HasSuffix(waitFor, "milli") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
 				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
+					return errors.Wrapf(errors.KindUsage, "--waitFor value %q is not a valid number", waitFor)
 				}
 				waitForMilliseconds = n
 			} else if strings.HasSuffix(waitFor, "sec") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
 				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
+					return errors.Wrapf(errors.KindUsage, "--waitFor value %q is not a valid number", waitFor)
 				}
 				waitForMilliseconds = n * 1000
 			} else if strings.HasSuffix(waitFor, "min") {
 				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
 				if err != nil {
-					fmt.Printf("--waitFor value %q is not a valid number\n", waitFor)
-					os.Exit(1)
+					return errors.Wrapf(errors.KindUsage, "--waitFor value %q is not a valid number", waitFor)
 				}
 				waitForMilliseconds = n * 60 * 1000
+			}
+
+			params := testParams{
+				serviceRef:         serviceRef,
+				testEndpoint:       testEndpoint,
+				runnerType:         runnerType,
+				secretName:         secretName,
+				waitForMillis:      waitForMilliseconds,
+				filteredOperations: filteredOperations,
+				operationsHeaders:  operationsHeaders,
+				oAuth2Context:      oAuth2Context,
+			}
+
+			if !dryRun {
+				if artifact != "" {
+					return errors.Wrapf(errors.KindUsage, "--artifact is only valid together with --dry-run")
+				}
+				if watch {
+					return errors.Wrapf(errors.KindUsage, "--watch is only valid together with --dry-run")
+				}
+				if driver != "" {
+					return errors.Wrapf(errors.KindUsage, "--driver is only valid together with --dry-run")
+				}
+			}
+
+			if dryRun {
+				// Ephemeral path: no server, no Keycloak, no prior import needed.
+				return runDryRunTest(dryRunOptions{
+					artifact:     artifact,
+					image:        image,
+					readyTimeout: readyTimeout,
+					watch:        watch,
+					driver:       driver,
+					params:       params,
+				})
 			}
 
 			var mc connectors.MicrocksClient
@@ -113,25 +145,29 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				// create client with server address
 				serverAddr = globalClientOpts.ServerAddr
-				mc = connectors.NewMicrocksClient(serverAddr)
+				var err error
+				mc, err = connectors.NewMicrocksClient(serverAddr)
+				if err != nil {
+					return err
+				}
 
 				keycloakURL, err := mc.GetKeycloakURL()
 				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
-					os.Exit(1)
+					return err
 				}
 
-				var oauthToken string = "unauthenticated-token"
+				oauthToken := "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					if err != nil {
+						return err
+					}
 
 					oauthToken, err = kc.ConnectAndGetToken()
 					if err != nil {
-						fmt.Printf("Got error when invoking Keycloak client: %s", err)
-						os.Exit(1)
+						return err
 					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
 				}
 
 				// Then - launch the test on Microcks Server.
@@ -140,13 +176,11 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			} else {
 				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
 				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+					return err
 				}
 
 				if localConfig == nil {
-					fmt.Println("Please login to perform operation...")
-					os.Exit(1)
+					return errors.Wrapf(errors.KindUsage, "please login to perform this operation")
 				}
 
 				if globalClientOpts.Context == "" {
@@ -155,54 +189,28 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 				mc, err = connectors.NewClient(*globalClientOpts)
 				if err != nil {
-					fmt.Printf("error %v", err)
-					os.Exit(1)
+					return err
 				}
 
 				ctx, err := localConfig.ResolveContext(globalClientOpts.Context)
-				errors.CheckError(err)
+				if err != nil {
+					return errors.Wrap(errors.KindNotFound, err)
+				}
 
 				serverAddr = ctx.Server.Server
 			}
 
-			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			success, testResultID, err := runTestAndWait(mc, params)
 			if err != nil {
-				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
-				os.Exit(1)
-			}
-			//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
-
-			// Finally - wait before checking and loop for some time
-			time.Sleep(1 * time.Second)
-
-			// Add 10.000ms to wait time as it's now representing the server timeout.
-			now := nowInMilliseconds()
-			future := now + waitForMilliseconds + 10000
-
-			var success = false
-			for nowInMilliseconds() < future {
-				testResultSummary, err := mc.GetTestResult(testResultID)
-				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
-					os.Exit(1)
-				}
-				success = testResultSummary.Success
-				inProgress := testResultSummary.InProgress
-				fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
-
-				if !inProgress {
-					break
-				}
-
-				fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
-				time.Sleep(2 * time.Second)
+				return err
 			}
 
 			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
 			if !success {
-				os.Exit(1)
+				return errors.ErrTestFailed
 			}
+			return nil
 		},
 	}
 
@@ -211,10 +219,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run the test against an ephemeral local Microcks container instead of a server")
+	testCmd.Flags().StringVar(&artifact, "artifact", "", "Local spec file to import on the ephemeral server (required with --dry-run)")
+	testCmd.Flags().StringVar(&image, "image", defaultDryRunImage, "Microcks uber-native image used for --dry-run")
+	testCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 90*time.Second, "How long to wait for the ephemeral container to be ready (--dry-run only)")
+	testCmd.Flags().BoolVar(&watch, "watch", false, "Watch the artifact file and re-run the test on change (--dry-run only)")
+	testCmd.Flags().StringVar(&driver, "driver", "", "Container runtime for --dry-run: 'docker' or 'podman' (default: auto-detect)")
 
 	return testCmd
-}
-
-func nowInMilliseconds() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
 }
