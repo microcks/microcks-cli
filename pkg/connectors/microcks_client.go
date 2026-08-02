@@ -48,11 +48,36 @@ type MicrocksClient interface {
 	HttpClient() *http.Client
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
+	ListServices(page int, size int) ([]Service, error)
+	GetService(ref string) (*ServiceDetail, error)
+	ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
 	GetFullTestResult(testResultID string) (*TestResult, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+}
+
+// Service represents a Microcks service summary.
+type Service struct {
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Version    string      `json:"version"`
+	Type       string      `json:"type"`
+	Operations []Operation `json:"operations,omitempty"`
+}
+
+// Operation represents a Microcks service operation.
+type Operation struct {
+	Name          string   `json:"name"`
+	Method        string   `json:"method,omitempty"`
+	ResourcePaths []string `json:"resourcePaths,omitempty"`
+}
+
+// ServiceDetail represents the Microcks service detail response used by the UI.
+type ServiceDetail struct {
+	Service     Service                      `json:"service"`
+	MessagesMap map[string][]json.RawMessage `json:"messagesMap,omitempty"`
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -373,6 +398,111 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.AuthToken = oauthToken
 }
 
+func (c *microcksClient) ListServices(page int, size int) ([]Service, error) {
+	values := url.Values{}
+	values.Set("page", strconv.Itoa(page))
+	values.Set("size", strconv.Itoa(size))
+
+	var services []Service
+	if err := c.getJSON("services", values, &services, "Microcks for listing services"); err != nil {
+		return nil, err
+	}
+	return services, nil
+}
+
+func (c *microcksClient) GetService(ref string) (*ServiceDetail, error) {
+	id := ref
+	if strings.Contains(ref, ":") {
+		serviceID, err := c.resolveServiceID(ref)
+		if err != nil {
+			return nil, err
+		}
+		id = serviceID
+	}
+
+	var detail ServiceDetail
+	if err := c.getJSON("services/"+id, nil, &detail, "Microcks for getting service detail"); err != nil {
+		return nil, err
+	}
+	return &detail, nil
+}
+
+func (c *microcksClient) ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error) {
+	values := url.Values{}
+	values.Set("page", strconv.Itoa(page))
+	values.Set("size", strconv.Itoa(size))
+	if serviceID != "" {
+		values.Set("serviceId", serviceID)
+	}
+
+	var tests []TestResultSummary
+	if err := c.getJSON("tests", values, &tests, "Microcks for listing tests"); err != nil {
+		return nil, err
+	}
+	return tests, nil
+}
+
+func (c *microcksClient) resolveServiceID(ref string) (string, error) {
+	name, version, ok := strings.Cut(ref, ":")
+	if !ok || name == "" || version == "" {
+		return "", errors.Wrapf(errors.KindUsage, "service reference %q must be <name>:<version>", ref)
+	}
+	services, err := c.ListServices(0, 100)
+	if err != nil {
+		return "", err
+	}
+	for _, service := range services {
+		if service.Name == name && service.Version == version {
+			return service.ID, nil
+		}
+	}
+	return "", errors.Wrapf(errors.KindNotFound, "service %q does not exist", ref)
+}
+
+func (c *microcksClient) getJSON(path string, query url.Values, out any, dumpLabel string) error {
+	rel := &url.URL{Path: path}
+	if len(query) > 0 {
+		rel.RawQuery = query.Encode()
+	}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	config.DumpRequestIfRequired(dumpLabel, req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, err)
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired(dumpLabel, resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, fmt.Errorf("reading Microcks response: %w", err))
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return errors.Wrapf(kind, "Microcks returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	if err := json.Unmarshal(body, out); err != nil {
+		return errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Microcks response: %w", err))
+	}
+	return nil
+}
+
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
@@ -447,77 +577,20 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
-	// Ensure we have a correct URL.
-	rel := &url.URL{Path: "tests/" + testResultID}
-	u := c.APIURL.ResolveReference(rel)
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
+	result := TestResultSummary{}
+	if err := c.getJSON("tests/"+testResultID, nil, &result, "Microcks for getting status"); err != nil {
 		return nil, err
 	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
-
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for getting status", req, false)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errors.Wrap(errors.KindConnection, err)
-	}
-	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for getting status test", resp, true)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.Wrap(errors.KindConnection, fmt.Errorf("reading test result response: %w", err))
-	}
-
-	result := TestResultSummary{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse test result response: %w", err)
-	}
-
 	return &result, nil
 }
 
 // GetFullTestResult fetches the complete TestResult including per-operation
 // (testCaseResults) detail, used by the richer --output formatters.
 func (c *microcksClient) GetFullTestResult(testResultID string) (*TestResult, error) {
-	rel := &url.URL{Path: "tests/" + testResultID}
-	u := c.APIURL.ResolveReference(rel)
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
-
-	config.DumpRequestIfRequired("Microcks for getting full test result", req, false)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	config.DumpResponseIfRequired("Microcks for getting full test result", resp, true)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	result := TestResult{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse full test result response: %w", err)
+	if err := c.getJSON("tests/"+testResultID, nil, &result, "Microcks for getting full test result"); err != nil {
+		return nil, err
 	}
-
 	return &result, nil
 }
 

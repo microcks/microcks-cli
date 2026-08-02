@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
@@ -123,25 +122,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			dirPath := args[0]
 
-			config.InsecureTLS = globalClientOpts.InsecureTLS
-			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
-
-			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-			if err != nil {
-				return err
-			}
-
-			if localConfig == nil {
-				return errors.Wrapf(errors.KindUsage, "please login to perform this operation")
-			}
-
-			if globalClientOpts.Context == "" {
-				globalClientOpts.Context = localConfig.CurrentContext
-			}
-
-			// Create client
-			mc, err := connectors.NewClient(*globalClientOpts)
+			mc, _, err := newCommandClient(globalClientOpts)
 			if err != nil {
 				return err
 			}

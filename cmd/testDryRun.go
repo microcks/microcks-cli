@@ -99,15 +99,15 @@ func setupPodman() error {
 
 func validateDryRunOptions(opts dryRunOptions) error {
 	if opts.artifact == "" {
-		return fmt.Errorf("--artifact is required with --dry-run")
+		return errors.Wrapf(errors.KindUsage, "--artifact is required with --dry-run")
 	}
 	if _, err := os.Stat(opts.artifact); err != nil {
-		return fmt.Errorf("cannot read --artifact file %q: %v", opts.artifact, err)
+		return errors.Wrapf(errors.KindUsage, "cannot read --artifact file %q: %v", opts.artifact, err)
 	}
 	// The uber-native flavor runs without Keycloak, which is what makes the
 	// zero-config dry-run possible. Fail fast on other flavors.
 	if !strings.Contains(opts.image, "-native") {
-		return fmt.Errorf("--dry-run requires the uber-native image variant (got %q). "+
+		return errors.Wrapf(errors.KindUsage, "--dry-run requires the uber-native image variant (got %q). "+
 			"Use the default or pass --image with a *-native tag", opts.image)
 	}
 	return nil
@@ -147,7 +147,7 @@ func runDryRunTest(opts dryRunOptions) error {
 	progress := progressWriter(opts.params.outputFormat)
 
 	if err := validateDryRunOptions(opts); err != nil {
-		return errors.Wrap(errors.KindUsage, err)
+		return err
 	}
 
 	// Select the container runtime (docker default, podman wired via DOCKER_HOST).
@@ -228,7 +228,7 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("failed to create file watcher: %w", err)
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to create file watcher: %w", err))
 	}
 	defer watcher.Close()
 
@@ -236,10 +236,10 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 	// (rename + create), which silently drops a watch set on the file itself.
 	artifactPath, err := filepath.Abs(opts.artifact)
 	if err != nil {
-		return fmt.Errorf("failed to resolve artifact path: %w", err)
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("failed to resolve artifact path: %w", err))
 	}
 	if err := watcher.Add(filepath.Dir(artifactPath)); err != nil {
-		return fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err)
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err))
 	}
 
 	fmt.Fprintf(progress, "\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact)

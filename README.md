@@ -71,6 +71,7 @@ microcks [command] [flags]
 | `import`     | Import API spec files from local filesystem              | [`import`](documentation/cmd/import.md)         |
 | `import-dir`  | Scan a directory and import API spec files.              | [`import-dir`](documentation/cmd/importDir.md)     |
 | `import-url` | Import API spec files directly from a remote URL         | [`import-url`](documentation/cmd/importUrl.md) |
+| `service`    | List and inspect Microcks services                       | [`service`](documentation/cmd/service.md)       |
 | `test`       | Run tests against a deployed API using selected runner   | [`test`](documentation/cmd/test.md)             |
 | `version`    | Print Microcks CLI version                               | [`version`](documentation/cmd/version.md)       |
 

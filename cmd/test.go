@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/microcks/microcks-cli/pkg/output"
@@ -82,11 +81,6 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				return errors.Wrapf(errors.KindUsage, "--output must be one of: text, json, yaml, github-actions")
 			}
 
-			// Collect optional HTTPS transport flags.
-			config.InsecureTLS = globalClientOpts.InsecureTLS
-			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
-
 			// Compute time to wait in milliseconds.
 			var waitForMilliseconds int64
 			if strings.HasSuffix(waitFor, "milli") {
@@ -146,66 +140,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				})
 			}
 
-			var mc connectors.MicrocksClient
-			var serverAddr string
-
-			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
-
-				// create client with server address
-				serverAddr = globalClientOpts.ServerAddr
-				var err error
-				mc, err = connectors.NewMicrocksClient(serverAddr)
-				if err != nil {
-					return err
-				}
-
-				keycloakURL, err := mc.GetKeycloakURL()
-				if err != nil {
-					return err
-				}
-
-				oauthToken := "unauthenticated-token"
-				if keycloakURL != "null" {
-					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
-					if err != nil {
-						return err
-					}
-
-					oauthToken, err = kc.ConnectAndGetToken()
-					if err != nil {
-						return err
-					}
-				}
-
-				// Then - launch the test on Microcks Server.
-				mc.SetOAuthToken(oauthToken)
-
-			} else {
-				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-				if err != nil {
-					return err
-				}
-
-				if localConfig == nil {
-					return errors.Wrapf(errors.KindUsage, "please login to perform this operation")
-				}
-
-				if globalClientOpts.Context == "" {
-					globalClientOpts.Context = localConfig.CurrentContext
-				}
-
-				mc, err = connectors.NewClient(*globalClientOpts)
-				if err != nil {
-					return err
-				}
-
-				ctx, err := localConfig.ResolveContext(globalClientOpts.Context)
-				if err != nil {
-					return errors.Wrap(errors.KindNotFound, err)
-				}
-
-				serverAddr = ctx.Server.Server
+			mc, serverAddr, err := newCommandClient(globalClientOpts)
+			if err != nil {
+				return err
 			}
 
 			success, testResultID, err := runTestAndWait(mc, params)
@@ -234,6 +171,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().BoolVar(&watch, "watch", false, "Watch the artifact file and re-run the test on change (--dry-run only)")
 	testCmd.Flags().StringVar(&driver, "driver", "", "Container runtime for --dry-run: 'docker' or 'podman' (default: auto-detect)")
 	testCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text, json, yaml, or github-actions")
+
+	testCmd.AddCommand(newTestListCommand(globalClientOpts))
+	testCmd.AddCommand(newTestGetCommand(globalClientOpts))
 
 	return testCmd
 }

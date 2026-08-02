@@ -13,18 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package main
+package output
 
 import (
-	"github.com/microcks/microcks-cli/cmd"
+	"encoding/json"
+	"fmt"
+	"io"
 )
 
-func main() {
-	// cmd.Handle is the single exit point: it prints the error to stderr and
-	// maps its Failure Kind to an exit code. Nothing else in the tree exits.
-	command, err := cmd.NewCommand()
+// WriteJSON writes value as indented JSON followed by a newline.
+func WriteJSON(w io.Writer, value any) error {
+	b, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
-		cmd.Handle(err)
+		return err
 	}
-	cmd.Handle(command.Execute())
+	_, err = fmt.Fprintln(w, string(b))
+	return err
+}
+
+// IsTextOrJSON reports whether s is a supported output value for list/get
+// commands that have not opted into the full test-result formatter set.
+func IsTextOrJSON(s string) bool {
+	return s == "text" || s == "json"
 }
