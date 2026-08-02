@@ -1,0 +1,62 @@
+name: policy-guards
+
+on:
+  push:
+    paths:
+      - '**/*.go'
+      - '.github/workflows/policy-guards.yml'
+  pull_request:
+    paths:
+      - '**/*.go'
+      - '.github/workflows/policy-guards.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  policy-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+      - name: Guard Go copyright headers
+        run: |
+          missing=""
+          while IFS= read -r file; do
+            if ! grep -q "Copyright The Microcks Authors" "$file"; then
+              missing+="${file}"$'\n'
+            fi
+          done < <(git ls-files '*.go')
+
+          if [[ -n "$missing" ]]; then
+            echo "::error::Go files missing Microcks copyright header:"
+            printf "%s" "$missing"
+            exit 1
+          fi
+
+      - name: Guard against silently ignored errors
+        run: |
+          # Avoid reintroducing review issues where malformed responses or local
+          # failures are discarded instead of being returned as classified errors.
+          if grep -rnE '(^|[^[:alnum:]_])_ =|, _ :=|fmt\.Println\(err\)' --include='*.go' cmd pkg; then
+            echo "::error::Potential silently ignored error found. Handle it explicitly or return errors.Wrap(kind, err)."
+            exit 1
+          fi
+
+      - name: Guard against stray process exits
+        run: |
+          # Library and command packages must return classified errors, never
+          # exit or panic. Only the explicit process entrypoints may exit.
+          # See documentation/error-handling.md.
+          matches="$(git grep -nE '(os\.Exit|log\.Fatal|panic\()' -- '*.go' \
+            ':!**/*_test.go' \
+            ':!cmd/exit.go' \
+            ':!main.go' \
+            ':!watcher/main.go' || true)"
+
+          if [[ -n "$matches" ]]; then
+            printf "%s\n" "$matches"
+            echo "::error::os.Exit/log.Fatal/panic found outside approved entrypoints — return errors.Wrap(kind, err) instead."
+            exit 1
+          fi

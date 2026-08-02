@@ -100,15 +100,15 @@ func setupPodman() error {
 
 func validateDryRunOptions(opts dryRunOptions) error {
 	if opts.artifact == "" {
-		return fmt.Errorf("--artifact is required with --dry-run")
+		return errors.Wrapf(errors.KindUsage, "--artifact is required with --dry-run")
 	}
 	if _, err := os.Stat(opts.artifact); err != nil {
-		return fmt.Errorf("cannot read --artifact file %q: %v", opts.artifact, err)
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("cannot read --artifact file %q: %w", opts.artifact, err))
 	}
 	// The uber-native flavor runs without Keycloak, which is what makes the
 	// zero-config dry-run possible. Fail fast on other flavors.
 	if !strings.Contains(opts.image, "-native") {
-		return fmt.Errorf("--dry-run requires the uber-native image variant (got %q). "+
+		return errors.Wrapf(errors.KindUsage, "--dry-run requires the uber-native image variant (got %q). "+
 			"Use the default or pass --image with a *-native tag", opts.image)
 	}
 	return nil
@@ -144,7 +144,7 @@ func rewriteLocalEndpoint(testEndpoint string) (string, int, bool) {
 
 func runDryRunTest(opts dryRunOptions) error {
 	if err := validateDryRunOptions(opts); err != nil {
-		return errors.Wrap(errors.KindUsage, err)
+		return err
 	}
 
 	// Select the container runtime (docker default, podman wired via DOCKER_HOST).

@@ -50,8 +50,8 @@ func CreateTLSConfig() *tls.Config {
 	}
 	if len(CaCertPaths) > 0 {
 		// Get the SystemCertPool, continue with an empty pool on error
-		rootCAs, _ := x509.SystemCertPool()
-		if rootCAs == nil {
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil || rootCAs == nil {
 			rootCAs = x509.NewCertPool()
 		}
 

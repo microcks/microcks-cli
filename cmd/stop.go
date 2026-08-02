@@ -75,10 +75,10 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				if !ok {
 					return errors.Wrapf(errors.KindNotFound, "context %q does not exist", ctx.Name)
 				}
-				_ = localConfig.RemoveServer(ctx.Server.Server)
-				_ = localConfig.RemoveUser(ctx.User.Name)
-				_ = localConfig.RemoveAuth(ctx.Server.Server)
-				_ = localConfig.RemoveInstance(instance.Name)
+				localConfig.RemoveServer(ctx.Server.Server)
+				localConfig.RemoveUser(ctx.User.Name)
+				localConfig.RemoveAuth(ctx.Server.Server)
+				localConfig.RemoveInstance(instance.Name)
 
 				localConfig.CurrentContext = ""
 				log.Printf("Instance %s removed successfully", instance.Name)

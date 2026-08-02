@@ -169,7 +169,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				_, _, err = parser.ParseUnverified(authToken, &claims)
 
 				if err != nil {
-					fmt.Println(err)
+					return errors.Wrap(errors.KindAPI, fmt.Errorf("parsing authentication token: %w", err))
 				}
 
 				em := StringField(claims, "preferred_username")
@@ -332,7 +332,9 @@ func oauth2login(
 	fmt.Printf("Authentication successful\n")
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
-	_ = srv.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		return "", "", errors.Wrap(errors.KindEnvironment, fmt.Errorf("shutting down temporary HTTP server: %w", err))
+	}
 
 	return tokenString, refreshToken, nil
 }

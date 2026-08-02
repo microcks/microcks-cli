@@ -30,6 +30,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/moby/term"
 )
 
@@ -141,7 +142,10 @@ func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) 
 	ctx := context.Background()
 
 	// Define exposed port and bindings
-	exposedPort, _ := nat.NewPort("tcp", "8080")
+	exposedPort, err := nat.NewPort("tcp", "8080")
+	if err != nil {
+		return "", errors.Wrap(errors.KindEnvironment, fmt.Errorf("creating exposed container port: %w", err))
+	}
 	portBindings := nat.PortMap{
 		exposedPort: []nat.PortBinding{
 			{

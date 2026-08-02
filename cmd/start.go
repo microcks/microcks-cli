@@ -63,8 +63,8 @@ microcks start --name [name of you container/instance]`,
 				localConfig = &config.LocalConfig{}
 			}
 
-			instance, _ := localConfig.GetInstance(name)
-			if instance == nil {
+			instance, err := localConfig.GetInstance(name)
+			if err != nil {
 				instance = &config.Instance{}
 			}
 

@@ -147,10 +147,13 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 		return nil, errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak OIDC config: %w", err))
 	}
 
-	authURL, _ := openIDResp["authorization_endpoint"].(string)
-	tokenURL, _ := openIDResp["token_endpoint"].(string)
-	if authURL == "" || tokenURL == "" {
-		return nil, errors.Wrapf(errors.KindAPI, "Keycloak OIDC config missing authorization_endpoint or token_endpoint")
+	authURL, ok := openIDResp["authorization_endpoint"].(string)
+	if !ok || authURL == "" {
+		return nil, errors.Wrapf(errors.KindAPI, "Keycloak OIDC config missing or invalid authorization_endpoint")
+	}
+	tokenURL, ok := openIDResp["token_endpoint"].(string)
+	if !ok || tokenURL == "" {
+		return nil, errors.Wrapf(errors.KindAPI, "Keycloak OIDC config missing or invalid token_endpoint")
 	}
 
 	return &oauth2.Config{
@@ -201,10 +204,13 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 		return "", "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak token response: %w", err))
 	}
 
-	authToken, _ := openIDResp["access_token"].(string)
-	refreshToken, _ := openIDResp["refresh_token"].(string)
-	if authToken == "" || refreshToken == "" {
-		return "", "", errors.Wrapf(errors.KindAPI, "Keycloak token response missing access_token or refresh_token")
+	authToken, ok := openIDResp["access_token"].(string)
+	if !ok || authToken == "" {
+		return "", "", errors.Wrapf(errors.KindAPI, "Keycloak token response missing or invalid access_token")
+	}
+	refreshToken, ok := openIDResp["refresh_token"].(string)
+	if !ok || refreshToken == "" {
+		return "", "", errors.Wrapf(errors.KindAPI, "Keycloak token response missing or invalid refresh_token")
 	}
 
 	return authToken, refreshToken, nil

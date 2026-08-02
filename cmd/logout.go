@@ -74,7 +74,7 @@ func logoutContext(target, configPath string) error {
 
 	err = config.ValidateLocalConfig(*localCfg)
 	if err != nil {
-		return fmt.Errorf("Error in loging out: %s", err)
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("logging out leaves local config invalid: %w", err))
 	}
 
 	return config.WriteLocalConfig(*localCfg, configPath)
