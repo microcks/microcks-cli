@@ -18,6 +18,7 @@ package connectors
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -49,6 +50,7 @@ type ContainerOpts struct {
 	Port       string
 	AutoRemove bool
 	Name       string
+	Output     io.Writer
 }
 
 const (
@@ -136,7 +138,7 @@ func NewPodmanClient() (*containerClient, error) {
 	return &containerClient{cli: cli}, nil
 }
 
-func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) {
+func (cli *containerClient) CreateContainer(opts ContainerOpts) (containerID string, resultErr error) {
 	ctx := context.Background()
 
 	// Define exposed port and bindings
@@ -154,13 +156,29 @@ func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil {
+			if resultErr == nil {
+				resultErr = fmt.Errorf("closing image pull stream: %w", err)
+			} else {
+				resultErr = fmt.Errorf("%v; closing image pull stream: %w", resultErr, err)
+			}
+		}
+	}()
 
-	fd, isTerminal := term.GetFdInfo(os.Stdout)
+	progress := opts.Output
+	if progress == nil {
+		progress = os.Stdout
+	}
+	var fd uintptr
+	var isTerminal bool
+	if outputFile, ok := progress.(*os.File); ok {
+		fd, isTerminal = term.GetFdInfo(outputFile)
+	}
 
 	err = jsonmessage.DisplayJSONMessagesStream(
 		out,
-		os.Stdout,
+		progress,
 		fd,
 		isTerminal,
 		nil,
