@@ -43,6 +43,7 @@ func NewCommand() (*cobra.Command, error) {
 	command.AddCommand(NewImportCommand(&clientOpts))
 	command.AddCommand(NewImportDirCommand(&clientOpts))
 	command.AddCommand(NewVersionCommand())
+	command.AddCommand(NewCapabilitiesCommand())
 	command.AddCommand(NewTestCommand(&clientOpts))
 	command.AddCommand(NewServiceCommand(&clientOpts))
 	command.AddCommand(NewImportURLCommand(&clientOpts))
