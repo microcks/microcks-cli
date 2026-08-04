@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*/
+ */
 
 package cmd
 
@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -88,7 +89,10 @@ func executeCLIForTest(t *testing.T, args ...string) (string, error) {
 	if err != nil {
 		t.Fatalf("NewCommand returned error: %v", err)
 	}
-	command.SetArgs(append(args, "--config", t.TempDir()+"/config.yaml"))
+	if !slices.Contains(args, "--config") {
+		args = append(args, "--config", t.TempDir()+"/config.yaml")
+	}
+	command.SetArgs(args)
 
 	execErr := command.Execute()
 	_ = w.Close()

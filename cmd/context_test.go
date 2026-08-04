@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -23,6 +24,49 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestContextListOutputsJSON(t *testing.T) {
+	configPath := t.TempDir() + "/config.yaml"
+	require.NoError(t, os.WriteFile(configPath, []byte(testConfig), 0o600))
+
+	out, err := executeCLIForTest(t, "context", "--output", "json", "--config", configPath)
+	require.NoError(t, err)
+
+	var contexts []contextSummary
+	require.NoError(t, json.Unmarshal([]byte(out), &contexts))
+	require.Len(t, contexts, 2)
+	assert.Equal(t, "http://localhost:8083", contexts[1].Name)
+	assert.True(t, contexts[1].Current)
+}
+
+func TestContextListOutputsEmptyJSONArrayWithoutConfig(t *testing.T) {
+	configPath := t.TempDir() + "/missing-config.yaml"
+
+	out, err := executeCLIForTest(t, "context", "--output", "json", "--config", configPath)
+	require.NoError(t, err)
+	assert.JSONEq(t, "[]", out)
+}
+
+func TestContextUseOutputsJSON(t *testing.T) {
+	configPath := t.TempDir() + "/config.yaml"
+	require.NoError(t, os.WriteFile(configPath, []byte(testConfig), 0o600))
+
+	out, err := executeCLIForTest(
+		t,
+		"context",
+		"http://localhost:8080",
+		"--output",
+		"json",
+		"--config",
+		configPath,
+	)
+	require.NoError(t, err)
+
+	var result contextMutationResult
+	require.NoError(t, json.Unmarshal([]byte(out), &result))
+	assert.Equal(t, "selected", result.Action)
+	assert.Equal(t, "http://localhost:8080", result.Server)
+}
 
 const testConfig = `current-context: http://localhost:8083
 contexts:
