@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/microcks/microcks-cli/pkg/output"
 )
 
@@ -38,6 +39,7 @@ type testParams struct {
 	oAuth2Context      string
 	outputFormat       string
 	artifactPath       string
+	suppressOutput     bool
 }
 
 // progressWriter returns where human progress/diagnostics should go. For
@@ -78,18 +80,24 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 		}
 		success = testResultSummary.Success
 		inProgress := testResultSummary.InProgress
-		fmt.Fprintf(progress, "MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
+		if _, err := fmt.Fprintf(progress, "MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress)); err != nil {
+			return false, testResultID, errors.Wrap(errors.KindEnvironment, err)
+		}
 
 		if !inProgress {
 			break
 		}
 
-		fmt.Fprintln(progress, "MicrocksTester waiting for 2 seconds before checking again or exiting.")
+		if _, err := fmt.Fprintln(progress, "MicrocksTester waiting for 2 seconds before checking again or exiting."); err != nil {
+			return false, testResultID, errors.Wrap(errors.KindEnvironment, err)
+		}
 		time.Sleep(2 * time.Second)
 	}
 
-	if err := renderTestResult(mc, testResultID, params.outputFormat, params.artifactPath); err != nil {
-		return false, testResultID, err
+	if !params.suppressOutput {
+		if err := renderTestResult(mc, testResultID, params.outputFormat, params.artifactPath); err != nil {
+			return false, testResultID, err
+		}
 	}
 
 	return success, testResultID, nil

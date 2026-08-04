@@ -32,6 +32,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/testcontainers/testcontainers-go"
 	microcks "microcks.io/testcontainers-go"
 )
@@ -141,10 +142,25 @@ func rewriteLocalEndpoint(testEndpoint string) (string, int, bool) {
 	return u.String(), port, true
 }
 
-func runDryRunTest(opts dryRunOptions) error {
+func runDryRunTest(opts dryRunOptions) (resultErr error) {
 	// Progress/diagnostics go to stderr for machine output formats so stdout
 	// carries only the formatted result.
 	progress := progressWriter(opts.params.outputFormat)
+	eventMode := opts.watch && opts.params.outputFormat == string(output.FormatJSON)
+	var events *dryRunEventWriter
+	if eventMode {
+		events = newDryRunEventWriter(os.Stdout)
+		defer func() {
+			if err := events.emit(dryRunWatchEvent{Type: "stopped"}); err != nil {
+				resultErr = errors.Wrapf(
+					errors.KindEnvironment,
+					"writing dry-run stopped event: %v (previous error: %v)",
+					err,
+					resultErr,
+				)
+			}
+		}()
+	}
 
 	if err := validateDryRunOptions(opts); err != nil {
 		return err
@@ -166,30 +182,62 @@ func runDryRunTest(opts dryRunOptions) error {
 	// A localhost test endpoint refers to the user's machine, not the
 	// container: expose the port and point Microcks at the host gateway.
 	if rewritten, hostPort, ok := rewriteLocalEndpoint(opts.params.testEndpoint); ok {
-		fmt.Fprintf(progress, "Test endpoint %s is local: reaching it from the container as %s\n", opts.params.testEndpoint, rewritten)
+		if _, err := fmt.Fprintf(progress, "Test endpoint %s is local: reaching it from the container as %s\n", opts.params.testEndpoint, rewritten); err != nil {
+			return errors.Wrap(errors.KindEnvironment, err)
+		}
 		opts.params.testEndpoint = rewritten
 		containerOpts = append(containerOpts, testcontainers.WithHostPortAccess(hostPort))
 	}
 
-	fmt.Fprintf(progress, "Starting ephemeral Microcks container (%s)...\n", opts.image)
+	if _, err := fmt.Fprintf(progress, "Starting ephemeral Microcks container (%s)...\n", opts.image); err != nil {
+		return errors.Wrap(errors.KindEnvironment, err)
+	}
 	startCtx, startCancel := context.WithTimeout(ctx, opts.readyTimeout)
 	defer startCancel()
 
 	container, err := microcks.Run(startCtx, opts.image, containerOpts...)
 	if err != nil {
 		if container != nil {
-			terminateContainer(container, progress)
+			if terminateErr := terminateContainer(container, progress); terminateErr != nil {
+				return errors.Wrapf(
+					errors.KindEnvironment,
+					"failed to start ephemeral Microcks container: %v; cleanup also failed: %v",
+					err,
+					terminateErr,
+				)
+			}
 		}
 		return errors.Wrapf(errors.KindEnvironment, "failed to start ephemeral Microcks container: %v. "+
 			"Check that the container runtime is running, the port is free and the image is reachable (or raise --ready-timeout)", err)
 	}
-	defer terminateContainer(container, progress)
+	defer func() {
+		if err := terminateContainer(container, progress); err != nil {
+			resultErr = errors.Wrapf(
+				errors.KindEnvironment,
+				"tearing down ephemeral Microcks container: %v (previous error: %v)",
+				err,
+				resultErr,
+			)
+		}
+	}()
 
 	endpoint, err := container.HttpEndpoint(ctx)
 	if err != nil {
 		return errors.Wrapf(errors.KindEnvironment, "failed to resolve ephemeral Microcks endpoint: %v", err)
 	}
-	fmt.Fprintf(progress, "Ephemeral Microcks is ready at %s\n", endpoint)
+	if _, err := fmt.Fprintf(progress, "Ephemeral Microcks is ready at %s\n", endpoint); err != nil {
+		return errors.Wrap(errors.KindEnvironment, err)
+	}
+	if events != nil {
+		if err := events.emit(dryRunWatchEvent{Type: "ready", Endpoint: endpoint}); err != nil {
+			return errors.Wrap(errors.KindEnvironment, err)
+		}
+		if err := events.emit(dryRunWatchEvent{
+			Type: "imported", Artifact: opts.artifact, Service: opts.params.serviceRef,
+		}); err != nil {
+			return errors.Wrap(errors.KindEnvironment, err)
+		}
+	}
 
 	// The uber-native image runs without Keycloak: a headless client with
 	// the unauthenticated token is enough.
@@ -199,9 +247,22 @@ func runDryRunTest(opts dryRunOptions) error {
 	}
 	mc.SetOAuthToken("unauthenticated-token")
 
-	success, testResultID, err := runTestAndWait(mc, opts.params)
+	params := opts.params
+	params.suppressOutput = eventMode
+	success, testResultID, err := runTestAndWait(mc, params)
 	if err != nil {
+		if emitErr := emitDryRunError(events, err); emitErr != nil {
+			return emitErr
+		}
 		return err
+	}
+	if events != nil {
+		if err := events.emitTestResult(mc, testResultID); err != nil {
+			return errors.Wrap(errors.KindAPI, err)
+		}
+		if err := events.emit(dryRunWatchEvent{Type: "waiting"}); err != nil {
+			return errors.Wrap(errors.KindEnvironment, err)
+		}
 	}
 
 	if !opts.watch {
@@ -210,27 +271,52 @@ func runDryRunTest(opts dryRunOptions) error {
 		}
 		return errors.ErrTestFailed
 	}
-	printDetailsLink(progress, endpoint, testResultID)
-	return watchAndRerun(ctx, mc, endpoint, opts)
+	if err := printDetailsLink(progress, endpoint, testResultID); err != nil {
+		return err
+	}
+	return watchAndRerun(ctx, mc, endpoint, opts, events)
 }
 
-func terminateContainer(container *microcks.MicrocksContainer, progress io.Writer) {
+func terminateContainer(container *microcks.MicrocksContainer, progress io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	fmt.Fprintln(progress, "Tearing down ephemeral Microcks container...")
-	if err := container.Terminate(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to terminate container %s: %s\n", container.GetContainerID(), err)
+	if _, err := fmt.Fprintln(progress, "Tearing down ephemeral Microcks container..."); err != nil {
+		return errors.Wrap(errors.KindEnvironment, err)
 	}
+	if err := container.Terminate(ctx); err != nil {
+		return errors.Wrapf(
+			errors.KindEnvironment,
+			"failed to terminate container %s: %v",
+			container.GetContainerID(),
+			err,
+		)
+	}
+	return nil
 }
 
-func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr string, opts dryRunOptions) error {
+func watchAndRerun(
+	ctx context.Context,
+	mc connectors.MicrocksClient,
+	serverAddr string,
+	opts dryRunOptions,
+	events *dryRunEventWriter,
+) (resultErr error) {
 	progress := progressWriter(opts.params.outputFormat)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to create file watcher: %w", err))
 	}
-	defer watcher.Close()
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			resultErr = errors.Wrapf(
+				errors.KindEnvironment,
+				"closing file watcher: %v (previous error: %v)",
+				err,
+				resultErr,
+			)
+		}
+	}()
 
 	// Watch the directory, not the file: editors replace files on save
 	// (rename + create), which silently drops a watch set on the file itself.
@@ -242,7 +328,9 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to watch %s: %w", filepath.Dir(artifactPath), err))
 	}
 
-	fmt.Fprintf(progress, "\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact)
+	if _, err := fmt.Fprintf(progress, "\nWatching %s for changes — press Ctrl+C to stop.\n", opts.artifact); err != nil {
+		return errors.Wrap(errors.KindEnvironment, err)
+	}
 
 	rerun := make(chan struct{}, 1)
 	var debounce *time.Timer
@@ -250,7 +338,9 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(progress, "\nStopping watch mode.")
+			if _, err := fmt.Fprintln(progress, "\nStopping watch mode."); err != nil {
+				return errors.Wrap(errors.KindEnvironment, err)
+			}
 			return nil
 
 		case event, ok := <-watcher.Events:
@@ -279,32 +369,88 @@ func watchAndRerun(ctx context.Context, mc connectors.MicrocksClient, serverAddr
 			if !ok {
 				return nil
 			}
-			fmt.Fprintf(os.Stderr, "Watch error: %s\n", err)
+			if _, writeErr := fmt.Fprintf(os.Stderr, "Watch error: %s\n", err); writeErr != nil {
+				return errors.Wrap(errors.KindEnvironment, writeErr)
+			}
+			if emitErr := emitDryRunError(events, err); emitErr != nil {
+				return emitErr
+			}
 
 		case <-rerun:
-			fmt.Fprintln(progress, strings.Repeat("-", 60))
-			fmt.Fprintf(progress, "Artifact changed, re-importing %s ...\n", opts.artifact)
+			if _, err := fmt.Fprintln(progress, strings.Repeat("-", 60)); err != nil {
+				return errors.Wrap(errors.KindEnvironment, err)
+			}
+			if _, err := fmt.Fprintf(progress, "Artifact changed, re-importing %s ...\n", opts.artifact); err != nil {
+				return errors.Wrap(errors.KindEnvironment, err)
+			}
 			if _, err := mc.UploadArtifact(opts.artifact, true); err != nil {
 				// Invalid spec mid-edit is normal in a TDD loop: report and
 				// keep watching, the next valid save recovers.
-				fmt.Fprintf(os.Stderr, "Re-import failed, waiting for next change: %s\n", err)
+				if _, writeErr := fmt.Fprintf(os.Stderr, "Re-import failed, waiting for next change: %s\n", err); writeErr != nil {
+					return errors.Wrap(errors.KindEnvironment, writeErr)
+				}
+				if emitErr := emitDryRunError(events, err); emitErr != nil {
+					return emitErr
+				}
 				continue
 			}
-			success, testResultID, err := runTestAndWait(mc, opts.params)
+			if events != nil {
+				if err := events.emit(dryRunWatchEvent{
+					Type: "imported", Artifact: opts.artifact, Service: opts.params.serviceRef,
+				}); err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
+			}
+			params := opts.params
+			params.suppressOutput = events != nil
+			success, testResultID, err := runTestAndWait(mc, params)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Test run failed, waiting for next change: %s\n", err)
+				if _, writeErr := fmt.Fprintf(os.Stderr, "Test run failed, waiting for next change: %s\n", err); writeErr != nil {
+					return errors.Wrap(errors.KindEnvironment, writeErr)
+				}
+				if emitErr := emitDryRunError(events, err); emitErr != nil {
+					return emitErr
+				}
 				continue
 			}
-			printDetailsLink(progress, serverAddr, testResultID)
+			if events != nil {
+				if err := events.emitTestResult(mc, testResultID); err != nil {
+					if emitErr := emitDryRunError(events, err); emitErr != nil {
+						return emitErr
+					}
+					continue
+				}
+				if err := events.emit(dryRunWatchEvent{Type: "waiting"}); err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
+			}
+			if err := printDetailsLink(progress, serverAddr, testResultID); err != nil {
+				return err
+			}
 			if success {
-				fmt.Fprintln(progress, "Contract test PASSED — waiting for next change.")
+				if _, err := fmt.Fprintln(progress, "Contract test PASSED — waiting for next change."); err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 			} else {
-				fmt.Fprintln(progress, "Contract test FAILED — waiting for next change.")
+				if _, err := fmt.Fprintln(progress, "Contract test FAILED — waiting for next change."); err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 			}
 		}
 	}
 }
 
-func printDetailsLink(progress io.Writer, serverAddr, testResultID string) {
-	fmt.Fprintf(progress, "Test details (live while watching): %s/#/tests/%s\n", serverAddr, testResultID)
+func emitDryRunError(events *dryRunEventWriter, sourceErr error) error {
+	if events == nil {
+		return nil
+	}
+	if err := events.emit(dryRunWatchEvent{Type: "error", Message: sourceErr.Error()}); err != nil {
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("writing dry-run error event: %w", err))
+	}
+	return nil
+}
+
+func printDetailsLink(progress io.Writer, serverAddr, testResultID string) error {
+	_, err := fmt.Fprintf(progress, "Test details (live while watching): %s/#/tests/%s\n", serverAddr, testResultID)
+	return errors.Wrap(errors.KindEnvironment, err)
 }

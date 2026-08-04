@@ -67,3 +67,17 @@ One of:
 | `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
 | `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
 | `--microcksURL`          | Microcks API URL                            |
+
+### Structured output contracts
+
+`test list --output json` writes a JSON array of test-result summaries.
+`test get --output json` writes one complete test result, including its
+`testCaseResults` when present. Integrations should check for the
+`test.list.json` and `test.get.json` capabilities before depending on these
+contracts.
+
+`microcks test ... --output json` and one-shot dry-run tests write the completed
+test result to stdout while progress and diagnostics go to stderr. Dry-run
+watch mode writes one JSON event per line. Consumers should require
+`test.dry-run.watch.events.json` and handle `ready`, `imported`, `test-result`,
+`waiting`, `error`, and `stopped`.
