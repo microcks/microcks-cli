@@ -32,6 +32,7 @@ microcks import ./api.yaml --microcksURL <microcks-url>
 | ----------- | --------------------------------------------------- |
 | `-h, --help`| help for import                                     |
 | `--watch`   | Watch the file(s) and auto-reimport them on changes |
+| `--output`  | Output format: `text` or `json` (`json` cannot be combined with `--watch`) |
 
 ### Options Inherited from Parent Commands
 | Flag                     | Description                                 |
