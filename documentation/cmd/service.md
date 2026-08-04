@@ -41,3 +41,14 @@ microcks service get "E-Commerce Platform API:2.0.0" --output json
 | `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
 | `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
 | `--microcksURL`          | Microcks API URL                            |
+
+### JSON contracts
+
+`service list --output json` writes a JSON array of service summaries. Each
+summary includes `id`, `name`, `version`, and `type`, and may include
+`operations`.
+
+`service get --output json` writes an object containing `service` and, when
+available, `messagesMap`. Integrations should check for the
+`service.list.json` and `service.get.json` capabilities before depending on
+these contracts.
