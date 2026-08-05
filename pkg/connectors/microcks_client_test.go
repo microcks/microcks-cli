@@ -1,3 +1,19 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package connectors
 
 import (
@@ -8,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
 )
 
 func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
@@ -54,7 +72,9 @@ func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(expectedResponse))
+		if _, err := w.Write([]byte(expectedResponse)); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -91,7 +111,9 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 			t.Fatalf("unexpected mainArtifact value: %s", got)
 		}
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(expectedBody))
+		if _, err := w.Write([]byte(expectedBody)); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -106,5 +128,117 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 	}
 	if strings.TrimSpace(msg) != expectedBody {
 		t.Fatalf("expected response body %q, got %q", expectedBody, msg)
+	}
+}
+
+func TestGetKeycloakURLRejectsMalformedConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "missing enabled",
+			body: `{"auth-server-url":"http://keycloak","realm":"microcks"}`,
+			want: "enabled",
+		},
+		{
+			name: "invalid auth server url",
+			body: `{"enabled":true,"auth-server-url":42,"realm":"microcks"}`,
+			want: "auth-server-url",
+		},
+		{
+			name: "invalid realm",
+			body: `{"enabled":true,"auth-server-url":"http://keycloak","realm":42}`,
+			want: "realm",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/keycloak/config" {
+					t.Fatalf("unexpected path: %s", r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(tt.body)); err != nil {
+					t.Fatalf("failed to write response: %v", err)
+				}
+			}))
+			defer server.Close()
+
+			client, err := NewMicrocksClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewMicrocksClient returned error: %v", err)
+			}
+
+			_, err = client.GetKeycloakURL()
+			if err == nil {
+				t.Fatal("GetKeycloakURL returned nil error")
+			}
+			if got := microckserrors.KindOf(err); got != microckserrors.KindAPI {
+				t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindAPI)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error %q does not mention %q", err.Error(), tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateTestResultClassifiesMalformedResponses(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "invalid json", body: `not-json`, want: "parse test creation response"},
+		{name: "missing id", body: `{}`, want: "missing 'id'"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/tests" {
+					t.Fatalf("unexpected path: %s", r.URL.Path)
+				}
+				w.WriteHeader(http.StatusCreated)
+				if _, err := w.Write([]byte(tt.body)); err != nil {
+					t.Fatalf("failed to write response: %v", err)
+				}
+			}))
+			defer server.Close()
+
+			client, err := NewMicrocksClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewMicrocksClient returned error: %v", err)
+			}
+
+			_, err = client.CreateTestResult("service:1.0", "http://example.test", "OPEN_API_SCHEMA", "", 1000, "", "", "")
+			if err == nil {
+				t.Fatal("CreateTestResult returned nil error")
+			}
+			if got := microckserrors.KindOf(err); got != microckserrors.KindAPI {
+				t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindAPI)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error %q does not mention %q", err.Error(), tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateTestResultRejectsInvalidFilteredOperations(t *testing.T) {
+	client, err := NewMicrocksClient("http://localhost:8585")
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+
+	_, err = client.CreateTestResult("service:1.0", "http://example.test", "OPEN_API_SCHEMA", "", 1000, "{", "", "")
+	if err == nil {
+		t.Fatal("CreateTestResult returned nil error")
+	}
+	if got := microckserrors.KindOf(err); got != microckserrors.KindUsage {
+		t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindUsage)
 	}
 }

@@ -1,3 +1,19 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import (
@@ -59,10 +75,10 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				if !ok {
 					return errors.Wrapf(errors.KindNotFound, "context %q does not exist", ctx.Name)
 				}
-				_ = localConfig.RemoveServer(ctx.Server.Server)
-				_ = localConfig.RemoveUser(ctx.User.Name)
-				_ = localConfig.RemoveAuth(ctx.Server.Server)
-				_ = localConfig.RemoveInstance(instance.Name)
+				localConfig.RemoveServer(ctx.Server.Server)
+				localConfig.RemoveUser(ctx.User.Name)
+				localConfig.RemoveAuth(ctx.Server.Server)
+				localConfig.RemoveInstance(instance.Name)
 
 				localConfig.CurrentContext = ""
 				log.Printf("Instance %s removed successfully", instance.Name)

@@ -45,6 +45,13 @@ Microcks has adopted a Code of Conduct that we expect project participants to ad
 
 We use Github to host code, to track issues and feature requests, as well as accept pull requests.
 
+## Error handling
+
+Code under `pkg/` and `cmd/` must return errors, never exit or panic on a runtime
+error: wrap the failure with a Kind (`return errors.Wrap(errors.KindConnection, err)`)
+and let it flow up. Only the `main` entrypoints and `cmd.Handle` exit the process.
+See [documentation/error-handling.md](documentation/error-handling.md); CI enforces this.
+
 ## Issues
 
 [Open an issue](https://github.com/microcks/microcks/issues/new) **only** if you want to report a bug or a feature. Don't open issues for questions or support, instead join our [Discord #support channel](https://microcks.io/discord-invite) or our [GitHub discussions](https://github.com/orgs/microcks/discussions) and ask there. 

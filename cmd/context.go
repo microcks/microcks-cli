@@ -1,8 +1,23 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -81,8 +96,8 @@ func deleteContext(context, configPath string) error {
 	if !ok {
 		return errors.Wrapf(errors.KindNotFound, "context %q does not exist", context)
 	}
-	_ = localCfg.RemoveUser(context)
-	_ = localCfg.RemoveServer(serverName)
+	localCfg.RemoveUser(context)
+	localCfg.RemoveServer(serverName)
 
 	if localCfg.IsEmpty() {
 		if err := localCfg.DeleteLocalConfig(configPath); err != nil {
@@ -112,24 +127,26 @@ func printMicrocksContexts(configPath string) error {
 		return errors.Wrapf(errors.KindUsage, "no contexts defined in %s", configPath)
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer func() { _ = w.Flush() }()
 	columnNames := []string{"CURRENT", "NAME", "SERVER"}
 	if _, err = fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
-		return err
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("writing contexts output: %w", err))
 	}
 
 	for _, contextRef := range localCfg.Contexts {
 		context, err := localCfg.ResolveContext(contextRef.Name)
 		if err != nil {
-			log.Printf("Context '%s' had error: %v", contextRef.Name, err)
+			return errors.Wrap(errors.KindUsage, fmt.Errorf("context %q is invalid: %w", contextRef.Name, err))
 		}
 		prefix := " "
 		if localCfg.CurrentContext == context.Name {
 			prefix = "*"
 		}
 		if _, err = fmt.Fprintf(w, "%s\t%s\t%s\n", prefix, context.Name, context.Server.Server); err != nil {
-			return err
+			return errors.Wrap(errors.KindEnvironment, fmt.Errorf("writing contexts output: %w", err))
 		}
+	}
+	if err := w.Flush(); err != nil {
+		return errors.Wrap(errors.KindEnvironment, fmt.Errorf("writing contexts output: %w", err))
 	}
 	return nil
 }
