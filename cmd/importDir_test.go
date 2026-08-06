@@ -17,11 +17,15 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -420,4 +424,99 @@ func BenchmarkImportDirectory(b *testing.B) {
 		_, err := ImportDirectory(mockClient, mockFS, "/test", config)
 		require.NoError(b, err)
 	}
+}
+
+func TestImportDirCommandPartialFailureExitCode(t *testing.T) {
+	if os.Getenv("MICROCKS_CLI_TEST_IMPORT_DIR_PARTIAL_FAILURE") == "1" {
+		configPath := os.Getenv("MICROCKS_CLI_TEST_CONFIG_PATH")
+		dirPath := os.Getenv("MICROCKS_CLI_TEST_DIR_PATH")
+
+		os.Args = []string{
+			os.Args[0],
+			"import-dir",
+			"--config=" + configPath,
+			dirPath,
+		}
+
+		cmd, err := NewCommand()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cmd.Execute()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+
+	// 1. Create a mock HTTP server.
+	importAttempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/artifact/upload" {
+			importAttempts++
+			if importAttempts == 1 {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte("mock-id-success"))
+			} else {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("mock-upload-failure"))
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	// 2. Create a temporary configuration file.
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "config.yaml")
+	localCfg := config.LocalConfig{
+		CurrentContext: "default",
+		Contexts: []config.ContextRef{
+			{Name: "default", Server: server.URL, User: "default-user"},
+		},
+		Servers: []config.Server{
+			{Server: server.URL, KeycloakEnable: false},
+		},
+		Users: []config.User{
+			{Name: "default-user", AuthToken: "dummy-token", RefreshToken: ""},
+		},
+	}
+	err := config.WriteLocalConfig(localCfg, configPath)
+	require.NoError(t, err)
+
+	// 3. Create a temporary directory with two supported files.
+	specsDir := filepath.Join(tempDir, "specs")
+	err = os.Mkdir(specsDir, 0755)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(specsDir, "spec1.yaml"), []byte("openapi: 3.0.0"), 0644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(specsDir, "spec2.yaml"), []byte("openapi: 3.0.0"), 0644)
+	require.NoError(t, err)
+
+	// 4. Run the subprocess.
+	cmd := exec.Command(os.Args[0], "-test.run=TestImportDirCommandPartialFailureExitCode")
+	cmd.Env = append(os.Environ(),
+		"MICROCKS_CLI_TEST_IMPORT_DIR_PARTIAL_FAILURE=1",
+		"MICROCKS_CLI_TEST_MOCK_SERVER_URL="+server.URL,
+		"MICROCKS_CLI_TEST_CONFIG_PATH="+configPath,
+		"MICROCKS_CLI_TEST_DIR_PATH="+specsDir,
+	)
+
+	output, err := cmd.CombinedOutput()
+	
+	// We expect the command to fail because there was a partial failure (1 success, 1 failure).
+	require.Error(t, err, "expected command to exit with error due to partial failure")
+
+	exitError, ok := err.(*exec.ExitError)
+	require.True(t, ok, "expected ExitError")
+	assert.Equal(t, 1, exitError.ExitCode(), "expected exit code 1")
+
+	// Verify command output
+	outputStr := string(output)
+	assert.Contains(t, outputStr, "Import completed:")
+	assert.Contains(t, outputStr, "✗ Failed:")
+	assert.Contains(t, outputStr, "✓ Imported:")
 }
