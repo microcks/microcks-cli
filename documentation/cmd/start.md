@@ -18,7 +18,7 @@ microcks start --port [Port you want]
 microcks start --driver [docker-or-podman]
 
 # Define name of your microcks container/instance
-microcks start --name [name of you container/instance]
+microcks start --name [name of your container/instance]
 
 # Auto remove the container on exit
 microcks start --rm

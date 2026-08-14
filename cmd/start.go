@@ -50,10 +50,10 @@ microcks start
 microcks start --port [Port you want]
 
 # Define your driver (by default docker)
-microcks start --driver [driver you wnat either 'docker' or 'podman']
+microcks start --driver [driver you want either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
-microcks start --name [name of you container/instance]`,
+microcks start --name [name of your container/instance]`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !output.IsTextOrJSON(outputFormat) {
 				return errors.Wrapf(errors.KindUsage, "--output must be one of: text, json")

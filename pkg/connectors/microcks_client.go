@@ -273,7 +273,7 @@ func (c *microcksClient) HttpClient() *http.Client {
 }
 
 func (c *microcksClient) GetKeycloakURL() (string, error) {
-	// Ensure we have a correct URL for retrieving Keycloal configuration.
+	// Ensure we have a correct URL for retrieving Keycloak configuration.
 	rel := &url.URL{Path: "keycloak/config"}
 	u := c.APIURL.ResolveReference(rel)
 

@@ -4,7 +4,7 @@ Log in to a Microcks instance using username/password or SSO. Creates or updates
 ### Examples
 ```bash
 # Login to microcks using a username and password
-microcks login http://locahost:8080
+microcks login http://localhost:8080
 
 # Provide name to your logged in context (Default context name is server name)
 microcks login http://localhost:8080 --name
