@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -34,8 +33,6 @@ var (
 	CaCertPaths string
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
-
-	ConfigPath = defaultConfigPath()
 )
 
 var sensitiveHeaderPattern = regexp.MustCompile(
@@ -44,14 +41,6 @@ var sensitiveHeaderPattern = regexp.MustCompile(
 var sensitiveParamPattern = regexp.MustCompile(
 	`(?i)(access_token|refresh_token|id_token|code)=([^&\s]+)`,
 )
-
-func defaultConfigPath() string {
-	homeDir, err := getHomeDir()
-	if err != nil {
-		return filepath.Join(".microcks-cli", "config.yaml")
-	}
-	return filepath.Join(homeDir, ".microcks-cli", "config.yaml")
-}
 
 // CreateTLSConfig wraps the creation of tls.Config object for use with HTTP Client for example.
 func CreateTLSConfig() *tls.Config {
