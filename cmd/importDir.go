@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -115,39 +115,16 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			microcks import-dir ./api-specs --recursive
 			microcks import-dir ./api-specs --pattern "*.yaml"
 			microcks import-dir ./api-specs --recursive --pattern "openapi.*"`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				fmt.Println("import-dir command requires a directory path")
-				cmd.HelpFunc()(cmd, args)
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "import-dir requires a directory path argument")
 			}
 
 			dirPath := args[0]
 
-			config.InsecureTLS = globalClientOpts.InsecureTLS
-			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
-
-			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
+			mc, _, err := newCommandClient(globalClientOpts)
 			if err != nil {
-				fmt.Println(err)
-				return
-			}
-
-			if localConfig == nil {
-				fmt.Println("Please login to perform operation...")
-				return
-			}
-
-			if globalClientOpts.Context == "" {
-				globalClientOpts.Context = localConfig.CurrentContext
-			}
-
-			// Create client
-			mc, err := connectors.NewClient(*globalClientOpts)
-			if err != nil {
-				fmt.Printf("error %v", err)
-				return
+				return err
 			}
 
 			// Set up business logic dependencies
@@ -161,12 +138,10 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			// Execute business logic
 			result, err := ImportDirectory(mc, fs, dirPath, importConfig)
 			if err != nil {
-				if validationErr, ok := err.(*ValidationError); ok {
-					fmt.Println(validationErr.Message)
-					return
+				if _, ok := err.(*ValidationError); ok {
+					return errors.Wrap(errors.KindUsage, err)
 				}
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 
 			// Display results
@@ -197,6 +172,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 
 			fmt.Printf("\nImport completed: %d/%d files imported successfully\n", result.SuccessCount, result.TotalFiles)
+			return importDirectoryPartialFailure(result)
 		},
 	}
 
@@ -205,6 +181,13 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	importDirCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed progress")
 
 	return importDirCmd
+}
+
+func importDirectoryPartialFailure(result ImportResult) error {
+	if result.FailedCount == 0 {
+		return nil
+	}
+	return errors.Wrapf(errors.KindAPI, "%d/%d files failed to import", result.FailedCount, result.TotalFiles)
 }
 
 func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, config ImportConfig) (ImportResult, error) {

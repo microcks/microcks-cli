@@ -17,14 +17,13 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -39,18 +38,21 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		filteredOperations string
 		operationsHeaders  string
 		oAuth2Context      string
+		dryRun             bool
+		artifact           string
+		image              string
+		readyTimeout       time.Duration
+		watch              bool
+		driver             string
+		outputFormat       string
 	)
 	var testCmd = &cobra.Command{
 
-		Use:   "test",
+		Use:   "test <apiName:apiVersion> <testEndpoint> <runner>",
 		Short: "Run tests on Microcks",
 		Long:  `Run tests on Microcks`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Parse subcommand args first.
-			if len(os.Args) < 4 {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
-			}
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			serviceRef := args[0]
 			testEndpoint := args[1]
@@ -58,142 +60,102 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 
 			// Validate presence and values of args.
 			if len(serviceRef) == 0 || strings.HasPrefix(serviceRef, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "missing required argument: <apiName:apiVersion> (e.g. 'my-api:1.0')")
 			}
 			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "missing required argument: <testEndpoint> (e.g. 'http://localhost:8080/api')")
 			}
 			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
-				fmt.Println("test command require <apiName:apiVersion> <testEndpoint> <runner> args")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "missing required argument: <runner> (e.g. 'HTTP', 'POSTMAN', 'OPEN_API_SCHEMA')")
 			}
 			if _, validChoice := runnerChoices[runnerType]; !validChoice {
-				fmt.Println("<runner> should be one of: HTTP, SOAP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
-				os.Exit(1)
+				return errors.Wrapf(errors.KindUsage, "<runner> should be one of: HTTP, SOAP_HTTP, SOAP_UI, POSTMAN, OPEN_API_SCHEMA, ASYNC_API_SCHEMA, GRPC_PROTOBUF, GRAPHQL_SCHEMA")
 			}
 
 			// Validate presence and values of flags.
 			if !strings.HasSuffix(waitFor, "milli") && !strings.HasSuffix(waitFor, "sec") && !strings.HasSuffix(waitFor, "min") {
-				fmt.Println("--waitFor format is wrong. Applying default 5sec")
+				return errors.Wrapf(errors.KindUsage, "--waitFor format is wrong. Accepted units are: milli, sec, min (e.g. 500milli, 30sec, 5min)")
 			}
 
-			// Collect optional HTTPS transport flags.
-			config.InsecureTLS = globalClientOpts.InsecureTLS
-			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
+			if !output.IsValid(outputFormat) {
+				return errors.Wrapf(errors.KindUsage, "--output must be one of: text, json, yaml, github-actions")
+			}
 
 			// Compute time to wait in milliseconds.
-			var waitForMilliseconds int64 = 5000
+			var waitForMilliseconds int64
 			if strings.HasSuffix(waitFor, "milli") {
-				waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
+				n, err := strconv.ParseInt(waitFor[:len(waitFor)-5], 0, 64)
+				if err != nil {
+					return errors.Wrapf(errors.KindUsage, "--waitFor value %q is not a valid number", waitFor)
+				}
+				waitForMilliseconds = n
 			} else if strings.HasSuffix(waitFor, "sec") {
-				waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				waitForMilliseconds = waitForMilliseconds * 1000
+				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+				if err != nil {
+					return errors.Wrapf(errors.KindUsage, "--waitFor value %q is not a valid number", waitFor)
+				}
+				waitForMilliseconds = n * 1000
 			} else if strings.HasSuffix(waitFor, "min") {
-				waitForMilliseconds, _ = strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
-				waitForMilliseconds = waitForMilliseconds * 60 * 1000
+				n, err := strconv.ParseInt(waitFor[:len(waitFor)-3], 0, 64)
+				if err != nil {
+					return errors.Wrapf(errors.KindUsage, "--waitFor value %q is not a valid number", waitFor)
+				}
+				waitForMilliseconds = n * 60 * 1000
 			}
 
-			var mc connectors.MicrocksClient
-			var serverAddr string
-
-			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
-
-				// create client with server address
-				serverAddr = globalClientOpts.ServerAddr
-				mc = connectors.NewMicrocksClient(serverAddr)
-
-				keycloakURL, err := mc.GetKeycloakURL()
-				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client retrieving config: %s", err)
-					os.Exit(1)
-				}
-
-				var oauthToken string = "unauthentifed-token"
-				if keycloakURL != "null" {
-					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
-
-					oauthToken, err = kc.ConnectAndGetToken()
-					if err != nil {
-						fmt.Printf("Got error when invoking Keycloack client: %s", err)
-						os.Exit(1)
-					}
-					//fmt.Printf("Retrieve OAuthToken: %s", oauthToken)
-				}
-
-				// Then - launch the test on Microcks Server.
-				mc.SetOAuthToken(oauthToken)
-
-			} else {
-				localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-
-				if localConfig == nil {
-					fmt.Println("Please login to perform opertion...")
-					return
-				}
-
-				if globalClientOpts.Context == "" {
-					globalClientOpts.Context = localConfig.CurrentContext
-				}
-
-				mc, err = connectors.NewClient(*globalClientOpts)
-				if err != nil {
-					fmt.Printf("error %v", err)
-					return
-				}
-
-				ctx, err := localConfig.ResolveContext(globalClientOpts.Context)
-				errors.CheckError(err)
-
-				serverAddr = ctx.Server.Server
+			params := testParams{
+				serviceRef:         serviceRef,
+				testEndpoint:       testEndpoint,
+				runnerType:         runnerType,
+				secretName:         secretName,
+				waitForMillis:      waitForMilliseconds,
+				filteredOperations: filteredOperations,
+				operationsHeaders:  operationsHeaders,
+				oAuth2Context:      oAuth2Context,
+				outputFormat:       outputFormat,
+				artifactPath:       artifact,
 			}
 
-			var testResultID string
-			testResultID, err := mc.CreateTestResult(serviceRef, testEndpoint, runnerType, secretName, waitForMilliseconds, filteredOperations, operationsHeaders, oAuth2Context)
+			if !dryRun {
+				if artifact != "" {
+					return errors.Wrapf(errors.KindUsage, "--artifact is only valid together with --dry-run")
+				}
+				if watch {
+					return errors.Wrapf(errors.KindUsage, "--watch is only valid together with --dry-run")
+				}
+				if driver != "" {
+					return errors.Wrapf(errors.KindUsage, "--driver is only valid together with --dry-run")
+				}
+			}
+
+			if dryRun {
+				// Ephemeral path: no server, no Keycloak, no prior import needed.
+				return runDryRunTest(dryRunOptions{
+					artifact:     artifact,
+					image:        image,
+					readyTimeout: readyTimeout,
+					watch:        watch,
+					driver:       driver,
+					params:       params,
+				})
+			}
+
+			mc, serverAddr, err := newCommandClient(globalClientOpts)
 			if err != nil {
-				fmt.Printf("Got error when invoking Microcks client creating Test: %s", err)
-				os.Exit(1)
-			}
-			//fmt.Printf("Retrieve TestResult ID: %s", testResultID)
-
-			// Finally - wait before checking and loop for some time
-			time.Sleep(1 * time.Second)
-
-			// Add 10.000ms to wait time as it's now representing the server timeout.
-			now := nowInMilliseconds()
-			future := now + waitForMilliseconds + 10000
-
-			var success = false
-			for nowInMilliseconds() < future {
-				testResultSummary, err := mc.GetTestResult(testResultID)
-				if err != nil {
-					fmt.Printf("Got error when invoking Microcks client check TestResult: %s", err)
-					os.Exit(1)
-				}
-				success = testResultSummary.Success
-				inProgress := testResultSummary.InProgress
-				fmt.Printf("MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress))
-
-				if !inProgress {
-					break
-				}
-
-				fmt.Println("MicrocksTester waiting for 2 seconds before checking again or exiting.")
-				time.Sleep(2 * time.Second)
+				return err
 			}
 
-			fmt.Printf("Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			success, testResultID, err := runTestAndWait(mc, params)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(progressWriter(outputFormat), "Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
 
 			if !success {
-				os.Exit(1)
+				return errors.ErrTestFailed
 			}
+			return nil
 		},
 	}
 
@@ -202,10 +164,16 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.Flags().StringVar(&filteredOperations, "filteredOperations", "", "List of operations to launch a test for")
 	testCmd.Flags().StringVar(&operationsHeaders, "operationsHeaders", "", "Override of operations headers as JSON string")
 	testCmd.Flags().StringVar(&oAuth2Context, "oAuth2Context", "", "Spec of an OAuth2 client context as JSON string")
+	testCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run the test against an ephemeral local Microcks container instead of a server")
+	testCmd.Flags().StringVar(&artifact, "artifact", "", "Local spec file to import on the ephemeral server (required with --dry-run)")
+	testCmd.Flags().StringVar(&image, "image", defaultDryRunImage, "Microcks uber-native image used for --dry-run")
+	testCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 90*time.Second, "How long to wait for the ephemeral container to be ready (--dry-run only)")
+	testCmd.Flags().BoolVar(&watch, "watch", false, "Watch the artifact file and re-run the test on change (--dry-run only)")
+	testCmd.Flags().StringVar(&driver, "driver", "", "Container runtime for --dry-run: 'docker' or 'podman' (default: auto-detect)")
+	testCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text, json, yaml, or github-actions")
+
+	testCmd.AddCommand(newTestListCommand(globalClientOpts))
+	testCmd.AddCommand(newTestGetCommand(globalClientOpts))
 
 	return testCmd
-}
-
-func nowInMilliseconds() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
 }

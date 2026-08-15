@@ -23,7 +23,8 @@ import (
 	"net/http/httputil"
 	"os"
 	"path/filepath"
-	strings "strings"
+	"regexp"
+	"strings"
 )
 
 var (
@@ -35,6 +36,13 @@ var (
 	Verbose bool = false
 
 	ConfigPath = defaultConfigPath()
+)
+
+var sensitiveHeaderPattern = regexp.MustCompile(
+	`(?im)^(Authorization:\s*)(Bearer\s+)?(.+)$`,
+)
+var sensitiveParamPattern = regexp.MustCompile(
+	`(?i)(access_token|refresh_token|id_token|code)=([^&\s]+)`,
 )
 
 func defaultConfigPath() string {
@@ -53,8 +61,8 @@ func CreateTLSConfig() *tls.Config {
 	}
 	if len(CaCertPaths) > 0 {
 		// Get the SystemCertPool, continue with an empty pool on error
-		rootCAs, _ := x509.SystemCertPool()
-		if rootCAs == nil {
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil || rootCAs == nil {
 			rootCAs = x509.NewCertPool()
 		}
 
@@ -84,7 +92,7 @@ func DumpRequestIfRequired(name string, req *http.Request, body bool) {
 		if err != nil {
 			fmt.Println("Got error while dumping request out")
 		}
-		fmt.Printf("%s", dump)
+		fmt.Printf("%s", redactSensitiveContent(string(dump)))
 	}
 }
 
@@ -96,9 +104,16 @@ func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
 		if err != nil {
 			fmt.Println("Got error while dumping response")
 		}
-		fmt.Printf("%s", dump)
+		fmt.Printf("%s", redactSensitiveContent(string(dump)))
 		if body {
 			fmt.Println("")
 		}
 	}
+}
+
+// redactSensitiveContent masks OAuth tokens and credentials in HTTP dump output.
+func redactSensitiveContent(dump string) string {
+	redacted := sensitiveHeaderPattern.ReplaceAllString(dump, "${1}[REDACTED]")
+	redacted = sensitiveParamPattern.ReplaceAllString(redacted, "${1}=[REDACTED]")
+	return redacted
 }

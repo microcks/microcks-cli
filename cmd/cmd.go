@@ -18,18 +18,20 @@ package cmd
 import (
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
-	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-func NewCommad() *cobra.Command {
+func NewCommand() (*cobra.Command, error) {
 
 	var clientOpts connectors.ClientOptions
 
 	command := &cobra.Command{
-		Use:          "microcks",
-		Short:        "A CLI tool for Microcks",
-		SilenceUsage: true,
+		Use:   "microcks",
+		Short: "A CLI tool for Microcks",
+		// cmd.Handle (called by main) is the single point that prints errors and
+		// exits, so Cobra must not also print them.
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
 		},
@@ -41,7 +43,9 @@ func NewCommad() *cobra.Command {
 	command.AddCommand(NewImportCommand(&clientOpts))
 	command.AddCommand(NewImportDirCommand(&clientOpts))
 	command.AddCommand(NewVersionCommand())
+	command.AddCommand(NewCapabilitiesCommand())
 	command.AddCommand(NewTestCommand(&clientOpts))
+	command.AddCommand(NewServiceCommand(&clientOpts))
 	command.AddCommand(NewImportURLCommand(&clientOpts))
 	command.AddCommand(NewStartCommand(&clientOpts))
 	command.AddCommand(NewStopCommand(&clientOpts))
@@ -50,7 +54,9 @@ func NewCommad() *cobra.Command {
 	command.AddCommand(NewLogoutCommand(&clientOpts))
 
 	defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
-	errors.CheckError(err)
+	if err != nil {
+		return nil, err
+	}
 	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config")
 	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use")
 	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
@@ -61,5 +67,5 @@ func NewCommad() *cobra.Command {
 	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL")
 	command.MarkFlagsRequiredTogether("keycloakClientId", "keycloakClientSecret")
 
-	return command
+	return command, nil
 }
