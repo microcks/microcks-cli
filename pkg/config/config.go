@@ -24,7 +24,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -37,26 +36,28 @@ var (
 	CaCertPaths string
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
-
-	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
 )
 
 const redactedValue = "[REDACTED]"
 
-// sensitiveHeaderPattern matches headers whose value is a credential. The auth
-// scheme is kept so dumps stay useful for debugging.
+// sensitiveHeaderPattern matches headers whose whole value is a credential.
 var sensitiveHeaderPattern = regexp.MustCompile(
-	`(?im)^((?:Authorization|Proxy-Authorization|X-Auth-Token|Cookie|Set-Cookie):[ \t]*)(Bearer[ \t]+|Basic[ \t]+|Digest[ \t]+)?[^\r\n]*`,
+	`(?im)^((?:Authorization|Proxy-Authorization|X-Auth-Token|Cookie|Set-Cookie):[ \t]*)[^\r\n]*`,
 )
 
 // contentTypePattern extracts the media type from a dumped header block.
 var contentTypePattern = regexp.MustCompile(`(?im)^Content-Type:[ \t]*([^\r\n]+)`)
 
-// sensitiveTextPattern matches "key=value", `"key":"value"` and quoted variants
-// in bodies that cannot be parsed structurally (chunked framing, truncated or
-// unknown encodings). Key membership is checked in the replacement callback.
+// sensitiveTextPattern matches "key=value", `"key":"value"` and quoted variants.
+// It covers query strings in request lines and redirect headers, plus bodies
+// that cannot be parsed structurally (chunked framing, unknown encodings). Key
+// membership is checked in the replacement callback.
+//
+// '?' is excluded from the value class so that a URL such as
+// "http://host?access_token=x" does not let the leading "http://host" match
+// swallow the query string before its parameters are examined.
 var sensitiveTextPattern = regexp.MustCompile(
-	`(["']?)([A-Za-z0-9_-]+)(["']?[ \t]*[:=][ \t]*)(["']?)([^"'&,}\r\n\s]+)(["']?)`,
+	`(["']?)([A-Za-z0-9_-]+)(["']?[ \t]*[:=][ \t]*)(["']?)([^"'&,}?\r\n\s]+)(["']?)`,
 )
 
 // sensitiveValueKeys holds the normalized parameter and field names whose
@@ -103,8 +104,8 @@ func CreateTLSConfig() *tls.Config {
 	}
 	if len(CaCertPaths) > 0 {
 		// Get the SystemCertPool, continue with an empty pool on error
-		rootCAs, _ := x509.SystemCertPool()
-		if rootCAs == nil {
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil || rootCAs == nil {
 			rootCAs = x509.NewCertPool()
 		}
 
@@ -159,11 +160,18 @@ func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
 // rather than by wire delimiter.
 func redactSensitiveContent(dump string) string {
 	head, sep, body := splitHTTPMessage(dump)
-	head = sensitiveHeaderPattern.ReplaceAllString(head, "${1}${2}"+redactedValue)
+	contentType := contentTypeOf(head)
+
+	// Credential-bearing headers are masked whole. The rest of the head still
+	// needs scanning: the request line and redirect targets carry OAuth
+	// parameters in their query string.
+	head = sensitiveHeaderPattern.ReplaceAllString(head, "${1}"+redactedValue)
+	head = redactText(head)
+
 	if sep == "" {
 		return head
 	}
-	return head + sep + redactBody(contentTypeOf(head), body)
+	return head + sep + redactBody(contentType, body)
 }
 
 // splitHTTPMessage divides a dumped HTTP message into its header block, the

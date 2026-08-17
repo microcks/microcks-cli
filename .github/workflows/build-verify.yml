@@ -41,6 +41,9 @@ jobs:
           make clean
           make build-binaries
 
+      - name: Run tests
+        run: go test ./...
+
       - name: Set environment for branch
         run: |
           set -x

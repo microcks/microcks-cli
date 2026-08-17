@@ -1,12 +1,30 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package connectors
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -21,6 +39,7 @@ type ContainerClient interface {
 	CreateContainer(opts ContainerOpts) (string, error)
 	StartContainer(containerId string) error
 	StopContainer(continerId string) error
+	ContainerExists(containerId string) (bool, error)
 	CloseClient() error
 }
 
@@ -33,6 +52,7 @@ type ContainerOpts struct {
 	Port       string
 	AutoRemove bool
 	Name       string
+	Output     io.Writer
 }
 
 const (
@@ -63,26 +83,52 @@ func NewDockerClient() (*containerClient, error) {
 	return &containerClient{cli: cli}, nil
 }
 
-func NewPodmanClient() (*containerClient, error) {
-	osName := runtime.GOOS
-	switch osName {
-	case "windows":
-		remoteSocket, err := exec.Command("podman", "machine", "inspect", "--format", "{{.ConnectionInfo.PodmanPipe.Path}}").Output()
-		errors.CheckError(err)
-		socketPath := strings.TrimSpace(string(remoteSocket))
-		err = os.Setenv("DOCKER_HOST", "npipe:////"+strings.TrimPrefix(socketPath, "\\\\"))
-		errors.CheckError(err)
+// PingDockerHost verifies the Docker-API endpoint at DOCKER_HOST actually
+// answers. The raw client honors DOCKER_HOST with no fallback, so this catches
+// an unreachable endpoint (e.g. a stopped Podman machine) before testcontainers-go
+// silently resolves to a different runtime.
+func PingDockerHost() error {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = cli.Ping(ctx)
+	return err
+}
+
+func ConfigurePodmanHost() error {
+	switch runtime.GOOS {
+	case "windows":
+		out, err := exec.Command("podman", "machine", "inspect", "--format", "{{.ConnectionInfo.PodmanPipe.Path}}").Output()
+		if err != nil {
+			return fmt.Errorf("resolving podman pipe path (is the podman machine running?): %w", err)
+		}
+		socketPath := strings.TrimSpace(string(out))
+		return os.Setenv("DOCKER_HOST", "npipe:////"+strings.TrimPrefix(socketPath, "\\\\"))
 	case "darwin":
-		remoteSocket, err := exec.Command("podman", "machine", "inspect", "--format", "{{.ConnectionInfo.PodmanSocket.Path}}").Output()
-		errors.CheckError(err)
-		err = os.Setenv("DOCKER_HOST", "unix://"+strings.TrimSpace(string(remoteSocket)))
-		errors.CheckError(err)
+		out, err := exec.Command("podman", "machine", "inspect", "--format", "{{.ConnectionInfo.PodmanSocket.Path}}").Output()
+		if err != nil {
+			return fmt.Errorf("resolving podman socket path (is the podman machine running?): %w", err)
+		}
+		return os.Setenv("DOCKER_HOST", "unix://"+strings.TrimSpace(string(out)))
 	case "linux":
-		remoteSocket, err := exec.Command("podman", "info", "--format", "{{.Host.RemoteSocket.Path}}").Output()
-		errors.CheckError(err)
-		err = os.Setenv("DOCKER_HOST", "unix://"+strings.TrimSpace(string(remoteSocket)))
-		errors.CheckError(err)
+		out, err := exec.Command("podman", "info", "--format", "{{.Host.RemoteSocket.Path}}").Output()
+		if err != nil {
+			return fmt.Errorf("resolving podman socket path: %w", err)
+		}
+		return os.Setenv("DOCKER_HOST", "unix://"+strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func NewPodmanClient() (*containerClient, error) {
+	if err := ConfigurePodmanHost(); err != nil {
+		return nil, err
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -94,11 +140,14 @@ func NewPodmanClient() (*containerClient, error) {
 	return &containerClient{cli: cli}, nil
 }
 
-func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) {
+func (cli *containerClient) CreateContainer(opts ContainerOpts) (containerID string, resultErr error) {
 	ctx := context.Background()
 
 	// Define exposed port and bindings
-	exposedPort, _ := nat.NewPort("tcp", "8080")
+	exposedPort, err := nat.NewPort("tcp", "8080")
+	if err != nil {
+		return "", errors.Wrap(errors.KindEnvironment, fmt.Errorf("creating exposed container port: %w", err))
+	}
 	portBindings := nat.PortMap{
 		exposedPort: []nat.PortBinding{
 			{
@@ -112,13 +161,29 @@ func (cli *containerClient) CreateContainer(opts ContainerOpts) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil {
+			if resultErr == nil {
+				resultErr = fmt.Errorf("closing image pull stream: %w", err)
+			} else {
+				resultErr = fmt.Errorf("%v; closing image pull stream: %w", resultErr, err)
+			}
+		}
+	}()
 
-	fd, isTerminal := term.GetFdInfo(os.Stdout)
+	progress := opts.Output
+	if progress == nil {
+		progress = os.Stdout
+	}
+	var fd uintptr
+	var isTerminal bool
+	if outputFile, ok := progress.(*os.File); ok {
+		fd, isTerminal = term.GetFdInfo(outputFile)
+	}
 
 	err = jsonmessage.DisplayJSONMessagesStream(
 		out,
-		os.Stdout,
+		progress,
 		fd,
 		isTerminal,
 		nil,
@@ -155,6 +220,21 @@ func (cli *containerClient) StopContainer(containerId string) error {
 	fmt.Print("Stopping container ", containerId, "... ")
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully
 	return cli.cli.ContainerStop(ctx, containerId, container.StopOptions{Timeout: &noWaitTimeout})
+}
+
+// ContainerExists reports whether the container is still known to the
+// runtime. "No such container" is a regular outcome here, not an error,
+// so callers can reconcile stale config entries.
+func (cli *containerClient) ContainerExists(containerId string) (bool, error) {
+	ctx := context.Background()
+	_, err := cli.cli.ContainerInspect(ctx, containerId)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (cli *containerClient) CloseClient() error {

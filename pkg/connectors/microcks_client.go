@@ -43,15 +43,43 @@ var (
 	grantTypeChoices = map[string]bool{"PASSWORD": true, "CLIENT_CREDENTIALS": true, "REFRESH_TOKEN": true}
 )
 
+const serviceLookupPageSize = 100
+
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
 	HttpClient() *http.Client
 	GetKeycloakURL() (string, error)
 	SetOAuthToken(oauthToken string)
+	ListServices(page int, size int) ([]Service, error)
+	GetService(ref string) (*ServiceDetail, error)
+	ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
+	GetFullTestResult(testResultID string) (*TestResult, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+}
+
+// Service represents a Microcks service summary.
+type Service struct {
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Version    string      `json:"version"`
+	Type       string      `json:"type"`
+	Operations []Operation `json:"operations,omitempty"`
+}
+
+// Operation represents a Microcks service operation.
+type Operation struct {
+	Name          string   `json:"name"`
+	Method        string   `json:"method,omitempty"`
+	ResourcePaths []string `json:"resourcePaths,omitempty"`
+}
+
+// ServiceDetail represents the Microcks service detail response used by the UI.
+type ServiceDetail struct {
+	Service     Service                      `json:"service"`
+	MessagesMap map[string][]json.RawMessage `json:"messagesMap,omitempty"`
 }
 
 // TestResultSummary represents a simple view on Microcks TestResult
@@ -65,6 +93,37 @@ type TestResultSummary struct {
 	ElapsedTime    int32  `json:"elapsedTime"`
 	Success        bool   `json:"success"`
 	InProgress     bool   `json:"inProgress"`
+}
+
+// TestResult represents a full Microcks TestResult including per-operation detail.
+type TestResult struct {
+	ID              string           `json:"id"`
+	Version         int32            `json:"version"`
+	TestNumber      int32            `json:"testNumber"`
+	TestDate        int64            `json:"testDate"`
+	TestedEndpoint  string           `json:"testedEndpoint"`
+	ServiceID       string           `json:"serviceId"`
+	ElapsedTime     int32            `json:"elapsedTime"`
+	Success         bool             `json:"success"`
+	InProgress      bool             `json:"inProgress"`
+	TestCaseResults []TestCaseResult `json:"testCaseResults"`
+}
+
+// TestCaseResult is the result for a single operation within a TestResult.
+type TestCaseResult struct {
+	Success         bool             `json:"success"`
+	ElapsedTime     int32            `json:"elapsedTime"`
+	OperationName   string           `json:"operationName"`
+	TestStepResults []TestStepResult `json:"testStepResults"`
+}
+
+// TestStepResult is the result for a single request/message within a TestCaseResult.
+type TestStepResult struct {
+	Success          bool   `json:"success"`
+	ElapsedTime      int32  `json:"elapsedTime"`
+	RequestName      string `json:"requestName"`
+	EventMessageName string `json:"eventMessageName"`
+	Message          string `json:"message"`
 }
 
 // HeaderDTO represents an operation header passed for Test
@@ -151,7 +210,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 
 		u, err := url.Parse(apiURL)
 		if err != nil {
-			panic(err)
+			return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid server URL %q: %w", apiURL, err))
 		}
 		c.APIURL = u
 
@@ -182,7 +241,7 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 }
 
 // NewMicrocksClient builds a new headless MicrocksClient without any authtoken and all for general purposes
-func NewMicrocksClient(apiURL string) MicrocksClient {
+func NewMicrocksClient(apiURL string) (MicrocksClient, error) {
 	mc := microcksClient{}
 
 	if strings.HasSuffix(apiURL, "/api") {
@@ -194,7 +253,7 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 
 	u, err := url.Parse(apiURL)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid server URL %q: %w", apiURL, err))
 	}
 	mc.APIURL = u
 
@@ -207,7 +266,7 @@ func NewMicrocksClient(apiURL string) MicrocksClient {
 	} else {
 		mc.httpClient = http.DefaultClient
 	}
-	return &mc
+	return &mc, nil
 }
 func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
@@ -220,7 +279,7 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak config request: %w", err))
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -230,7 +289,7 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -239,24 +298,36 @@ func (c *microcksClient) GetKeycloakURL() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading Keycloak config response: %w", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", errors.Wrapf(errors.KindAPI, "Microcks returned HTTP %d for Keycloak config: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var configResp map[string]interface{}
 	if err := json.Unmarshal(body, &configResp); err != nil {
-		panic(err)
+		return "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak config response: %w", err))
 	}
 
-	// Retrieve auth server url and realm name.
-	enabled := configResp["enabled"].(bool)
-	authServerURL := configResp["auth-server-url"].(string)
-	realmName := configResp["realm"].(string)
-
-	// Return a proper URL or 'null' if Keycloak is disables.
-	if enabled {
-		return authServerURL + "/realms/" + realmName + "/", nil
+	enabled, ok := configResp["enabled"].(bool)
+	if !ok {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak config response missing or invalid enabled field")
 	}
-	return "null", nil
+	// Return 'null' if Keycloak is disabled.
+	if !enabled {
+		return "null", nil
+	}
+
+	authServerURL, ok := configResp["auth-server-url"].(string)
+	if !ok || authServerURL == "" {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak config response missing or invalid auth-server-url field")
+	}
+	realmName, ok := configResp["realm"].(string)
+	if !ok || realmName == "" {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak config response missing or invalid realm field")
+	}
+	return authServerURL + "/realms/" + realmName + "/", nil
 }
 
 func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName, configPath string) error {
@@ -304,10 +375,17 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
 	keyCloakUrl, err := c.GetKeycloakURL()
-	errors.CheckError(err)
-	kc := NewKeycloakClient(keyCloakUrl, "", "")
+	if err != nil {
+		return "", "", err
+	}
+	kc, err := NewKeycloakClient(keyCloakUrl, "", "")
+	if err != nil {
+		return "", "", err
+	}
 	oauth2Conf, err := kc.GetOIDCConfig()
-	errors.CheckError(err)
+	if err != nil {
+		return "", "", err
+	}
 	oauth2Conf.ClientID = auth.ClientId
 	oauth2Conf.ClientSecret = auth.ClientSecret
 
@@ -329,6 +407,116 @@ func (c *microcksClient) SetOAuthToken(oauthToken string) {
 	c.AuthToken = oauthToken
 }
 
+func (c *microcksClient) ListServices(page int, size int) ([]Service, error) {
+	values := url.Values{}
+	values.Set("page", strconv.Itoa(page))
+	values.Set("size", strconv.Itoa(size))
+
+	var services []Service
+	if err := c.getJSON("services", values, &services, "Microcks for listing services"); err != nil {
+		return nil, err
+	}
+	return services, nil
+}
+
+func (c *microcksClient) GetService(ref string) (*ServiceDetail, error) {
+	id := ref
+	if strings.Contains(ref, ":") {
+		serviceID, err := c.resolveServiceID(ref)
+		if err != nil {
+			return nil, err
+		}
+		id = serviceID
+	}
+
+	var detail ServiceDetail
+	if err := c.getJSON("services/"+id, nil, &detail, "Microcks for getting service detail"); err != nil {
+		return nil, err
+	}
+	return &detail, nil
+}
+
+func (c *microcksClient) ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error) {
+	values := url.Values{}
+	values.Set("page", strconv.Itoa(page))
+	values.Set("size", strconv.Itoa(size))
+	if serviceID != "" {
+		values.Set("serviceId", serviceID)
+	}
+
+	var tests []TestResultSummary
+	if err := c.getJSON("tests", values, &tests, "Microcks for listing tests"); err != nil {
+		return nil, err
+	}
+	return tests, nil
+}
+
+func (c *microcksClient) resolveServiceID(ref string) (string, error) {
+	name, version, ok := strings.Cut(ref, ":")
+	if !ok || name == "" || version == "" {
+		return "", errors.Wrapf(errors.KindUsage, "service reference %q must be <name>:<version>", ref)
+	}
+	for page := 0; ; page++ {
+		services, err := c.ListServices(page, serviceLookupPageSize)
+		if err != nil {
+			return "", err
+		}
+		for _, service := range services {
+			if service.Name == name && service.Version == version {
+				return service.ID, nil
+			}
+		}
+		if len(services) < serviceLookupPageSize {
+			break
+		}
+	}
+	return "", errors.Wrapf(errors.KindNotFound, "service %q does not exist", ref)
+}
+
+func (c *microcksClient) getJSON(path string, query url.Values, out any, dumpLabel string) error {
+	rel := &url.URL{Path: path}
+	if len(query) > 0 {
+		rel.RawQuery = query.Encode()
+	}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	config.DumpRequestIfRequired(dumpLabel, req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, err)
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired(dumpLabel, resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, fmt.Errorf("reading Microcks response: %w", err))
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return errors.Wrapf(kind, "Microcks returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	if err := json.Unmarshal(body, out); err != nil {
+		return errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Microcks response: %w", err))
+	}
+	return nil
+}
+
 func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error) {
 	// Ensure we have a correct URL.
 	rel := &url.URL{Path: "tests"}
@@ -343,24 +531,33 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 		SecretName:   secretName,
 	}
 
-	if len(filteredOperations) > 0 && ensureValidOperationsList(filteredOperations) {
+	if len(filteredOperations) > 0 {
+		if err := ensureValidOperationsList(filteredOperations); err != nil {
+			return "", err
+		}
 		testReq.FilteredOperations = json.RawMessage(filteredOperations)
 	}
-	if len(operationsHeaders) > 0 && ensureValidOperationsHeaders(operationsHeaders) {
+	if len(operationsHeaders) > 0 {
+		if err := ensureValidOperationsHeaders(operationsHeaders); err != nil {
+			return "", err
+		}
 		testReq.OperationsHeaders = json.RawMessage(operationsHeaders)
 	}
-	if len(oAuth2Context) > 0 && ensureValidOAuth2Context(oAuth2Context) {
+	if len(oAuth2Context) > 0 {
+		if err := ensureValidOAuth2Context(oAuth2Context); err != nil {
+			return "", err
+		}
 		testReq.OAuth2Context = json.RawMessage(oAuth2Context)
 	}
 
 	input, err := json.Marshal(testReq)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal test request: %w", err)
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("failed to marshal test request: %w", err))
 	}
 
 	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(input))
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating test request: %w", err))
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -372,62 +569,51 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for creating test", resp, true)
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading test creation response: %w", err))
+	}
+
+	// Check HTTP status before attempting to parse.
+	if resp.StatusCode != 201 {
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return "", errors.Wrapf(kind, "Microcks returned HTTP %d: %s (is the service '%s' registered?)", resp.StatusCode, strings.TrimSpace(string(body)), serviceID)
 	}
 
 	var createTestResp map[string]interface{}
 	if err := json.Unmarshal(body, &createTestResp); err != nil {
-		panic(err)
+		return "", errors.Wrap(errors.KindAPI, fmt.Errorf("failed to parse test creation response: %w", err))
 	}
 
-	testID := createTestResp["id"].(string)
-	return testID, err
+	testID, ok := createTestResp["id"].(string)
+	if !ok || testID == "" {
+		return "", errors.Wrapf(errors.KindAPI, "microcks response missing 'id' field")
+	}
+	return testID, nil
 }
 
 func (c *microcksClient) GetTestResult(testResultID string) (*TestResultSummary, error) {
-	// Ensure we have a correct URL.
-	rel := &url.URL{Path: "tests/" + testResultID}
-	u := c.APIURL.ResolveReference(rel)
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
-
-	// Dump request if verbose required.
-	config.DumpRequestIfRequired("Microcks for getting status", req, false)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Dump response if verbose required.
-	config.DumpResponseIfRequired("Microcks for getting status test", resp, true)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err.Error())
-	}
-
 	result := TestResultSummary{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse test result response: %w", err)
+	if err := c.getJSON("tests/"+testResultID, nil, &result, "Microcks for getting status"); err != nil {
+		return nil, err
 	}
+	return &result, nil
+}
 
+// GetFullTestResult fetches the complete TestResult including per-operation
+// (testCaseResults) detail, used by the richer --output formatters.
+func (c *microcksClient) GetFullTestResult(testResultID string) (*TestResult, error) {
+	result := TestResult{}
+	if err := c.getJSON("tests/"+testResultID, nil, &result, "Microcks for getting full test result"); err != nil {
+		return nil, err
+	}
 	return &result, nil
 }
 
@@ -435,7 +621,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	// Ensure file exists on fs.
 	file, err := os.Open(specificationFilePath)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindUsage, fmt.Errorf("cannot read artifact %q: %w", specificationFilePath, err))
 	}
 	defer file.Close()
 
@@ -475,7 +661,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	req, err := http.NewRequest("POST", u.String(), pr)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating artifact upload request: %w", err))
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
@@ -485,13 +671,13 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
 	// Check for errors from the multipart writer goroutine.
 	if pipeErr := <-errCh; pipeErr != nil {
-		return "", fmt.Errorf("failed to write multipart form: %w", pipeErr)
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("failed to write multipart form: %w", pipeErr))
 	}
 
 	// Dump response if verbose required.
@@ -499,12 +685,12 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read upload response: %w", err)
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("failed to read upload response: %w", err))
 	}
 
 	// Raise exception if not created.
 	if resp.StatusCode != 201 {
-		return "", errs.New(string(respBody))
+		return "", errors.Wrap(errors.KindAPI, errs.New(strings.TrimSpace(string(respBody))))
 	}
 
 	return string(respBody), nil
@@ -517,15 +703,21 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	writer := multipart.NewWriter(body)
 
 	// Add all the form fields
-	writer.WriteField("url", artifactURL)
-	writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact))
+	if err := writer.WriteField("url", artifactURL); err != nil {
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("writing artifact URL field: %w", err))
+	}
+	if err := writer.WriteField("mainArtifact", strconv.FormatBool(mainArtifact)); err != nil {
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("writing mainArtifact field: %w", err))
+	}
 	if secret != "" {
-		writer.WriteField("secret", secret)
+		if err := writer.WriteField("secret", secret); err != nil {
+			return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("writing secret field: %w", err))
+		}
 	}
 
 	err := writer.Close()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("closing artifact download form: %w", err))
 	}
 
 	// Ensure we have a correct URL.
@@ -534,7 +726,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	req, err := http.NewRequest("POST", u.String(), body)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating artifact download request: %w", err))
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
@@ -544,7 +736,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -553,49 +745,45 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading download response: %w", err))
 	}
 
 	// Raise exception if not created.
 	if resp.StatusCode != 201 {
-		return "", errs.New(string(respBody))
+		return "", errors.Wrap(errors.KindAPI, errs.New(strings.TrimSpace(string(respBody))))
 	}
 
-	return string(respBody), err
+	return string(respBody), nil
 }
 
-func ensureValidOperationsList(filteredOperations string) bool {
+func ensureValidOperationsList(filteredOperations string) error {
 	// Unmarshal using a generic interface
 	var list = []string{}
 	err := json.Unmarshal([]byte(filteredOperations), &list)
 	if err != nil {
-		fmt.Println("Error parsing JSON in filteredOperations: ", err)
-		return false
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("parsing filteredOperations JSON: %w", err))
 	}
-	return true
+	return nil
 }
 
-func ensureValidOperationsHeaders(operationsHeaders string) bool {
+func ensureValidOperationsHeaders(operationsHeaders string) error {
 	// Unmarshal using a generic interface
 	var headers = map[string][]HeaderDTO{}
 	err := json.Unmarshal([]byte(operationsHeaders), &headers)
 	if err != nil {
-		fmt.Println("Error parsing JSON in operationsHeaders: ", err)
-		return false
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("parsing operationsHeaders JSON: %w", err))
 	}
-	return true
+	return nil
 }
 
-func ensureValidOAuth2Context(oAuth2Context string) bool {
+func ensureValidOAuth2Context(oAuth2Context string) error {
 	var oContext = OAuth2ClientContext{}
 	err := json.Unmarshal([]byte(oAuth2Context), &oContext)
 	if err != nil {
-		fmt.Println("Error parsing JSON in oAuth2Context: ", err)
-		return false
+		return errors.Wrap(errors.KindUsage, fmt.Errorf("parsing oAuth2Context JSON: %w", err))
 	}
 	if !grantTypeChoices[oContext.GrantType] {
-		fmt.Println("grantType in oAuth2Context is not supported. OAuth2 is turned off.")
-		return false
+		return errors.Wrapf(errors.KindUsage, "grantType in oAuth2Context is not supported")
 	}
-	return true
+	return nil
 }

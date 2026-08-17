@@ -15,14 +15,20 @@ microcks start
 microcks start --port [Port you want]
 
 # Define your driver (by default docker)
-microcks start --driver [driver you wnat either 'docker' or 'podman']
+microcks start --driver [docker-or-podman]
 
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]
 
 # Auto remove the container on exit
 microcks start --rm
+
+# Start and return the selected local context as JSON
+microcks start --output json
 ```
+
+In JSON mode, stdout contains only the structured start result. Image-pull and
+readiness progress is written to stderr.
 
 ### Options
 | Flag        | Description                                                                      |
@@ -33,6 +39,9 @@ microcks start --rm
 | `--image`   | Container image to use (default: `quay.io/microcks/microcks-uber:latest-native`) |
 | `--rm`      | Auto-remove the container when it exits (like Docker `--rm`)                     |
 | `--driver`  | Container driver to use (`docker` or `podman`, default: `docker`)                |
+| `--ready-timeout` | How long to wait for Microcks to answer before failing (default: `1m`)   |
+| `--no-wait` | Return after the container starts without waiting for Microcks readiness         |
+| `--output`  | Output format: `text` or `json`                                                  |
 
 ### Options Inherited from Parent Commands
 | Flag                     | Description                                 |
@@ -45,4 +54,3 @@ microcks start --rm
 | `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
 | `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
 | `--microcksURL`          | Microcks API URL                            |
-
