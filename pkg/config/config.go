@@ -40,34 +40,23 @@ var (
 
 const redactedValue = "[REDACTED]"
 
-// sensitiveHeaderPattern matches headers whose whole value is a credential.
 var sensitiveHeaderPattern = regexp.MustCompile(
 	`(?im)^((?:Authorization|Proxy-Authorization|X-Auth-Token|Cookie|Set-Cookie):[ \t]*)[^\r\n]*`,
 )
 
-// contentTypePattern extracts the media type from a dumped header block.
 var contentTypePattern = regexp.MustCompile(`(?im)^Content-Type:[ \t]*([^\r\n]+)`)
 
-// sensitiveTextPattern matches "key=value", `"key":"value"` and quoted variants.
-// It covers query strings in request lines and redirect headers, plus bodies
-// that cannot be parsed structurally (chunked framing, unknown encodings). Key
-// membership is checked in the replacement callback.
-//
-// '?' is excluded from the value class so that a URL such as
-// "http://host?access_token=x" does not let the leading "http://host" match
-// swallow the query string before its parameters are examined.
+// sensitiveTextPattern matches key-value pairs in text and query strings.
+// '?' is excluded to avoid swallowing query strings in URLs.
 var sensitiveTextPattern = regexp.MustCompile(
 	`(["']?)([A-Za-z0-9_-]+)(["']?[ \t]*[:=][ \t]*)(["']?)([^"'&,}?\r\n\s]+)(["']?)`,
 )
 
-// sensitiveValueKeys holds the normalized parameter and field names whose
-// values must never reach verbose output, whatever encoding carries them.
-// Matching is on the name, not on the delimiter, so form bodies
-// (access_token=...) and JSON bodies ("accessToken": "...") are covered alike.
 var sensitiveValueKeys = map[string]struct{}{
 	"accesstoken":   {},
 	"refreshtoken":  {},
 	"idtoken":       {},
+	"authtoken":     {},
 	"token":         {},
 	"clientsecret":  {},
 	"password":      {},
@@ -78,8 +67,6 @@ var sensitiveValueKeys = map[string]struct{}{
 	"apikey":        {},
 }
 
-// normalizeKey folds a name so snake_case, camelCase, kebab-case and
-// capitalized spellings of the same field compare equal.
 func normalizeKey(key string) string {
 	var b strings.Builder
 	for _, r := range key {
@@ -154,17 +141,10 @@ func DumpResponseIfRequired(name string, resp *http.Response, body bool) {
 	}
 }
 
-// redactSensitiveContent masks OAuth tokens and credentials in HTTP dump
-// output. Headers and body are redacted separately: the body is parsed
-// according to its Content-Type so that credentials are matched by field name
-// rather than by wire delimiter.
 func redactSensitiveContent(dump string) string {
 	head, sep, body := splitHTTPMessage(dump)
 	contentType := contentTypeOf(head)
 
-	// Credential-bearing headers are masked whole. The rest of the head still
-	// needs scanning: the request line and redirect targets carry OAuth
-	// parameters in their query string.
 	head = sensitiveHeaderPattern.ReplaceAllString(head, "${1}"+redactedValue)
 	head = redactText(head)
 
@@ -174,11 +154,7 @@ func redactSensitiveContent(dump string) string {
 	return head + sep + redactBody(contentType, body)
 }
 
-// splitHTTPMessage divides a dumped HTTP message into its header block, the
-// blank-line separator and its body. sep is empty when there is no body.
 func splitHTTPMessage(dump string) (head, sep, body string) {
-	// "\r\n\r\n" is checked first: it contains no "\n\n", so a CRLF message can
-	// never be split on the LF-only boundary by mistake.
 	for _, candidate := range []string{"\r\n\r\n", "\n\n"} {
 		if before, after, found := strings.Cut(dump, candidate); found {
 			return before, candidate, after
@@ -194,8 +170,6 @@ func contentTypeOf(head string) string {
 	return ""
 }
 
-// redactBody masks credential-bearing fields in a dumped body, falling back to
-// text matching whenever the body cannot be parsed as its declared type.
 func redactBody(contentType, body string) string {
 	switch {
 	case strings.Contains(contentType, "json"):
@@ -210,9 +184,6 @@ func redactBody(contentType, body string) string {
 	return redactText(body)
 }
 
-// redactJSONBody rewrites a JSON body with sensitive members masked. It reports
-// false when the body is not a single well-formed JSON value, so the caller can
-// fall back rather than emit a truncated re-encoding.
 func redactJSONBody(body string) (string, bool) {
 	trimmed := strings.TrimSpace(body)
 	if trimmed == "" {
@@ -220,20 +191,17 @@ func redactJSONBody(body string) (string, bool) {
 	}
 
 	decoder := json.NewDecoder(strings.NewReader(trimmed))
-	// Preserve the original number formatting instead of round-tripping
-	// every number through float64.
 	decoder.UseNumber()
 
 	var value interface{}
 	if err := decoder.Decode(&value); err != nil {
 		return "", false
 	}
-	// Trailing content means this was not a bare JSON body (chunked transfer
-	// framing, for instance); re-encoding would silently drop it.
 	if decoder.More() {
 		return "", false
 	}
 
+	// json.Marshal reorders keys and HTML-escapes, so dumped bodies are not byte-faithful.
 	out, err := json.Marshal(redactJSONValue(value))
 	if err != nil {
 		return "", false
@@ -261,8 +229,6 @@ func redactJSONValue(value interface{}) interface{} {
 	return value
 }
 
-// redactFormBody rewrites a form-urlencoded body with sensitive parameters
-// masked. It reports false when the body cannot be parsed as a query string.
 func redactFormBody(body string) (string, bool) {
 	trimmed := strings.TrimRight(body, "\r\n")
 	if trimmed == "" {
@@ -281,12 +247,9 @@ func redactFormBody(body string) (string, bool) {
 			vals[i] = redactedValue
 		}
 	}
-	// Preserve whatever trailing newlines the dump carried.
 	return values.Encode() + body[len(trimmed):], true
 }
 
-// redactText masks sensitive key/value pairs in a body of unknown or
-// unparseable encoding.
 func redactText(body string) string {
 	return sensitiveTextPattern.ReplaceAllStringFunc(body, func(match string) string {
 		groups := sensitiveTextPattern.FindStringSubmatch(match)

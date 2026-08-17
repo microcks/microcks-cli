@@ -457,12 +457,11 @@ func TestWatchConfig(t *testing.T) {
 	}
 }
 
-// secretMarkers are values that must never survive redaction, whatever
-// encoding carries them.
 var secretMarkers = []string{
 	"eyJLEAKEDACCESS",
 	"eyJLEAKEDREFRESH",
 	"eyJLEAKEDID",
+	"eyJPROBELEAK",
 	"LEAKEDCLIENTSECRET",
 	"LEAKEDPASSWORD",
 	"LEAKEDAUTHCODE",
@@ -475,9 +474,6 @@ func assertNoCredentialLeaked(t testing.TB, got string) {
 	}
 }
 
-// TestRedactSensitiveContentInBodies covers the encodings that carry
-// credentials in request and response bodies. Matching is by field name, so
-// neither JSON nor form spelling can slip past.
 func TestRedactSensitiveContentInBodies(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -486,8 +482,6 @@ func TestRedactSensitiveContentInBodies(t *testing.T) {
 		mustNotHave []string
 	}{
 		{
-			// Regression: the Keycloak token endpoint answers in JSON, so the
-			// form-encoded "access_token=..." shape never appears on the wire.
 			name: "json token response",
 			dump: "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json\r\n" +
@@ -496,8 +490,14 @@ func TestRedactSensitiveContentInBodies(t *testing.T) {
 			mustHave: []string{"token_type", "Bearer", "expires_in", "300"},
 		},
 		{
-			// Regression: oAuth2Context carries a client secret and an end-user
-			// password in the body of POST /api/tests.
+			name: "json authtoken in body",
+			dump: "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"\r\n" +
+				`{"authToken":"eyJPROBELEAK"}`,
+			mustHave: []string{`{"authToken":"[REDACTED]"}`},
+		},
+		{
 			name: "json test request with oauth2 context",
 			dump: "POST /api/tests HTTP/1.1\r\n" +
 				"Content-Type: application/json; charset=utf-8\r\n" +
@@ -515,6 +515,14 @@ func TestRedactSensitiveContentInBodies(t *testing.T) {
 			mustHave: []string{"grant_type", "authorization_code"},
 		},
 		{
+			name: "form encoded auth-token",
+			dump: "POST /api/login HTTP/1.1\r\n" +
+				"Content-Type: application/x-www-form-urlencoded\r\n" +
+				"\r\n" +
+				"auth-token=eyJPROBELEAK",
+			mustHave: []string{"auth-token=%5BREDACTED%5D"},
+		},
+		{
 			name: "nested and array json",
 			dump: "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json\r\n" +
@@ -523,8 +531,6 @@ func TestRedactSensitiveContentInBodies(t *testing.T) {
 			mustHave: []string{"sessions", "bob"},
 		},
 		{
-			// Chunked framing defeats structural parsing; the text fallback
-			// must still catch the credential.
 			name: "chunked json falls back to text redaction",
 			dump: "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json\r\n" +
@@ -533,7 +539,6 @@ func TestRedactSensitiveContentInBodies(t *testing.T) {
 				"3a\r\n" + `{"access_token":"eyJLEAKEDACCESS"}` + "\r\n0\r\n\r\n",
 		},
 		{
-			// The authorization code travels in the request line, not the body.
 			name: "oauth code in request line",
 			dump: "GET /auth/callback?state=abc&code=LEAKEDAUTHCODE HTTP/1.1\r\n" +
 				"Host: localhost:58085\r\n" +
@@ -550,8 +555,6 @@ func TestRedactSensitiveContentInBodies(t *testing.T) {
 			mustHave: []string{"Authorization: [REDACTED]"},
 		},
 		{
-			// Nothing sensitive: the dump must survive untouched so --verbose
-			// stays useful.
 			name: "non sensitive body is preserved",
 			dump: "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json\r\n" +
@@ -590,19 +593,16 @@ func TestRedactSensitiveContentPreservesCRLF(t *testing.T) {
 }
 
 func TestIsSensitiveKeyMatchesSpellingVariants(t *testing.T) {
-	sensitive := []string{"access_token", "accessToken", "Access-Token", "ACCESS_TOKEN", "clientSecret", "client_secret"}
+	sensitive := []string{"access_token", "accessToken", "Access-Token", "ACCESS_TOKEN", "clientSecret", "client_secret", "authToken", "auth-token", "AUTH_TOKEN"}
 	for _, key := range sensitive {
 		assert.True(t, isSensitiveKey(key), "expected %q to be treated as sensitive", key)
 	}
 
-	// Metadata, not credentials: these must stay readable.
 	for _, key := range []string{"token_type", "tokenType", "serviceId", "expires_in"} {
 		assert.False(t, isSensitiveKey(key), "did not expect %q to be treated as sensitive", key)
 	}
 }
 
-// TestDumpHelpersRedactCredentials exercises the dump helpers on the exact call
-// shapes test/import/importURL use under --verbose.
 func TestDumpHelpersRedactCredentials(t *testing.T) {
 	oldVerbose := Verbose
 	Verbose = true
@@ -635,7 +635,6 @@ func TestDumpHelpersRedactCredentials(t *testing.T) {
 	})
 }
 
-// The response body must remain readable by the caller after being dumped.
 func TestDumpResponseLeavesBodyReadable(t *testing.T) {
 	oldVerbose := Verbose
 	Verbose = true
