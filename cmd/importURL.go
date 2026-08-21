@@ -17,7 +17,9 @@
 package cmd
 
 import (
+
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -44,10 +46,13 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			}
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			for _, f := range sepSpecificationFiles {
-				artifactURL, mainArtifact, secret := parseImportURLSpecifier(f)
+				mainArtifact := true
+				secret := ""
+
+				f, mainArtifact, secret = parseImportURLArg(f)
 
 				// Try downloading the artifcat
-				msg, err := mc.DownloadArtifact(artifactURL, mainArtifact, secret)
+				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
 					return err
 				}
@@ -58,4 +63,27 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	}
 
 	return importURLCmd
+}
+
+func parseImportURLArg(f string) (string, bool, string) {
+	mainArtifact := true
+	secret := ""
+
+	// Check if URL starts with https or http
+	if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
+		parts := strings.Split(f, ":")
+		n := len(parts)
+
+		for i := n - 1; i >= 2; i-- {
+			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
+				mainArtifact = val
+				if i+1 < n {
+					secret = strings.Join(parts[i+1:], ":")
+				}
+				f = strings.Join(parts[:i], ":")
+				break
+			}
+		}
+	}
+	return f, mainArtifact, secret
 }

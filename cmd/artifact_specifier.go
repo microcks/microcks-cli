@@ -21,46 +21,12 @@ import (
 	"strings"
 )
 
-// parseImportURLSpecifier parses an import-url argument of the form:
-//   <url>[:<mainArtifactBool>[:<secret>]]
-//
-// It is intentionally parsed from the right side so that normal URLs containing
-// additional ':' characters (scheme, ports, etc.) are preserved unchanged unless
-// they end with the supported suffixes.
-func parseImportURLSpecifier(spec string) (url string, mainArtifact bool, secret string) {
-	mainArtifact = true
-
-	lastColon := strings.LastIndex(spec, ":")
-	if lastColon == -1 {
-		return spec, mainArtifact, ""
-	}
-
-	tail := spec[lastColon+1:]
-	if b, err := strconv.ParseBool(tail); err == nil {
-		return spec[:lastColon], b, ""
-	}
-
-	// Might be <url>:<bool>:<secret> — only treat it as such if the second-to-last
-	// segment parses as bool.
-	secretCandidate := tail
-	rest := spec[:lastColon]
-	secondColon := strings.LastIndex(rest, ":")
-	if secondColon == -1 {
-		return spec, mainArtifact, ""
-	}
-	boolCandidate := rest[secondColon+1:]
-	if b, err := strconv.ParseBool(boolCandidate); err == nil {
-		return rest[:secondColon], b, secretCandidate
-	}
-
-	return spec, mainArtifact, ""
-}
-
 // parseImportFileSpecifier parses an import argument of the form:
-//   <path>[:<mainArtifactBool>]
 //
-// Like parseImportURLSpecifier, it parses from the right to avoid breaking
-// paths that may contain ':' characters.
+//	<path>[:<mainArtifactBool>]
+//
+// It parses from the right to avoid breaking paths that may contain ':'
+// characters (e.g. Windows absolute paths like C:\...).
 func parseImportFileSpecifier(spec string) (path string, mainArtifact bool) {
 	mainArtifact = true
 
@@ -76,4 +42,3 @@ func parseImportFileSpecifier(spec string) (path string, mainArtifact bool) {
 
 	return spec, mainArtifact
 }
-

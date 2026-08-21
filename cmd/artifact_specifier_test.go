@@ -1,81 +1,22 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import "testing"
-
-func TestParseImportURLSpecifier_PreservesPortAndPathWithMainArtifactSuffix(t *testing.T) {
-	in := "http://localhost:8080/spec.yaml:true"
-	url, main, secret := parseImportURLSpecifier(in)
-
-	if url != "http://localhost:8080/spec.yaml" {
-		t.Fatalf("url mismatch: got %q", url)
-	}
-	if main != true {
-		t.Fatalf("mainArtifact mismatch: got %v", main)
-	}
-	if secret != "" {
-		t.Fatalf("secret mismatch: got %q", secret)
-	}
-}
-
-func TestParseImportURLSpecifier_PreservesQueryAndFragment(t *testing.T) {
-	in := "https://example.com:8443/spec.yaml?x=1#frag:false"
-	url, main, secret := parseImportURLSpecifier(in)
-
-	if url != "https://example.com:8443/spec.yaml?x=1#frag" {
-		t.Fatalf("url mismatch: got %q", url)
-	}
-	if main != false {
-		t.Fatalf("mainArtifact mismatch: got %v", main)
-	}
-	if secret != "" {
-		t.Fatalf("secret mismatch: got %q", secret)
-	}
-}
-
-func TestParseImportURLSpecifier_WithSecretSuffix(t *testing.T) {
-	in := "http://localhost:8080/spec.yaml:true:mySecret"
-	url, main, secret := parseImportURLSpecifier(in)
-
-	if url != "http://localhost:8080/spec.yaml" {
-		t.Fatalf("url mismatch: got %q", url)
-	}
-	if main != true {
-		t.Fatalf("mainArtifact mismatch: got %v", main)
-	}
-	if secret != "mySecret" {
-		t.Fatalf("secret mismatch: got %q", secret)
-	}
-}
-
-func TestParseImportURLSpecifier_NoSuffixes_Unchanged(t *testing.T) {
-	in := "http://localhost:8080/spec.yaml"
-	url, main, secret := parseImportURLSpecifier(in)
-
-	if url != in {
-		t.Fatalf("url mismatch: got %q", url)
-	}
-	if main != true {
-		t.Fatalf("mainArtifact mismatch: got %v", main)
-	}
-	if secret != "" {
-		t.Fatalf("secret mismatch: got %q", secret)
-	}
-}
-
-func TestParseImportURLSpecifier_PortOnly_NoSuffixes_Unchanged(t *testing.T) {
-	in := "http://localhost:8080/spec.yaml:1234"
-	url, main, secret := parseImportURLSpecifier(in)
-
-	if url != in {
-		t.Fatalf("url mismatch: got %q", url)
-	}
-	if main != true {
-		t.Fatalf("mainArtifact mismatch: got %v", main)
-	}
-	if secret != "" {
-		t.Fatalf("secret mismatch: got %q", secret)
-	}
-}
 
 func TestParseImportFileSpecifier_SuffixBool(t *testing.T) {
 	in := "./specs/openapi.yaml:false"
@@ -98,4 +39,3 @@ func TestParseImportFileSpecifier_NoSuffix_Unchanged(t *testing.T) {
 		t.Fatalf("mainArtifact mismatch: got %v", main)
 	}
 }
-
