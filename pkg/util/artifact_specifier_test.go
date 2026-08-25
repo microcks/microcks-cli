@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package cmd
+package util
 
 import "testing"
 
 func TestParseImportFileSpecifier_SuffixBool(t *testing.T) {
 	in := "./specs/openapi.yaml:false"
-	path, main := parseImportFileSpecifier(in)
+	path, main := ParseImportFileSpecifier(in)
 	if path != "./specs/openapi.yaml" {
 		t.Fatalf("path mismatch: got %q", path)
 	}
@@ -31,7 +31,7 @@ func TestParseImportFileSpecifier_SuffixBool(t *testing.T) {
 
 func TestParseImportFileSpecifier_NoSuffix_Unchanged(t *testing.T) {
 	in := "./specs/openapi.yaml"
-	path, main := parseImportFileSpecifier(in)
+	path, main := ParseImportFileSpecifier(in)
 	if path != in {
 		t.Fatalf("path mismatch: got %q", path)
 	}

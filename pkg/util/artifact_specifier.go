@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package cmd
+package util
 
 import (
 	"strconv"
 	"strings"
 )
 
-// parseImportFileSpecifier parses an import argument of the form:
+// ParseImportFileSpecifier parses an import argument of the form:
 //
 //	<path>[:<mainArtifactBool>]
 //
 // It parses from the right to avoid breaking paths that may contain ':'
 // characters (e.g. Windows absolute paths like C:\...).
-func parseImportFileSpecifier(spec string) (path string, mainArtifact bool) {
+func ParseImportFileSpecifier(spec string) (path string, mainArtifact bool) {
 	mainArtifact = true
 
 	lastColon := strings.LastIndex(spec, ":")

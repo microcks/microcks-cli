@@ -24,6 +24,7 @@ import (
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/microcks/microcks-cli/pkg/output"
+	"github.com/microcks/microcks-cli/pkg/util"
 	"github.com/microcks/microcks-cli/pkg/watcher"
 	"github.com/spf13/cobra"
 )
@@ -125,7 +126,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			results := make([]artifactImportResult, 0, len(sepSpecificationFiles))
 			for _, f := range sepSpecificationFiles {
-				path, mainArtifact := parseImportFileSpecifier(f)
+				path, mainArtifact := util.ParseImportFileSpecifier(f)
 
 				// Try uploading this artifact.
 				msg, err := mc.UploadArtifact(path, mainArtifact)
