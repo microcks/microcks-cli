@@ -45,13 +45,6 @@ Microcks has adopted a Code of Conduct that we expect project participants to ad
 
 We use Github to host code, to track issues and feature requests, as well as accept pull requests.
 
-## Error handling
-
-Code under `pkg/` and `cmd/` must return errors, never exit or panic on a runtime
-error: wrap the failure with a Kind (`return errors.Wrap(errors.KindConnection, err)`)
-and let it flow up. Only the `main` entrypoints and `cmd.Handle` exit the process.
-See [documentation/error-handling.md](documentation/error-handling.md); CI enforces this.
-
 ## Issues
 
 [Open an issue](https://github.com/microcks/microcks/issues/new) **only** if you want to report a bug or a feature. Don't open issues for questions or support, instead join our [Discord #support channel](https://microcks.io/discord-invite) or our [GitHub discussions](https://github.com/orgs/microcks/discussions) and ask there. 
@@ -63,6 +56,10 @@ Please use our issues templates that provide you with hints on what information 
 ## Pull Requests
 
 **Please, make sure you open an issue before starting with a Pull Request, unless it's a typo or a really obvious error.** Pull requests are the best way to propose changes to the specification. Take time to check the current working branch for the repository you want to contribute on before working :wink:
+
+### AI Contribution Policy
+
+If you use Generative AI tools (like GitHub Copilot, Cursor, etc.) to assist in your contributions, you must adhere to our [AI Contribution Policy](AI-POLICY.md). You are 100% accountable for your code, must explicitly disclose AI usage in your PR, and must not use AI tools to auto-reply to maintainers.
 
 ## Conventional commits
 
