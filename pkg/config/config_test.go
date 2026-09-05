@@ -456,3 +456,201 @@ func TestWatchConfig(t *testing.T) {
 		}
 	}
 }
+
+var secretMarkers = []string{
+	"eyJLEAKEDACCESS",
+	"eyJLEAKEDREFRESH",
+	"eyJLEAKEDID",
+	"eyJPROBELEAK",
+	"LEAKEDCLIENTSECRET",
+	"LEAKEDPASSWORD",
+	"LEAKEDAUTHCODE",
+}
+
+func assertNoCredentialLeaked(t testing.TB, got string) {
+	t.Helper()
+	for _, marker := range secretMarkers {
+		assert.NotContains(t, got, marker, "credential leaked into output")
+	}
+}
+
+func TestRedactSensitiveContentInBodies(t *testing.T) {
+	tests := []struct {
+		name        string
+		dump        string
+		mustHave    []string
+		mustNotHave []string
+	}{
+		{
+			name: "json token response",
+			dump: "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"\r\n" +
+				`{"access_token":"eyJLEAKEDACCESS","refresh_token":"eyJLEAKEDREFRESH","token_type":"Bearer","expires_in":300}`,
+			mustHave: []string{"token_type", "Bearer", "expires_in", "300"},
+		},
+		{
+			name: "json authtoken in body",
+			dump: "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"\r\n" +
+				`{"authToken":"eyJPROBELEAK"}`,
+			mustHave: []string{`{"authToken":"[REDACTED]"}`},
+		},
+		{
+			name: "json test request with oauth2 context",
+			dump: "POST /api/tests HTTP/1.1\r\n" +
+				"Content-Type: application/json; charset=utf-8\r\n" +
+				"Authorization: Bearer eyJLEAKEDACCESS\r\n" +
+				"\r\n" +
+				`{"serviceId":"Beer Catalog:0.9","oAuth2Context":{"clientId":"cli","clientSecret":"LEAKEDCLIENTSECRET","username":"bob","password":"LEAKEDPASSWORD","grantType":"PASSWORD"}}`,
+			mustHave: []string{"Beer Catalog:0.9", "clientId", "bob", "PASSWORD"},
+		},
+		{
+			name: "form encoded token exchange",
+			dump: "POST /token HTTP/1.1\r\n" +
+				"Content-Type: application/x-www-form-urlencoded\r\n" +
+				"\r\n" +
+				"grant_type=authorization_code&code=LEAKEDAUTHCODE&client_secret=LEAKEDCLIENTSECRET",
+			mustHave: []string{"grant_type", "authorization_code"},
+		},
+		{
+			name: "form encoded auth-token",
+			dump: "POST /api/login HTTP/1.1\r\n" +
+				"Content-Type: application/x-www-form-urlencoded\r\n" +
+				"\r\n" +
+				"auth-token=eyJPROBELEAK",
+			mustHave: []string{"auth-token=%5BREDACTED%5D"},
+		},
+		{
+			name: "nested and array json",
+			dump: "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"\r\n" +
+				`{"sessions":[{"user":"bob","credentials":{"idToken":"eyJLEAKEDID"}}]}`,
+			mustHave: []string{"sessions", "bob"},
+		},
+		{
+			name: "chunked json falls back to text redaction",
+			dump: "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"Transfer-Encoding: chunked\r\n" +
+				"\r\n" +
+				"3a\r\n" + `{"access_token":"eyJLEAKEDACCESS"}` + "\r\n0\r\n\r\n",
+		},
+		{
+			name: "oauth code in request line",
+			dump: "GET /auth/callback?state=abc&code=LEAKEDAUTHCODE HTTP/1.1\r\n" +
+				"Host: localhost:58085\r\n" +
+				"\r\n",
+			mustHave: []string{"state=abc", "Host: localhost:58085"},
+		},
+		{
+			name: "credentials in both header and body",
+			dump: "POST /api/tests HTTP/1.1\r\n" +
+				"Authorization: Bearer eyJLEAKEDACCESS\r\n" +
+				"Content-Type: application/json\r\n" +
+				"\r\n" +
+				`{"password":"LEAKEDPASSWORD"}`,
+			mustHave: []string{"Authorization: [REDACTED]"},
+		},
+		{
+			name: "non sensitive body is preserved",
+			dump: "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"\r\n" +
+				`{"id":"abc123","success":true,"elapsedTime":42}`,
+			mustHave:    []string{"abc123", "true", "42"},
+			mustNotHave: []string{"[REDACTED]"},
+		},
+		{
+			name: "header only dump without body",
+			dump: "GET /api/keycloak/config HTTP/1.1\r\n" +
+				"Accept: application/json",
+			mustHave:    []string{"Accept: application/json"},
+			mustNotHave: []string{"[REDACTED]"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := redactSensitiveContent(tt.dump)
+			assertNoCredentialLeaked(t, got)
+			for _, want := range tt.mustHave {
+				assert.Contains(t, got, want, "expected value to survive redaction")
+			}
+			for _, unwanted := range tt.mustNotHave {
+				assert.NotContains(t, got, unwanted)
+			}
+		})
+	}
+}
+
+func TestRedactSensitiveContentPreservesCRLF(t *testing.T) {
+	dump := "GET / HTTP/1.1\r\nAuthorization: Bearer eyJLEAKEDACCESS\r\nAccept: */*\r\n\r\n"
+	got := redactSensitiveContent(dump)
+	assert.Contains(t, got, "[REDACTED]\r\nAccept:", "CRLF line ending was not preserved around the redacted header")
+}
+
+func TestIsSensitiveKeyMatchesSpellingVariants(t *testing.T) {
+	sensitive := []string{"access_token", "accessToken", "Access-Token", "ACCESS_TOKEN", "clientSecret", "client_secret", "authToken", "auth-token", "AUTH_TOKEN"}
+	for _, key := range sensitive {
+		assert.True(t, isSensitiveKey(key), "expected %q to be treated as sensitive", key)
+	}
+
+	for _, key := range []string{"token_type", "tokenType", "serviceId", "expires_in"} {
+		assert.False(t, isSensitiveKey(key), "did not expect %q to be treated as sensitive", key)
+	}
+}
+
+func TestDumpHelpersRedactCredentials(t *testing.T) {
+	oldVerbose := Verbose
+	Verbose = true
+	defer func() { Verbose = oldVerbose }()
+
+	t.Run("keycloak token response", func(t *testing.T) {
+		body := `{"access_token":"eyJLEAKEDACCESS","refresh_token":"eyJLEAKEDREFRESH"}`
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Proto:      "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
+			Header:        http.Header{"Content-Type": []string{"application/json"}},
+			Body:          io.NopCloser(strings.NewReader(body)),
+			ContentLength: int64(len(body)),
+		}
+		assertNoCredentialLeaked(t, captureStdout(t, func() {
+			DumpResponseIfRequired("Keycloak for getting token", resp, true)
+		}))
+	})
+
+	t.Run("test creation request", func(t *testing.T) {
+		payload := `{"serviceId":"x","oAuth2Context":{"clientSecret":"LEAKEDCLIENTSECRET","password":"LEAKEDPASSWORD"}}`
+		req, err := http.NewRequest("POST", "https://microcks.example.com/api/tests", strings.NewReader(payload))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		req.Header.Set("Authorization", "Bearer eyJLEAKEDACCESS")
+
+		assertNoCredentialLeaked(t, captureStdout(t, func() {
+			DumpRequestIfRequired("Microcks for creating test", req, true)
+		}))
+	})
+}
+
+func TestDumpResponseLeavesBodyReadable(t *testing.T) {
+	oldVerbose := Verbose
+	Verbose = true
+	defer func() { Verbose = oldVerbose }()
+
+	body := `{"access_token":"eyJLEAKEDACCESS"}`
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Proto:      "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
+		Header:        http.Header{"Content-Type": []string{"application/json"}},
+		Body:          io.NopCloser(strings.NewReader(body)),
+		ContentLength: int64(len(body)),
+	}
+	captureStdout(t, func() { DumpResponseIfRequired("token", resp, true) })
+
+	got, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, body, string(got), "body was altered by dump")
+}
