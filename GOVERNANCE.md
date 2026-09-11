@@ -86,6 +86,8 @@ If a maintainer or code owner can no longer fulfill their commitments, they shou
 ## Adding or Removing Sub Projects
 Microcks maintainers have the authority to add or remove sub-projects or repositories as needed. We follow a careful approach when making these changes: any new sub-project must serve a long-term purpose that is clearly distinct from existing ones, while sub-projects slated for removal must be shown to have either outlived their usefulness, become deprecated or unmaintainable.
 
+The canonical inventory of Microcks projects and repositories, including their lifecycle status and responsible ownership, is maintained in [SUBPROJECTS.md](https://github.com/microcks/.github/blob/main/SUBPROJECTS.md).
+
 When a sub-project is removed, it will be archived as-is within the Microcks-archive organization, along with its associated repositories, ensuring transparency and historical reference.
 
 ## Conflict Resolutions
