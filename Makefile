@@ -10,7 +10,8 @@ HOST_ARCH=$(shell go env GOARCH)
 
 .PHONY: build-local
 build-local:
-	go build -o ${DIST_DIR}/${BIN_NAME}
+	@mkdir -p "${DIST_DIR}"
+	go build -o "${DIST_DIR}/${BIN_NAME}"
 
 .PHONY: clean
 clean:
