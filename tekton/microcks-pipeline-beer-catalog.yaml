@@ -18,10 +18,8 @@ spec:
           value: http://microcks.apps.144.76.24.92.nip.io/api/
         - name: waitFor
           value: 12sec
-        - name: keycloakClientId
-          value: microcks-serviceaccount
-        - name: keycloakClientSecret
-          value: 34a49089-7566-45a0-88a6-112b297fd803
+        - name: keycloakSecret
+          value: microcks-keycloak-client-secret
         - name: operationsHeaders
           value: |-
             {
