@@ -128,6 +128,13 @@ func TestParseImportURLArg(t *testing.T) {
 			expectedMainArtifact: true,
 			expectedSecret:      "",
 		},
+		{
+    		name:                 "boolean-like secret is not consumed as primary flag",
+    		input:                "http://example.com/api:true:false",
+    		expectedURL:          "http://example.com/api",
+    		expectedMainArtifact: true,
+    		expectedSecret:       "false",
+		},
 	}
 
 	for _, tt := range tests {

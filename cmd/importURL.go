@@ -73,16 +73,19 @@ func parseImportURLArg(f string) (string, bool, string) {
 		parts := strings.Split(f, ":")
 		n := len(parts)
 
-		for i := n - 1; i >= 2; i-- {
-			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
+		if n >= 3 {
+			// Case 1: URL:boolean:secret
+			if val, err := strconv.ParseBool(parts[n-2]); err == nil {
 				mainArtifact = val
-				if i+1 < n {
-					secret = strings.Join(parts[i+1:], ":")
-				}
-				f = strings.Join(parts[:i], ":")
-				break
+				secret = parts[n-1]
+				f = strings.Join(parts[:n-2], ":")
+			} else if val, err := strconv.ParseBool(parts[n-1]); err == nil {
+				// Case 2: URL:boolean
+				mainArtifact = val
+				f = strings.Join(parts[:n-1], ":")
 			}
 		}
 	}
+
 	return f, mainArtifact, secret
 }
