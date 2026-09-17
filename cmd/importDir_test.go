@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,7 +69,7 @@ func (m *MockFileSystem) Walk(root string, walkFn filepath.WalkFunc) error {
 	}
 
 	for path, isDir := range m.Files {
-		if filepath.HasPrefix(path, root) {
+		if strings.HasPrefix(path, root+string(filepath.Separator)) {
 			info := &MockFileInfo{name: filepath.Base(path), isDir: isDir}
 			if err := walkFn(path, info, nil); err != nil {
 				return err
