@@ -173,9 +173,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					}
 
 					// Normalize file path to match the watcher fsnotify events format.
-					if strings.HasPrefix(f, "./") {
-						f = strings.TrimPrefix(f, "./")
-					}
+					f = strings.TrimPrefix(f, "./")
 
 					// Upsert entry.
 					watchCfg.UpsertEntry(config.WatchEntry{
