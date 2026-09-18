@@ -69,7 +69,7 @@ func (m *MockFileSystem) Walk(root string, walkFn filepath.WalkFunc) error {
 	}
 
 	for path, isDir := range m.Files {
-		if strings.HasPrefix(path, root+string(filepath.Separator)) {
+        if path == root || strings.HasPrefix(path, root+string(filepath.Separator)) {
 			info := &MockFileInfo{name: filepath.Base(path), isDir: isDir}
 			if err := walkFn(path, info, nil); err != nil {
 				return err
