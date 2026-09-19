@@ -52,71 +52,14 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 
 			specificationFiles := args[0]
 
-			// Initialize config from command options.
-			config.InsecureTLS = globalClientOpts.InsecureTLS
-			config.CaCertPaths = globalClientOpts.CaCertPaths
-			config.Verbose = globalClientOpts.Verbose
-
-			// Read local config file in case we need some context info.
-			localConfig, err := config.ReadLocalConfig(globalClientOpts.ConfigPath)
+			mc, serverAddr, err := newCommandClient(globalClientOpts)
 			if err != nil {
-				return errors.Wrap(errors.KindEnvironment, err)
+				return err
 			}
 
-			// Prepare Microcks client.
-			var mc connectors.MicrocksClient
-
-			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
-				// Create client with server address.
-				var err error
-				mc, err = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
-				if err != nil {
-					return err
-				}
-
-				keycloakURL, err := mc.GetKeycloakURL()
-				if err != nil {
-					return err
-				}
-
-				oauthToken := "unauthenticated-token"
-				if keycloakURL != "null" {
-					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
-					if err != nil {
-						return err
-					}
-
-					oauthToken, err = kc.ConnectAndGetToken()
-					if err != nil {
-						return err
-					}
-				}
-
-				// Set Auth token.
-				mc.SetOAuthToken(oauthToken)
-
-				// If no context provided use current one from config file or client server address.
-				// So that watch config can be updated properly, referencing the right context.
-				if globalClientOpts.Context == "" {
-					if (localConfig != nil) && (localConfig.CurrentContext != "") {
-						globalClientOpts.Context = localConfig.CurrentContext
-					} else {
-						globalClientOpts.Context = globalClientOpts.ServerAddr
-					}
-				}
-
-			} else {
-				// Create client from config file and using the current or provided context.
-				if localConfig == nil {
-					return errors.Wrapf(errors.KindUsage, "please login to perform this operation")
-				}
-
-				if globalClientOpts.Context == "" {
-					globalClientOpts.Context = localConfig.CurrentContext
-				}
-
-				mc, err = connectors.NewClient(*globalClientOpts)
+			watchContext := globalClientOpts.Context
+			if watch && watchContext == "" {
+				watchContext, err = defaultImportWatchContext(globalClientOpts.ConfigPath, serverAddr)
 				if err != nil {
 					return err
 				}
@@ -180,7 +123,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					// Upsert entry.
 					watchCfg.UpsertEntry(config.WatchEntry{
 						FilePath:     f,
-						Context:      []string{globalClientOpts.Context},
+						Context:      []string{watchContext},
 						MainArtifact: mainArtifact,
 					})
 
@@ -218,6 +161,17 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 	importCmd.Flags().BoolVar(&watch, "watch", false, "Keep watch on file changes and re-import it on change")
 	importCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text or json")
 	return importCmd
+}
+
+func defaultImportWatchContext(configPath, serverAddr string) (string, error) {
+	localConfig, err := config.ReadLocalConfig(configPath)
+	if err != nil {
+		return "", errors.Wrap(errors.KindEnvironment, err)
+	}
+	if localConfig != nil && localConfig.CurrentContext != "" {
+		return localConfig.CurrentContext, nil
+	}
+	return serverAddr, nil
 }
 
 type artifactImportResult struct {
