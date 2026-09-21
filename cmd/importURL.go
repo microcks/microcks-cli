@@ -73,7 +73,7 @@ func parseImportURLArg(f string) (string, bool, string) {
 		parts := strings.Split(f, ":")
 		n := len(parts)
 
-		for i := n - 1; i >= 2; i-- {
+		for i := 2; i < n; i++ {
 			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
 				mainArtifact = val
 				if i+1 < n {
