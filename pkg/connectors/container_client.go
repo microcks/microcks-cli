@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	cerrdefs "github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/microcks/microcks-cli/pkg/errors"
@@ -229,7 +230,7 @@ func (cli *containerClient) ContainerExists(containerId string) (bool, error) {
 	ctx := context.Background()
 	_, err := cli.cli.ContainerInspect(ctx, containerId)
 	if err != nil {
-		if client.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
