@@ -149,6 +149,13 @@ func TestParseImportURLArg(t *testing.T) {
 			expectedMainArtifact: false,
 			expectedSecret:      "auth:basic:user:pass",
 		},
+		{
+			name:                "boolean host with port does not get misparsed as primary flag",
+			input:               "http://true:8080/api:false:secret",
+			expectedURL:         "http://true:8080/api",
+			expectedMainArtifact: false,
+			expectedSecret:      "secret",
+		},
 	}
 
 	for _, tt := range tests {
