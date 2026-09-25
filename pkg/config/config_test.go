@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -60,6 +61,7 @@ func TestGetFilePermission(t *testing.T) {
 			fi := mockFileInfo{mode: m}
 			err := getFilePermission(fi)
 			assert.Error(t, err, "Mode %v should be invalid on Windows", m)
+			assert.EqualError(t, err, fmt.Sprintf("config file has incorrect permission flags: %s, change the file permission either to 0444 or 0666", m.String()))
 		}
 	} else {
 		validModes := []os.FileMode{0600, 0400}
@@ -74,6 +76,7 @@ func TestGetFilePermission(t *testing.T) {
 			fi := mockFileInfo{mode: m}
 			err := getFilePermission(fi)
 			assert.Error(t, err, "Mode %v should be invalid on UNIX", m)
+			assert.EqualError(t, err, fmt.Sprintf("config file has incorrect permission flags: %s, change the file permission either to 0400 or 0600", m.String()))
 		}
 	}
 }
