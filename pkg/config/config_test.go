@@ -369,7 +369,7 @@ func TestLocalConfigCRUDAndValidation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "cont456", inst2Updated.ContainerID)
 
-	ok = loadedCfg.RemoveInstance("inst2-updated")
+	ok = loadedCfg.RemoveInstance("cont456")
 	assert.True(t, ok)
 
 	ok = loadedCfg.RemoveInstance("")
