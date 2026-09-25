@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -74,7 +75,44 @@ func NewContainerClient(driver string) (ContainerClient, error) {
 	}
 }
 
+// ConfigureDockerHost ensures DOCKER_HOST points to an active Docker daemon socket.
+// On macOS, Docker Desktop may not install the privileged /var/run/docker.sock symlink.
+// If DOCKER_HOST is not explicitly set, we look for the user socket or inspect the active context.
+func ConfigureDockerHost() error {
+	if os.Getenv("DOCKER_HOST") != "" {
+		return nil
+	}
+
+	if runtime.GOOS != "darwin" {
+		return nil
+	}
+
+	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+		return nil
+	}
+
+	// Query the endpoint from the active docker context first to honor user configuration.
+	out, err := exec.Command("docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}").Output()
+	if err == nil {
+		if endpoint := strings.TrimSpace(string(out)); endpoint != "" {
+			return os.Setenv("DOCKER_HOST", endpoint)
+		}
+	}
+
+	// Fall back to the standard Docker Desktop socket path on macOS.
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		userSocket := filepath.Join(homeDir, ".docker", "run", "docker.sock")
+		if _, err := os.Stat(userSocket); err == nil {
+			return os.Setenv("DOCKER_HOST", "unix://"+userSocket)
+		}
+	}
+
+	return nil
+}
 func NewDockerClient() (*containerClient, error) {
+	if err := ConfigureDockerHost(); err != nil {
+		return nil, err
+	}
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 
 	if err != nil {
@@ -89,6 +127,9 @@ func NewDockerClient() (*containerClient, error) {
 // an unreachable endpoint (e.g. a stopped Podman machine) before testcontainers-go
 // silently resolves to a different runtime.
 func PingDockerHost() error {
+	if err := ConfigureDockerHost(); err != nil {
+		return err
+	}
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return err

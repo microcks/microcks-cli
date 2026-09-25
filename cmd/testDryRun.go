@@ -60,12 +60,12 @@ func configureDriver(driver string) error {
 	case "podman":
 		return setupPodman()
 	case "docker":
-		return nil // testcontainers-go's default, via DOCKER_HOST
+		return connectors.ConfigureDockerHost() // ensure DOCKER_HOST is set before testcontainers-go connects
 	case "":
 		if shouldUsePodman() {
 			return setupPodman()
 		}
-		return nil
+		return connectors.ConfigureDockerHost()
 	default:
 		return errors.Wrapf(errors.KindUsage, "unsupported --driver %q (use 'docker' or 'podman')", driver)
 	}
