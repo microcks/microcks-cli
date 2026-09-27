@@ -48,8 +48,8 @@ func TriggerImportWithContext(ctx context.Context, entry config.WatchEntry) {
 		if _, err := os.Stat(cfgPath); err == nil {
 			globalClientOpts := &connectors.ClientOptions{
 				RequestContext: ctx,
-				ConfigPath:     cfgPath,
-				Context:        context,
+				ConfigPath: cfgPath,
+				Context:    context,
 			}
 
 			mc, err = connectors.NewClient(*globalClientOpts)
