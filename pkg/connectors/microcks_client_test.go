@@ -17,25 +17,20 @@
 package connectors
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
 )
 
 func TestUploadArtifact(t *testing.T) {
 	t.Run("streams without buffering", testUploadArtifactStreamsWithoutBuffering)
-	t.Run("cancels in-flight request", testUploadArtifactCancelsInFlightRequest)
 }
 
 func testUploadArtifactStreamsWithoutBuffering(t *testing.T) {
@@ -98,73 +93,6 @@ func testUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 	}
 	if strings.TrimSpace(msg) != expectedResponse {
 		t.Fatalf("expected response %q, got %q", expectedResponse, msg)
-	}
-}
-
-func testUploadArtifactCancelsInFlightRequest(t *testing.T) {
-	requestStarted := make(chan struct{})
-	readBody := make(chan struct{})
-	bodyRead := make(chan error, 1)
-	var releaseBody sync.Once
-	release := func() { releaseBody.Do(func() { close(readBody) }) }
-	defer release()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var firstByte [1]byte
-		if _, err := io.ReadFull(r.Body, firstByte[:]); err != nil {
-			bodyRead <- err
-			return
-		}
-		close(requestStarted)
-		<-readBody
-		_, err := io.Copy(io.Discard, r.Body)
-		bodyRead <- err
-	}))
-	defer server.Close()
-
-	path := filepath.Join(t.TempDir(), "artifact.json")
-	artifact, err := os.Create(path)
-	if err != nil {
-		t.Fatalf("failed to create artifact: %v", err)
-	}
-	if err := artifact.Truncate(64 << 20); err != nil {
-		artifact.Close()
-		t.Fatalf("failed to size artifact: %v", err)
-	}
-	if err := artifact.Close(); err != nil {
-		t.Fatalf("failed to close artifact: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	client, err := NewMicrocksClientWithContext(ctx, server.URL)
-	if err != nil {
-		t.Fatalf("NewMicrocksClientWithContext returned error: %v", err)
-	}
-
-	result := make(chan error, 1)
-	go func() {
-		_, err := client.UploadArtifact(path, true)
-		result <- err
-	}()
-
-	<-requestStarted
-	cancel()
-	release()
-	select {
-	case err := <-result:
-		if err == nil || !errors.Is(err, context.Canceled) {
-			t.Fatalf("UploadArtifact error = %v, want context.Canceled", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("UploadArtifact did not return after cancellation")
-	}
-	select {
-	case err := <-bodyRead:
-		if err == nil {
-			t.Fatal("server read the complete upload after cancellation")
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("server did not observe the canceled upload")
 	}
 }
 

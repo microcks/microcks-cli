@@ -146,15 +146,15 @@ type OAuth2ClientContext struct {
 
 type ClientOptions struct {
 	RequestContext context.Context
-	ServerAddr     string
-	Context        string
-	ConfigPath     string
-	AuthToken      string
-	InsecureTLS    bool
-	Verbose        bool
-	CaCertPaths    string
-	ClientId       string
-	ClientSecret   string
+	ServerAddr   string
+	Context      string
+	ConfigPath   string
+	AuthToken    string
+	InsecureTLS  bool
+	Verbose      bool
+	CaCertPaths  string
+	ClientId     string
+	ClientSecret string
 }
 
 type microcksClient struct {
