@@ -241,7 +241,7 @@ func runDryRunTest(opts dryRunOptions) (resultErr error) {
 
 	// The uber-native image runs without Keycloak: a headless client with
 	// the unauthenticated token is enough.
-	mc, err := connectors.NewMicrocksClient(endpoint)
+	mc, err := connectors.NewMicrocksClientWithContext(ctx, endpoint)
 	if err != nil {
 		return err
 	}

@@ -17,6 +17,11 @@
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/microcks/microcks-cli/cmd"
 )
 
@@ -27,5 +32,7 @@ func main() {
 	if err != nil {
 		cmd.Handle(err)
 	}
-	cmd.Handle(command.Execute())
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	cmd.Handle(command.ExecuteContext(ctx))
 }
