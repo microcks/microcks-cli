@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/errors"
@@ -62,9 +63,9 @@ func NewKeycloakClient(realmURL string, username string, password string) (Keycl
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
-		kc.httpClient = &http.Client{Transport: tr}
+		kc.httpClient = &http.Client{Transport: tr, Timeout: 30 * time.Second}
 	} else {
-		kc.httpClient = http.DefaultClient
+		kc.httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 	return &kc, nil
 }

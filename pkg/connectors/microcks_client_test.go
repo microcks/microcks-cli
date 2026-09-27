@@ -25,7 +25,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/microcks/microcks-cli/pkg/config"
 	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
 )
 
@@ -463,3 +465,75 @@ func TestGetFullTestResultClassifiesNotFound(t *testing.T) {
 		t.Fatalf("KindOf = %v, want KindNotFound", got)
 	}
 }
+
+func TestMicrocksClientTimeout(t *testing.T) {
+	client, err := NewMicrocksClient("http://localhost:8080")
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	if client.HttpClient().Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout, got %v", client.HttpClient().Timeout)
+	}
+
+	config.InsecureTLS = true
+	defer func() { config.InsecureTLS = false }()
+
+	tlsClient, err := NewMicrocksClient("http://localhost:8080")
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	if tlsClient.HttpClient().Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout with TLS, got %v", tlsClient.HttpClient().Timeout)
+	}
+}
+
+func TestKeycloakClientTimeout(t *testing.T) {
+	client, err := NewKeycloakClient("http://localhost:8080/realms/microcks", "user", "pass")
+	if err != nil {
+		t.Fatalf("NewKeycloakClient returned error: %v", err)
+	}
+	kc, ok := client.(*keycloakClient)
+	if !ok {
+		t.Fatalf("expected *keycloakClient type")
+	}
+	if kc.httpClient.Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout, got %v", kc.httpClient.Timeout)
+	}
+
+	config.InsecureTLS = true
+	defer func() { config.InsecureTLS = false }()
+
+	tlsClient, err := NewKeycloakClient("http://localhost:8080/realms/microcks", "user", "pass")
+	if err != nil {
+		t.Fatalf("NewKeycloakClient returned error: %v", err)
+	}
+	kcTLS, ok := tlsClient.(*keycloakClient)
+	if !ok {
+		t.Fatalf("expected *keycloakClient type")
+	}
+	if kcTLS.httpClient.Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout with TLS, got %v", kcTLS.httpClient.Timeout)
+	}
+}
+
+func TestNewClientTimeout(t *testing.T) {
+	client, err := NewClient(ClientOptions{})
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	if client.HttpClient().Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout, got %v", client.HttpClient().Timeout)
+	}
+
+	config.InsecureTLS = true
+	defer func() { config.InsecureTLS = false }()
+
+	tlsClient, err := NewClient(ClientOptions{})
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	if tlsClient.HttpClient().Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout with TLS, got %v", tlsClient.HttpClient().Timeout)
+	}
+}
+
