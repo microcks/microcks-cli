@@ -684,7 +684,9 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		_ = pr.CloseWithError(err)
+		if closeErr := pr.CloseWithError(err); closeErr != nil {
+			err = fmt.Errorf("%w (closing artifact upload pipe: %v)", err, closeErr)
+		}
 		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
