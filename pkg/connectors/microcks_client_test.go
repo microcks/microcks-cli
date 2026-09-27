@@ -33,7 +33,12 @@ import (
 	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
 )
 
-func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
+func TestUploadArtifact(t *testing.T) {
+	t.Run("streams without buffering", testUploadArtifactStreamsWithoutBuffering)
+	t.Run("cancels in-flight request", testUploadArtifactCancelsInFlightRequest)
+}
+
+func testUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 	const fileContent = `{"openapi":"3.0.0","info":{"title":"Test API","version":"1.0.0"}}`
 	const expectedResponse = "artifact uploaded"
 
@@ -96,7 +101,7 @@ func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 	}
 }
 
-func TestUploadArtifactCancelsInFlightRequest(t *testing.T) {
+func testUploadArtifactCancelsInFlightRequest(t *testing.T) {
 	requestStarted := make(chan struct{})
 	readBody := make(chan struct{})
 	bodyRead := make(chan error, 1)
