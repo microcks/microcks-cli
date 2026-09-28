@@ -17,6 +17,7 @@
 package watcher
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -25,6 +26,10 @@ import (
 )
 
 func TriggerImport(entry config.WatchEntry) {
+	TriggerImportWithContext(context.Background(), entry)
+}
+
+func TriggerImportWithContext(ctx context.Context, entry config.WatchEntry) {
 	// Retrieve config to get client options.
 	cfgPath, err := config.DefaultLocalConfigPath()
 	if err != nil {
@@ -42,6 +47,7 @@ func TriggerImport(entry config.WatchEntry) {
 		// If config path exist, instantiate client with it.
 		if _, err := os.Stat(cfgPath); err == nil {
 			globalClientOpts := &connectors.ClientOptions{
+				RequestContext: ctx,
 				ConfigPath: cfgPath,
 				Context:    context,
 			}
@@ -53,7 +59,7 @@ func TriggerImport(entry config.WatchEntry) {
 		} else {
 			// We have no config file, so just create a client with context as server URL.
 			var cerr error
-			mc, cerr = connectors.NewMicrocksClient(context)
+			mc, cerr = connectors.NewMicrocksClientWithContext(ctx, context)
 			if cerr != nil {
 				fmt.Printf("[ERROR] Cannot create Microcks client for context '%s': %v\n", context, cerr)
 				continue

@@ -87,7 +87,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			config.Verbose = globalClientOpts.Verbose
 
 			server = args[0]
-			mc, err := connectors.NewMicrocksClient(server)
+			mc, err := connectors.NewMicrocksClientWithContext(ctx, server)
 			if err != nil {
 				return err
 			}
@@ -140,7 +140,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 						return errors.Wrapf(errors.KindUsage, "please set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' to perform password login")
 					}
 					//Perform login and retrive tokens
-					authToken, refreshToken, err = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					authToken, refreshToken, err = passwordLogin(ctx, keycloakUrl, clientID, clientSecret, username, password)
 					if err != nil {
 						return err
 					}
@@ -149,7 +149,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				} else {
 					httpClient := mc.HttpClient()
 					ctx = oidc.ClientContext(ctx, httpClient)
-					kc, err := connectors.NewKeycloakClient(keycloakUrl, "", "")
+					kc, err := connectors.NewKeycloakClientWithContext(ctx, keycloakUrl, "", "")
 					if err != nil {
 						return err
 					}
@@ -351,8 +351,8 @@ func ssoAuthFlow(url string, ssoLaunchBrowser bool) error {
 	return nil
 }
 
-func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string, error) {
-	kc, err := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret)
+func passwordLogin(ctx context.Context, keycloakURL, clientId, clientSecret, Username, Password string) (string, string, error) {
+	kc, err := connectors.NewKeycloakClientWithContext(ctx, keycloakURL, clientId, clientSecret)
 	if err != nil {
 		return "", "", err
 	}

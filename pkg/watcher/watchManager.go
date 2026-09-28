@@ -17,6 +17,7 @@
 package watcher
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -93,8 +94,15 @@ func (wm *WatchManager) Reload() error {
 }
 
 func (wm *WatchManager) Run() {
+	wm.RunContext(context.Background())
+}
+
+func (wm *WatchManager) RunContext(ctx context.Context) {
+	defer wm.fileWatcher.Close()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case event := <-wm.fileWatcher.Events:
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				if event.Name == wm.configPath {
@@ -112,7 +120,7 @@ func (wm *WatchManager) Run() {
 					entry, exists := wm.watchEntries[event.Name]
 					wm.lock.Unlock()
 					if exists {
-						go TriggerImport(entry)
+						go TriggerImportWithContext(ctx, entry)
 					}
 				}
 			}

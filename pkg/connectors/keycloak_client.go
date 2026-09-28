@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -38,6 +39,7 @@ type KeycloakClient interface {
 }
 
 type keycloakClient struct {
+	ctx      context.Context
 	BaseURL  *url.URL
 	Username string
 	Password string
@@ -47,7 +49,15 @@ type keycloakClient struct {
 
 // NewKeycloakClient build a new KeycloakClient implementation
 func NewKeycloakClient(realmURL string, username string, password string) (KeycloakClient, error) {
-	kc := keycloakClient{}
+	return NewKeycloakClientWithContext(context.Background(), realmURL, username, password)
+}
+
+// NewKeycloakClientWithContext builds a KeycloakClient using ctx for HTTP requests.
+func NewKeycloakClientWithContext(ctx context.Context, realmURL string, username string, password string) (KeycloakClient, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	kc := keycloakClient{ctx: ctx}
 
 	u, err := url.Parse(realmURL)
 	if err != nil {
@@ -74,7 +84,7 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	rel := &url.URL{Path: "protocol/openid-connect/token"}
 	u := c.BaseURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
+	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +132,7 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 	u := c.BaseURL.ResolveReference(rel)
 
 	// Create HTTP request
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak OIDC request: %w", err))
 	}
@@ -176,7 +186,7 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	data.Set("password", password)
 	data.Set("grant_type", "password")
 	// Create HTTP request
-	req, err := http.NewRequest("POST", u.String(), bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return "", "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak token request: %w", err))
 	}

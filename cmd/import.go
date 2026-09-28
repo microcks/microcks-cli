@@ -70,7 +70,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
 				// Create client with server address.
 				var err error
-				mc, err = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
+				mc, err = connectors.NewMicrocksClientWithContext(cmd.Context(), globalClientOpts.ServerAddr)
 				if err != nil {
 					return err
 				}
@@ -83,7 +83,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				oauthToken := "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					kc, err := connectors.NewKeycloakClientWithContext(cmd.Context(), keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 					if err != nil {
 						return err
 					}
@@ -205,7 +205,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				if _, err := fmt.Println("Watch mode enabled - microcks-watcher started..."); err != nil {
 					return errors.Wrap(errors.KindEnvironment, err)
 				}
-				wm.Run()
+				wm.RunContext(cmd.Context())
 			}
 			if outputFormat == "json" {
 				return errors.Wrap(errors.KindEnvironment, output.WriteJSON(os.Stdout, results))

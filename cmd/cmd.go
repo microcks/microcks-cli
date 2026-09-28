@@ -32,6 +32,9 @@ func NewCommand() (*cobra.Command, error) {
 		// exits, so Cobra must not also print them.
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			clientOpts.RequestContext = cmd.Context()
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
 		},
