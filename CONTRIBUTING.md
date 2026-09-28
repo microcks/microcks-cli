@@ -2,10 +2,6 @@
 
 We love your input! We want to make contributing to this project as easy and transparent as possible.
 
-## Contribution recogniton
-
-We plan to use [All Contributors](https://allcontributors.org/docs/en/specification) specification to handle recognitions.
-
 ## Summary of the contribution flow
 
 The following is a summary of the ideal contribution flow. Please, note that Pull Requests can also be rejected by the maintainers when appropriate.
@@ -56,6 +52,10 @@ Please use our issues templates that provide you with hints on what information 
 ## Pull Requests
 
 **Please, make sure you open an issue before starting with a Pull Request, unless it's a typo or a really obvious error.** Pull requests are the best way to propose changes to the specification. Take time to check the current working branch for the repository you want to contribute on before working :wink:
+
+### AI Contribution Policy
+
+If you use Generative AI tools (like GitHub Copilot, Cursor, etc.) to assist in your contributions, you must adhere to our [AI Contribution Policy](AI-POLICY.md). You are 100% accountable for your code, must explicitly disclose AI usage in your PR, and must not use AI tools to auto-reply to maintainers.
 
 ## Conventional commits
 

@@ -4,6 +4,8 @@ Runs contract or integration tests against a deployed API using the selected run
 ### Usage
 ```bash
 microcks test <apiName:apiVersion> <testEndpoint> <runner> [flags]
+microcks test list [flags]
+microcks test get <testResultId> [flags]
 ```
 
 ### Example
@@ -19,6 +21,15 @@ microcks test Beer Catalog API:0.9 http://localhost:9090/api/ POSTMAN \
         --microcksURL <microcks-url> \
         --keycloakClientId <client-id> \
         --keycloakClientSecret <client-secret> \
+
+# List recent test results as JSON
+microcks test list --output json
+
+# List recent test results for a service
+microcks test list --serviceId <service-id> --output json
+
+# Get a full test result as JSON
+microcks test get <test-result-id> --output json
 ```
 
 ### Runner Options
@@ -34,6 +45,15 @@ One of:
 | `--filteredOperations` | Comma-separated list of operations to test                                          |
 | `--operationsHeaders`  | Custom headers for operations as JSON string                                        |
 | `--oAuth2Context`      | OAuth2 client context as JSON string                                                |
+| `--output`             | Output format: `text` (default), `json`, `yaml`, or `github-actions`                |
+
+### `test list` and `test get` Options
+| Flag          | Description                                      |
+| ------------- | ------------------------------------------------ |
+| `--output`    | Output format: `text` (default) or `json`        |
+| `--serviceId` | Service id to filter `test list` results         |
+| `--page`      | Page index to fetch for `test list`              |
+| `--size`      | Number of test results to fetch for `test list`  |
 
 
 ### Options Inherited from Parent Commands
@@ -47,3 +67,17 @@ One of:
 | `--keycloakClientId`     | Keycloak Realm Service Account ClientId     |
 | `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
 | `--microcksURL`          | Microcks API URL                            |
+
+### Structured output contracts
+
+`test list --output json` writes a JSON array of test-result summaries.
+`test get --output json` writes one complete test result, including its
+`testCaseResults` when present. Integrations should check for the
+`test.list.json` and `test.get.json` capabilities before depending on these
+contracts.
+
+`microcks test ... --output json` and one-shot dry-run tests write the completed
+test result to stdout while progress and diagnostics go to stderr. Dry-run
+watch mode writes one JSON event per line. Consumers should require
+`test.dry-run.watch.events.json` and handle `ready`, `imported`, `test-result`,
+`waiting`, `error`, and `stopped`.

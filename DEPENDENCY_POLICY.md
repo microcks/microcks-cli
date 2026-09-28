@@ -8,7 +8,7 @@ The list of external dependencies in this Microcks repository with their current
 ## Declaring external dependencies
 
 Depending on the Microcks Core or Module/extension technology stack, all external dependencies should be declared
-in either [pom.xml](pom.xml), [package.json](package.json) or [go.mod](go.mod) root files.
+in either `pom.xml`, `package.json` or `go.mod` root files.
 
 Dependency declarations must:
 
@@ -26,7 +26,7 @@ of this policy which we will be addressing over time, they do not provide ground
 
 |Criteria|Requirement|Mnemonic|Weight|Rationale|
 |--------|-----------|--------|------|---------|
-|Cloud Native Computing Foundation (CNCF) [approved license](https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist)|MUST|License|High||
+|Cloud Native Computing Foundation (CNCF) [approved license](https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md#approved-licenses-for-allowlist)|MUST|License|High||
 |Dependencies must not substantially increase the binary size unless they are optional (i.e. confined to specific extensions)|MUST|BinarySize|High|Microcks Uber is sensitive to binary size. We should pick dependencies that are used in core with this criteria in mind.|
 |No duplication of existing dependencies|MUST|NoDuplication|High|Avoid maintenance cost of multiple utility libs with same goals (ex: JSON parsers)|
 |CVE history appears reasonable, no pathological CVE arcs|MUST|SoundCVEs|High|Avoid dependencies that are CVE heavy in the same area (e.g. buffer overflow)
@@ -48,7 +48,7 @@ basis:
 
 * Core Microcks dependencies will be updated by the Microcks maintainers/security team.
 
-* Module/extension [CODEOWNERS](./CODEOWNERS) should update extension specific dependencies.
+* Module/extension `CODEOWNERS` should update extension specific dependencies.
 
 Where possible, we prefer the latest release version for external dependencies, rather than main branch GitHub SHA tarballs.
 

@@ -1,14 +1,31 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +38,7 @@ func NewStartCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		driver       string
 		readyTimeout time.Duration
 		noWait       bool
+		outputFormat string
 	)
 	var startCmd = &cobra.Command{
 		Use:   "start",
@@ -36,18 +54,24 @@ microcks start --driver [driver you wnat either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !output.IsTextOrJSON(outputFormat) {
+				return errors.Wrapf(errors.KindUsage, "--output must be one of: text, json")
+			}
+			progress := progressWriter(outputFormat)
 
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
-			errors.CheckError(err)
+			if err != nil {
+				return errors.Wrap(errors.KindEnvironment, err)
+			}
 
 			if localConfig == nil {
 				localConfig = &config.LocalConfig{}
 			}
 
-			instance, _ := localConfig.GetInstance(name)
-			if instance == nil {
+			instance, err := localConfig.GetInstance(name)
+			if err != nil {
 				instance = &config.Instance{}
 			}
 
@@ -60,12 +84,21 @@ microcks start --name [name of you container/instance]`,
 					instanceDriver = driver
 				}
 				containerClient, err := connectors.NewContainerClient(instanceDriver)
-				errors.CheckError(err)
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				exists, err := containerClient.ContainerExists(instance.ContainerID)
-				containerClient.CloseClient()
-				errors.CheckError(err)
+				closeErr := containerClient.CloseClient()
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
+				if closeErr != nil {
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("closing container client: %w", closeErr))
+				}
 				if !exists {
-					fmt.Printf("Container for instance %s no longer exists, recreating it\n", name)
+					if _, err := fmt.Fprintf(progress, "Container for instance %s no longer exists, recreating it\n", name); err != nil {
+						return errors.Wrap(errors.KindEnvironment, err)
+					}
 					instance.Status = ""
 					instance.ContainerID = ""
 				}
@@ -73,37 +106,52 @@ microcks start --name [name of you container/instance]`,
 
 			switch instance.Status {
 			case "Running":
-				fmt.Printf("Microcks instance with name %s is already running", name)
-				return
+				server := fmt.Sprintf("http://localhost:%s", instance.Port)
+				return writeStartResult(outputFormat, instanceStartResult{
+					Name: name, Server: server, Context: server, Status: "running",
+				})
 			case "Exited":
 				containerClient, err := connectors.NewContainerClient(instance.Driver)
-				errors.CheckError(err)
-				defer containerClient.CloseClient()
-
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				if err := containerClient.StartContainer(instance.ContainerID); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					if closeErr := containerClient.CloseClient(); closeErr != nil {
+						return errors.Wrapf(errors.KindEnvironment, "failed to start container: %v; closing container client: %v", err, closeErr)
+					}
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to start container: %w", err))
+				}
+				if err := containerClient.CloseClient(); err != nil {
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("closing container client: %w", err))
 				}
 				instance.Status = "Running"
 			default:
 				containerClient, err := connectors.NewContainerClient(driver)
-				errors.CheckError(err)
-				defer containerClient.CloseClient()
-
+				if err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				containerId, err := containerClient.CreateContainer(connectors.ContainerOpts{
 					Image:      imageName,
 					Port:       hostPort,
 					Name:       name,
 					AutoRemove: autoRemove,
+					Output:     progress,
 				})
 				if err != nil {
-					log.Fatalf("Failed to create a container: %v", err)
-					return
+					if closeErr := containerClient.CloseClient(); closeErr != nil {
+						return errors.Wrapf(errors.KindEnvironment, "failed to create container: %v; closing container client: %v", err, closeErr)
+					}
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to create container: %w", err))
 				}
 
 				if err := containerClient.StartContainer(containerId); err != nil {
-					log.Fatalf("failed to start container: %v", err)
-					return
+					if closeErr := containerClient.CloseClient(); closeErr != nil {
+						return errors.Wrapf(errors.KindEnvironment, "failed to start container: %v; closing container client: %v", err, closeErr)
+					}
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to start container: %w", err))
+				}
+				if err := containerClient.CloseClient(); err != nil {
+					return errors.Wrap(errors.KindEnvironment, fmt.Errorf("closing container client: %w", err))
 				}
 
 				instance.ContainerID = containerId
@@ -156,21 +204,26 @@ microcks start --name [name of you container/instance]`,
 			})
 
 			// Save configs to config file
-			err = config.WriteLocalConfig(*localConfig, configFile)
-			errors.CheckError(err)
+			if err := config.WriteLocalConfig(*localConfig, configFile); err != nil {
+				return errors.Wrap(errors.KindEnvironment, err)
+			}
 
 			// The container being up doesn't mean the Microcks server inside
 			// is serving traffic yet: wait until HTTP is actually answering
 			// so chained commands (import, test) don't race the boot.
 			if !noWait {
-				fmt.Printf("Waiting for Microcks to be ready at %s ...\n", server)
+				if _, err := fmt.Fprintf(progress, "Waiting for Microcks to be ready at %s ...\n", server); err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
 				if err := waitForReady(server, readyTimeout); err != nil {
-					log.Fatalf("Microcks container is started but the server is not ready: %v. "+
-						"It may still be booting — retry shortly or raise --ready-timeout.", err)
+					return errors.Wrapf(errors.KindEnvironment, "Microcks container is started but the server is not ready: %v. "+
+						"It may still be booting — retry shortly or raise --ready-timeout", err)
 				}
 			}
 
-			fmt.Printf("Microcks started successfully at %s\n", server)
+			return writeStartResult(outputFormat, instanceStartResult{
+				Name: name, Server: server, Context: server, Status: "running",
+			})
 		},
 	}
 	startCmd.Flags().StringVar(&name, "name", "microcks", "name for your Microcks instance")
@@ -180,7 +233,23 @@ microcks start --name [name of you container/instance]`,
 	startCmd.Flags().StringVar(&driver, "driver", "docker", "use --driver to change driver from docker to podman")
 	startCmd.Flags().DurationVar(&readyTimeout, "ready-timeout", 60*time.Second, "how long to wait for the Microcks server to be ready before failing")
 	startCmd.Flags().BoolVar(&noWait, "no-wait", false, "return as soon as the container is started, without waiting for the Microcks server to be ready")
+	startCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text or json")
 	return startCmd
+}
+
+type instanceStartResult struct {
+	Name    string `json:"name"`
+	Server  string `json:"server"`
+	Context string `json:"context"`
+	Status  string `json:"status"`
+}
+
+func writeStartResult(outputFormat string, result instanceStartResult) error {
+	if outputFormat == "json" {
+		return errors.Wrap(errors.KindEnvironment, output.WriteJSON(os.Stdout, result))
+	}
+	_, err := fmt.Printf("Microcks started successfully at %s\n", result.Server)
+	return errors.Wrap(errors.KindEnvironment, err)
 }
 
 // waitForReady polls the Microcks API until it answers with 200 or the

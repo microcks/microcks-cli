@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -34,8 +33,6 @@ var (
 	CaCertPaths string
 	// Verbose represents a debug flag for HTTP Exchanges
 	Verbose bool = false
-
-	ConfigPath = filepath.Join(os.Getenv("HOME"), ".microcks-cli", "config.yaml")
 )
 
 var sensitiveHeaderPattern = regexp.MustCompile(
@@ -53,8 +50,8 @@ func CreateTLSConfig() *tls.Config {
 	}
 	if len(CaCertPaths) > 0 {
 		// Get the SystemCertPool, continue with an empty pool on error
-		rootCAs, _ := x509.SystemCertPool()
-		if rootCAs == nil {
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil || rootCAs == nil {
 			rootCAs = x509.NewCertPool()
 		}
 

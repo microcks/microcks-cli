@@ -1,6 +1,23 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package watcher
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -9,6 +26,10 @@ import (
 )
 
 func TriggerImport(entry config.WatchEntry) {
+	TriggerImportWithContext(context.Background(), entry)
+}
+
+func TriggerImportWithContext(ctx context.Context, entry config.WatchEntry) {
 	// Retrieve config to get client options.
 	cfgPath, err := config.DefaultLocalConfigPath()
 	if err != nil {
@@ -26,6 +47,7 @@ func TriggerImport(entry config.WatchEntry) {
 		// If config path exist, instantiate client with it.
 		if _, err := os.Stat(cfgPath); err == nil {
 			globalClientOpts := &connectors.ClientOptions{
+				RequestContext: ctx,
 				ConfigPath: cfgPath,
 				Context:    context,
 			}
@@ -36,7 +58,12 @@ func TriggerImport(entry config.WatchEntry) {
 			}
 		} else {
 			// We have no config file, so just create a client with context as server URL.
-			mc = connectors.NewMicrocksClient(context)
+			var cerr error
+			mc, cerr = connectors.NewMicrocksClientWithContext(ctx, context)
+			if cerr != nil {
+				fmt.Printf("[ERROR] Cannot create Microcks client for context '%s': %v\n", context, cerr)
+				continue
+			}
 		}
 
 		_, err = mc.UploadArtifact(entry.FilePath, entry.MainArtifact)

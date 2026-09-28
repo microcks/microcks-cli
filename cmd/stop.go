@@ -1,3 +1,19 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import (
@@ -16,34 +32,38 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 		Use:   "stop",
 		Short: "stop microcks instance",
 		Long:  "stop microcks instance",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			configFile := globalClientOpts.ConfigPath
 			localConfig, err := config.ReadLocalConfig(configFile)
-			errors.CheckError(err)
+			if err != nil {
+				return err
+			}
 
 			if localConfig == nil {
 				fmt.Println("Config not found, nothing to stop")
-				return
+				return nil
 			}
 
 			ctx, err := localConfig.ResolveContext("")
-			errors.CheckError(err)
+			if err != nil {
+				return err
+			}
 			instance := ctx.Instance
 
 			if instance.Name == "" {
 				fmt.Println("No instance is associated with this context")
-				return
+				return nil
 			}
 
 			containerClient, err := connectors.NewContainerClient(instance.Driver)
-			errors.CheckError(err)
+			if err != nil {
+				return errors.Wrap(errors.KindEnvironment, err)
+			}
 			defer containerClient.CloseClient()
 
-			err = containerClient.StopContainer(instance.ContainerID)
-			if err != nil {
-				log.Fatalf("Failed to stop a container: %v", err)
-				return
+			if err := containerClient.StopContainer(instance.ContainerID); err != nil {
+				return errors.Wrap(errors.KindEnvironment, fmt.Errorf("failed to stop container: %w", err))
 			}
 			fmt.Println("")
 			log.Printf("Instance %s stopped successfully", instance.Name)
@@ -53,13 +73,12 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			if instance.AutoRemove {
 				_, ok := localConfig.RemoveContext(ctx.Name)
 				if !ok {
-					log.Fatalf("Context %s does not exist", ctx.Name)
-					return
+					return errors.Wrapf(errors.KindNotFound, "context %q does not exist", ctx.Name)
 				}
-				_ = localConfig.RemoveServer(ctx.Server.Server)
-				_ = localConfig.RemoveUser(ctx.User.Name)
-				_ = localConfig.RemoveAuth(ctx.Server.Server)
-				_ = localConfig.RemoveInstance(instance.Name)
+				localConfig.RemoveServer(ctx.Server.Server)
+				localConfig.RemoveUser(ctx.User.Name)
+				localConfig.RemoveAuth(ctx.Server.Server)
+				localConfig.RemoveInstance(instance.Name)
 
 				localConfig.CurrentContext = ""
 				log.Printf("Instance %s removed successfully", instance.Name)
@@ -68,8 +87,7 @@ func NewStopCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				localConfig.UpsertInstance(instance)
 				log.Printf("Instance %s status updated to Exited", instance.Name)
 			}
-			err = config.WriteLocalConfig(*localConfig, configFile)
-			errors.CheckError(err)
+			return config.WriteLocalConfig(*localConfig, configFile)
 		},
 	}
 

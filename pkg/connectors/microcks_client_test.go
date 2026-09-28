@@ -1,3 +1,19 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package connectors
 
 import (
@@ -17,7 +33,11 @@ import (
 	"github.com/microcks/microcks-cli/pkg/config"
 )
 
-func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
+func TestUploadArtifact(t *testing.T) {
+	t.Run("streams without buffering", testUploadArtifactStreamsWithoutBuffering)
+}
+
+func testUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 	const fileContent = `{"openapi":"3.0.0","info":{"title":"Test API","version":"1.0.0"}}`
 	const expectedResponse = "artifact uploaded"
 
@@ -61,11 +81,16 @@ func TestUploadArtifactStreamsWithoutBuffering(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(expectedResponse))
+		if _, err := w.Write([]byte(expectedResponse)); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
-	client := NewMicrocksClient(server.URL)
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
 	msg, err := client.UploadArtifact(specPath, true)
 	if err != nil {
 		t.Fatalf("UploadArtifact returned error: %v", err)
@@ -95,11 +120,16 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 			t.Fatalf("unexpected mainArtifact value: %s", got)
 		}
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(expectedBody))
+		if _, err := w.Write([]byte(expectedBody)); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
-	client := NewMicrocksClient(server.URL)
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
 
 	msg, err := client.DownloadArtifact("https://example.com/openapi.yaml", true, "")
 	if err != nil {

@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/config"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"golang.org/x/oauth2"
 )
 
@@ -37,6 +39,7 @@ type KeycloakClient interface {
 }
 
 type keycloakClient struct {
+	ctx      context.Context
 	BaseURL  *url.URL
 	Username string
 	Password string
@@ -45,12 +48,20 @@ type keycloakClient struct {
 }
 
 // NewKeycloakClient build a new KeycloakClient implementation
-func NewKeycloakClient(realmURL string, username string, password string) KeycloakClient {
-	kc := keycloakClient{}
+func NewKeycloakClient(realmURL string, username string, password string) (KeycloakClient, error) {
+	return NewKeycloakClientWithContext(context.Background(), realmURL, username, password)
+}
+
+// NewKeycloakClientWithContext builds a KeycloakClient using ctx for HTTP requests.
+func NewKeycloakClientWithContext(ctx context.Context, realmURL string, username string, password string) (KeycloakClient, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	kc := keycloakClient{ctx: ctx}
 
 	u, err := url.Parse(realmURL)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid Keycloak URL %q: %w", realmURL, err))
 	}
 	kc.BaseURL = u
 	kc.Username = username
@@ -65,7 +76,7 @@ func NewKeycloakClient(realmURL string, username string, password string) Keyclo
 	} else {
 		kc.httpClient = http.DefaultClient
 	}
-	return &kc
+	return &kc, nil
 }
 
 // ConnectAndGetToken implementation on keycloakClient structure
@@ -73,7 +84,7 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	rel := &url.URL{Path: "protocol/openid-connect/token"}
 	u := c.BaseURL.ResolveReference(rel)
 
-	req, err := http.NewRequest("POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
+	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +99,7 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
@@ -97,16 +108,23 @@ func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading Keycloak token response: %w", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak token response: %w", err))
 	}
 
-	accessToken := openIDResp["access_token"].(string)
-	return accessToken, err
+	accessToken, ok := openIDResp["access_token"].(string)
+	if !ok || accessToken == "" {
+		return "", errors.Wrapf(errors.KindAPI, "Keycloak token response missing access_token")
+	}
+	return accessToken, nil
 }
 
 func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
@@ -114,29 +132,39 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 	u := c.BaseURL.ResolveReference(rel)
 
 	// Create HTTP request
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		return nil, errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak OIDC request: %w", err))
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return nil, errors.Wrap(errors.KindConnection, fmt.Errorf("reading Keycloak OIDC config: %w", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Wrapf(errors.KindAPI, "Keycloak returned HTTP %d for OIDC config: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return nil, errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak OIDC config: %w", err))
 	}
 
-	authURL := openIDResp["authorization_endpoint"].(string)
-	tokenURL := openIDResp["token_endpoint"].(string)
+	authURL, ok := openIDResp["authorization_endpoint"].(string)
+	if !ok || authURL == "" {
+		return nil, errors.Wrapf(errors.KindAPI, "Keycloak OIDC config missing or invalid authorization_endpoint")
+	}
+	tokenURL, ok := openIDResp["token_endpoint"].(string)
+	if !ok || tokenURL == "" {
+		return nil, errors.Wrapf(errors.KindAPI, "Keycloak OIDC config missing or invalid token_endpoint")
+	}
 
 	return &oauth2.Config{
 		Endpoint: oauth2.Endpoint{
@@ -158,9 +186,9 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	data.Set("password", password)
 	data.Set("grant_type", "password")
 	// Create HTTP request
-	req, err := http.NewRequest("POST", u.String(), bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), bytes.NewBufferString(data.Encode()))
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		return "", "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak token request: %w", err))
 	}
 
 	// Set headers
@@ -168,22 +196,32 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.Wrap(errors.KindConnection, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return "", "", errors.Wrap(errors.KindConnection, fmt.Errorf("reading Keycloak token response: %w", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", errors.Wrapf(errors.KindAPI, "Keycloak returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var openIDResp map[string]interface{}
 	if err := json.Unmarshal(body, &openIDResp); err != nil {
-		panic(err)
+		return "", "", errors.Wrap(errors.KindAPI, fmt.Errorf("parsing Keycloak token response: %w", err))
 	}
 
-	authToken := openIDResp["access_token"].(string)
-	refreshToken := openIDResp["refresh_token"].(string)
+	authToken, ok := openIDResp["access_token"].(string)
+	if !ok || authToken == "" {
+		return "", "", errors.Wrapf(errors.KindAPI, "Keycloak token response missing or invalid access_token")
+	}
+	refreshToken, ok := openIDResp["refresh_token"].(string)
+	if !ok || refreshToken == "" {
+		return "", "", errors.Wrapf(errors.KindAPI, "Keycloak token response missing or invalid refresh_token")
+	}
 
 	return authToken, refreshToken, nil
 }
