@@ -36,6 +36,8 @@ import (
 	"github.com/moby/term"
 )
 
+var execCommand = exec.Command
+
 type ContainerClient interface {
 	CreateContainer(opts ContainerOpts) (string, error)
 	StartContainer(containerId string) error
@@ -75,6 +77,10 @@ func NewContainerClient(driver string) (ContainerClient, error) {
 }
 
 func NewDockerClient() (*containerClient, error) {
+	if err := ConfigureDockerHost(); err != nil {
+		return nil, err
+	}
+
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 
 	if err != nil {
@@ -100,6 +106,29 @@ func PingDockerHost() error {
 
 	_, err = cli.Ping(ctx)
 	return err
+}
+
+func ConfigureDockerHost() error {
+	if os.Getenv("DOCKER_HOST") != "" {
+		return nil
+	}
+
+	cmd := execCommand("docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}")
+	out, err := cmd.Output()
+	if err != nil {
+		exitError, ok := err.(*exec.ExitError)
+		if ok && exitError.ExitCode() == 1 {
+			return nil
+		}
+		return fmt.Errorf("resolving docker context host: %w", err)
+	}
+
+	dockerHost := strings.TrimSpace(string(out))
+	if dockerHost != "" {
+		return os.Setenv("DOCKER_HOST", dockerHost)
+	}
+
+	return nil
 }
 
 func ConfigurePodmanHost() error {
