@@ -108,7 +108,7 @@ func writeStepSummary(r *connectors.TestResult) error {
 	}
 	b.WriteString("\n")
 
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600) // G302: Use restrictive permissions (0600) instead of 0644
 	if err != nil {
 		return err
 	}
