@@ -263,7 +263,7 @@ func waitForReady(serverURL string, timeout time.Duration) error {
 	for time.Now().Before(deadline) {
 		resp, err := httpClient.Get(url)
 		if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close() // G104: error intentionally ignored in health-check polling loop
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
