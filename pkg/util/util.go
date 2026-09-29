@@ -25,6 +25,7 @@ import (
 // UnmarshalLocalFile retrieves JSON or YAML from a file on disk.
 // The caller is responsible for checking error return values.
 func UnmarshalLocalFile(path string, obj interface{}) error {
+	// #nosec G304 -- path is provided by the CLI user or local config; directory traversal is not a concern for a local CLI tool.
 	data, err := os.ReadFile(path)
 	if err == nil {
 		err = unmarshalObject(data, obj)

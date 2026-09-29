@@ -33,6 +33,7 @@ func openAPIOperationLine(specPath, operationName string) int {
 		return 0
 	}
 
+	// #nosec G304 -- specPath is a local file path explicitly provided by the CLI user; not a web input.
 	data, err := os.ReadFile(specPath)
 	if err != nil {
 		return 0

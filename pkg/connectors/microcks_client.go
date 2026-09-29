@@ -632,6 +632,7 @@ func (c *microcksClient) GetFullTestResult(testResultID string) (*TestResult, er
 
 func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error) {
 	// Ensure file exists on fs.
+	// #nosec G304 -- specificationFilePath is an artifact path provided explicitly by the CLI user; not a web-facing input.
 	file, err := os.Open(specificationFilePath)
 	if err != nil {
 		return "", errors.Wrap(errors.KindUsage, fmt.Errorf("cannot read artifact %q: %w", specificationFilePath, err))
