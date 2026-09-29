@@ -58,6 +58,7 @@ func CreateTLSConfig() *tls.Config {
 		sepCaFiles := strings.Split(CaCertPaths, ",")
 		for _, f := range sepCaFiles {
 			// Read in the cert file
+			// #nosec G304 -- f is a CA cert file path supplied by the user via --caCertPaths flag; reading it is the intended behavior.
 			certs, err := os.ReadFile(f)
 			if err != nil {
 				fmt.Println("Unable to read cert file from CaCertPaths: " + f)

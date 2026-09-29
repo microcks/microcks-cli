@@ -171,7 +171,7 @@ func ValidateLocalConfig(config LocalConfig) error {
 
 // WriteLocalConfig writes a new local configuration file.
 func WriteLocalConfig(config LocalConfig, configPath string) error {
-	err := os.MkdirAll(filepath.Dir(configPath), os.ModePerm)
+	err := os.MkdirAll(filepath.Dir(configPath), 0750) // G301: Use restrictive permissions instead of os.ModePerm (0777)
 	if err != nil {
 		return err
 	}
@@ -423,7 +423,7 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 
 // WriteLocalWatchConfig writes a new local watch configuration file.
 func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
-	err := os.MkdirAll(filepath.Dir(cfgPath), os.ModePerm)
+	err := os.MkdirAll(filepath.Dir(cfgPath), 0750) // G301: Use restrictive permissions instead of os.ModePerm (0777)
 	if err != nil {
 		return err
 	}
