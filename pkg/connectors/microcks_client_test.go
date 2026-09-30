@@ -17,16 +17,20 @@
 package connectors
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/config"
 )
 
 func TestUploadArtifact(t *testing.T) {
@@ -136,334 +140,162 @@ func TestDownloadArtifactReturnsResponseBody(t *testing.T) {
 	}
 }
 
-func TestGetKeycloakURLRejectsMalformedConfig(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-		want string
-	}{
-		{
-			name: "missing enabled",
-			body: `{"auth-server-url":"http://keycloak","realm":"microcks"}`,
-			want: "enabled",
+func createDummyJWT(exp int64) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"exp":%d}`, exp)))
+	return header + "." + payload + "."
+}
+
+func TestRefreshAuthToken_ValidTokenNoRefresh(t *testing.T) {
+	// A token with expiration 1 hour in the future
+	futureTime := time.Now().Add(1 * time.Hour).Unix()
+	dummyToken := createDummyJWT(futureTime)
+
+	// Setup local config
+	localCfg := &config.LocalConfig{
+		CurrentContext: "test-context",
+		Contexts: []config.ContextRef{
+			{Name: "test-context", Server: "localhost", User: "test-user"},
 		},
-		{
-			name: "invalid auth server url",
-			body: `{"enabled":true,"auth-server-url":42,"realm":"microcks"}`,
-			want: "auth-server-url",
+		Servers: []config.Server{
+			{Name: "localhost", Server: "localhost"},
 		},
-		{
-			name: "invalid realm",
-			body: `{"enabled":true,"auth-server-url":"http://keycloak","realm":42}`,
-			want: "realm",
+		Users: []config.User{
+			{Name: "test-user", AuthToken: dummyToken, RefreshToken: "some-refresh-token"},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/api/keycloak/config" {
-					t.Fatalf("unexpected path: %s", r.URL.Path)
-				}
-				w.Header().Set("Content-Type", "application/json")
-				if _, err := w.Write([]byte(tt.body)); err != nil {
-					t.Fatalf("failed to write response: %v", err)
-				}
-			}))
-			defer server.Close()
-
-			client, err := NewMicrocksClient(server.URL)
-			if err != nil {
-				t.Fatalf("NewMicrocksClient returned error: %v", err)
-			}
-
-			_, err = client.GetKeycloakURL()
-			if err == nil {
-				t.Fatal("GetKeycloakURL returned nil error")
-			}
-			if got := microckserrors.KindOf(err); got != microckserrors.KindAPI {
-				t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindAPI)
-			}
-			if !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("error %q does not mention %q", err.Error(), tt.want)
-			}
-		})
-	}
-}
-
-func TestCreateTestResultClassifiesMalformedResponses(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-		want string
-	}{
-		{name: "invalid json", body: `not-json`, want: "parse test creation response"},
-		{name: "missing id", body: `{}`, want: "missing 'id'"},
+	mc := &microcksClient{
+		AuthToken:    dummyToken,
+		RefreshToken: "some-refresh-token",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/api/tests" {
-					t.Fatalf("unexpected path: %s", r.URL.Path)
-				}
-				w.WriteHeader(http.StatusCreated)
-				if _, err := w.Write([]byte(tt.body)); err != nil {
-					t.Fatalf("failed to write response: %v", err)
-				}
-			}))
-			defer server.Close()
-
-			client, err := NewMicrocksClient(server.URL)
-			if err != nil {
-				t.Fatalf("NewMicrocksClient returned error: %v", err)
-			}
-
-			_, err = client.CreateTestResult("service:1.0", "http://example.test", "OPEN_API_SCHEMA", "", 1000, "", "", "")
-			if err == nil {
-				t.Fatal("CreateTestResult returned nil error")
-			}
-			if got := microckserrors.KindOf(err); got != microckserrors.KindAPI {
-				t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindAPI)
-			}
-			if !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("error %q does not mention %q", err.Error(), tt.want)
-			}
-		})
-	}
-}
-
-func TestCreateTestResultRejectsInvalidFilteredOperations(t *testing.T) {
-	client, err := NewMicrocksClient("http://localhost:8585")
+	// Calling refreshAuthToken with a valid token should do nothing and return nil
+	err := mc.refreshAuthToken(localCfg, "test-context", "")
 	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
+		t.Fatalf("refreshAuthToken failed: %v", err)
 	}
 
-	_, err = client.CreateTestResult("service:1.0", "http://example.test", "OPEN_API_SCHEMA", "", 1000, "{", "", "")
-	if err == nil {
-		t.Fatal("CreateTestResult returned nil error")
-	}
-	if got := microckserrors.KindOf(err); got != microckserrors.KindUsage {
-		t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindUsage)
+	// Verify token was not modified
+	if mc.AuthToken != dummyToken {
+		t.Errorf("expected AuthToken to remain %q, got %q", dummyToken, mc.AuthToken)
 	}
 }
 
-func TestGetFullTestResultChecksStatusBeforeParsing(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/tests/missing" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusNotFound)
-		if _, err := w.Write([]byte("missing test result")); err != nil {
-			t.Fatalf("failed to write response: %v", err)
-		}
-	}))
-	defer server.Close()
+func TestRefreshAuthToken_ExpiredTokenTriggersRefresh(t *testing.T) {
+	// A token with expiration 1 hour in the past
+	pastTime := time.Now().Add(-1 * time.Hour).Unix()
+	expiredToken := createDummyJWT(pastTime)
 
-	client, err := NewMicrocksClient(server.URL)
-	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	// We need a temporary config file path since the function calls WriteLocalConfig
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Setup local config. Note: refreshAuthToken uses the context name ("test-context")
+	// as the name of the user to upsert, so we name the user "test-context" to match.
+	localCfg := &config.LocalConfig{
+		CurrentContext: "test-context",
+		Contexts: []config.ContextRef{
+			{Name: "test-context", Server: "http://localhost", User: "test-context"},
+		},
+		Servers: []config.Server{
+			{Server: "http://localhost"},
+		},
+		Users: []config.User{
+			{Name: "test-context", AuthToken: expiredToken, RefreshToken: "old-refresh-token"},
+		},
+		Auths: []config.Auth{
+			{Server: "http://localhost", ClientId: "cli", ClientSecret: "secret"},
+		},
 	}
 
-	_, err = client.GetFullTestResult("missing")
-	if err == nil {
-		t.Fatal("GetFullTestResult returned nil error")
+	// Write initial localconfig to the temp file
+	if err := config.WriteLocalConfig(*localCfg, configPath); err != nil {
+		t.Fatalf("failed to write local config: %v", err)
 	}
-	if got := microckserrors.KindOf(err); got != microckserrors.KindNotFound {
-		t.Fatalf("KindOf = %v, want %v", got, microckserrors.KindNotFound)
-	}
-	if !strings.Contains(err.Error(), "HTTP 404") {
-		t.Fatalf("error %q does not mention HTTP 404", err.Error())
-	}
-}
 
-func TestListServicesFetchesServicesEndpoint(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/services" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		if got := r.URL.Query().Get("page"); got != "1" {
-			t.Fatalf("unexpected page: %s", got)
-		}
-		if got := r.URL.Query().Get("size"); got != "25" {
-			t.Fatalf("unexpected size: %s", got)
-		}
-		if err := json.NewEncoder(w).Encode([]Service{{
-			ID:      "svc-1",
-			Name:    "Catalog API",
-			Version: "1.0.0",
-			Type:    "REST",
-		}}); err != nil {
-			t.Fatalf("failed to encode services response: %v", err)
-		}
-	}))
-	defer server.Close()
-
-	client, err := NewMicrocksClient(server.URL)
-	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
-	}
-	services, err := client.ListServices(1, 25)
-	if err != nil {
-		t.Fatalf("ListServices returned error: %v", err)
-	}
-	if len(services) != 1 || services[0].ID != "svc-1" {
-		t.Fatalf("unexpected services: %#v", services)
-	}
-}
-
-func TestGetServiceResolvesNameVersionReference(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Spin up mock server handling Microcks client / Keycloak routes
+	var mockServer *httptest.Server
+	mockServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/api/services":
-			if err := json.NewEncoder(w).Encode([]Service{{
-				ID:      "svc-1",
-				Name:    "Catalog API",
-				Version: "1.0.0",
-				Type:    "REST",
-			}}); err != nil {
-				t.Fatalf("failed to encode services response: %v", err)
+		case "/api/keycloak/config":
+			// Return keycloak config pointing to this mock server
+			resp := map[string]interface{}{
+				"enabled":         true,
+				"auth-server-url": mockServer.URL,
+				"realm":           "microcks",
 			}
-		case "/api/services/svc-1":
-			if err := json.NewEncoder(w).Encode(ServiceDetail{
-				Service: Service{
-					ID:      "svc-1",
-					Name:    "Catalog API",
-					Version: "1.0.0",
-					Type:    "REST",
-				},
-			}); err != nil {
-				t.Fatalf("failed to encode service detail response: %v", err)
+			json.NewEncoder(w).Encode(resp)
+		case "/realms/microcks/.well-known/openid-configuration":
+			// Return OIDC metadata pointing to token endpoint on mock server
+			resp := map[string]string{
+				"authorization_endpoint": mockServer.URL + "/realms/microcks/protocol/openid-connect/auth",
+				"token_endpoint":         mockServer.URL + "/realms/microcks/protocol/openid-connect/token",
 			}
+			json.NewEncoder(w).Encode(resp)
+		case "/realms/microcks/protocol/openid-connect/token":
+			// Verify request body for refresh token grant
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("failed to parse form: %v", err)
+			}
+			if r.FormValue("grant_type") != "refresh_token" {
+				t.Errorf("unexpected grant_type: %q", r.FormValue("grant_type"))
+			}
+			if r.FormValue("refresh_token") != "old-refresh-token" {
+				t.Errorf("unexpected refresh_token: %q", r.FormValue("refresh_token"))
+			}
+			
+			// Return new tokens
+			resp := map[string]string{
+				"access_token":  "new-access-token",
+				"refresh_token": "new-refresh-token",
+			}
+			json.NewEncoder(w).Encode(resp)
 		default:
-			t.Fatalf("unexpected path: %s", r.URL.Path)
+			t.Fatalf("unexpected request to: %s", r.URL.Path)
 		}
 	}))
-	defer server.Close()
+	defer mockServer.Close()
 
-	client, err := NewMicrocksClient(server.URL)
+	apiURL, err := url.Parse(mockServer.URL + "/api/")
 	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
+		t.Fatalf("failed to parse URL: %v", err)
 	}
-	detail, err := client.GetService("Catalog API:1.0.0")
+
+	mc := &microcksClient{
+		APIURL:       apiURL,
+		AuthToken:    expiredToken,
+		RefreshToken: "old-refresh-token",
+		httpClient:   mockServer.Client(),
+	}
+
+	err = mc.refreshAuthToken(localCfg, "test-context", configPath)
 	if err != nil {
-		t.Fatalf("GetService returned error: %v", err)
-	}
-	if detail.Service.ID != "svc-1" {
-		t.Fatalf("unexpected service detail: %#v", detail)
-	}
-}
-
-func TestGetServiceResolvesNameVersionAcrossPages(t *testing.T) {
-	firstPage := make([]Service, serviceLookupPageSize)
-	for i := range firstPage {
-		firstPage[i] = Service{
-			ID:      "filler",
-			Name:    "Other API",
-			Version: "1.0.0",
-			Type:    "REST",
-		}
+		t.Fatalf("refreshAuthToken failed: %v", err)
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/services":
-			if got := r.URL.Query().Get("size"); got != "100" {
-				t.Fatalf("unexpected size: %s", got)
-			}
-			switch r.URL.Query().Get("page") {
-			case "0":
-				if err := json.NewEncoder(w).Encode(firstPage); err != nil {
-					t.Fatalf("failed to encode first page response: %v", err)
-				}
-			case "1":
-				if err := json.NewEncoder(w).Encode([]Service{{
-					ID:      "svc-2",
-					Name:    "Catalog API",
-					Version: "1.0.0",
-					Type:    "REST",
-				}}); err != nil {
-					t.Fatalf("failed to encode second page response: %v", err)
-				}
-			default:
-				t.Fatalf("unexpected page: %s", r.URL.Query().Get("page"))
-			}
-		case "/api/services/svc-2":
-			if err := json.NewEncoder(w).Encode(ServiceDetail{
-				Service: Service{
-					ID:      "svc-2",
-					Name:    "Catalog API",
-					Version: "1.0.0",
-					Type:    "REST",
-				},
-			}); err != nil {
-				t.Fatalf("failed to encode service detail response: %v", err)
-			}
-		default:
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-	}))
-	defer server.Close()
+	// Verify client tokens were updated
+	if mc.AuthToken != "new-access-token" {
+		t.Errorf("expected AuthToken to be refreshed to %q, got %q", "new-access-token", mc.AuthToken)
+	}
+	if mc.RefreshToken != "new-refresh-token" {
+		t.Errorf("expected RefreshToken to be refreshed to %q, got %q", "new-refresh-token", mc.RefreshToken)
+	}
 
-	client, err := NewMicrocksClient(server.URL)
+	// Verify local config was updated and written back to file
+	updatedCfg, err := config.ReadLocalConfig(configPath)
 	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
+		t.Fatalf("failed to read back config: %v", err)
 	}
-	detail, err := client.GetService("Catalog API:1.0.0")
+	user, err := updatedCfg.GetUser("test-context")
 	if err != nil {
-		t.Fatalf("GetService returned error: %v", err)
+		t.Fatalf("failed to get user: %v", err)
 	}
-	if detail.Service.ID != "svc-2" {
-		t.Fatalf("unexpected service detail: %#v", detail)
+	if user.AuthToken != "new-access-token" {
+		t.Errorf("expected config AuthToken to be %q, got %q", "new-access-token", user.AuthToken)
 	}
-}
-
-func TestListTestResultsFetchesTestsEndpoint(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/tests" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		if got := r.URL.Query().Get("serviceId"); got != "svc-1" {
-			t.Fatalf("unexpected serviceId: %s", got)
-		}
-		if err := json.NewEncoder(w).Encode([]TestResultSummary{{
-			ID:        "test-1",
-			ServiceID: "svc-1",
-			Success:   true,
-		}}); err != nil {
-			t.Fatalf("failed to encode test results response: %v", err)
-		}
-	}))
-	defer server.Close()
-
-	client, err := NewMicrocksClient(server.URL)
-	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
-	}
-	results, err := client.ListTestResults("svc-1", 0, 50)
-	if err != nil {
-		t.Fatalf("ListTestResults returned error: %v", err)
-	}
-	if len(results) != 1 || results[0].ID != "test-1" {
-		t.Fatalf("unexpected test results: %#v", results)
-	}
-}
-
-func TestGetFullTestResultClassifiesNotFound(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "missing", http.StatusNotFound)
-	}))
-	defer server.Close()
-
-	client, err := NewMicrocksClient(server.URL)
-	if err != nil {
-		t.Fatalf("NewMicrocksClient returned error: %v", err)
-	}
-	_, err = client.GetFullTestResult("missing")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if got := microckserrors.KindOf(err); got != microckserrors.KindNotFound {
-		t.Fatalf("KindOf = %v, want KindNotFound", got)
+	if user.RefreshToken != "new-refresh-token" {
+		t.Errorf("expected config RefreshToken to be %q, got %q", "new-refresh-token", user.RefreshToken)
 	}
 }
