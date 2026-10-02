@@ -48,7 +48,11 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				mainArtifact := true
 				secret := ""
 
-				f, mainArtifact, secret = parseImportURLArg(f)
+				var err error
+				f, mainArtifact, secret, err = parseImportURLArg(f)
+				if err != nil {
+					return err
+				}
 
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
@@ -64,7 +68,15 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	return importURLCmd
 }
 
-func parseImportURLArg(f string) (string, bool, string) {
+func parseImportURLArg(f string) (string, bool, string, error) {
+	if !strings.HasPrefix(f, "https://") && !strings.HasPrefix(f, "http://") {
+		return "", false, "", errors.Wrapf(
+			errors.KindUsage,
+			"invalid artifact URL '%s': must start with http:// or https://",
+			f,
+		)
+	}
+
 	mainArtifact := true
 	secret := ""
 
@@ -84,5 +96,5 @@ func parseImportURLArg(f string) (string, bool, string) {
 			}
 		}
 	}
-	return f, mainArtifact, secret
+	return f, mainArtifact, secret, nil
 }
