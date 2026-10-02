@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -210,6 +211,11 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 		FailedFiles:  make([]string, 0, len(files)),
 		Errors:       make([]string, 0, len(files)),
 	}
+
+	// Secondary artifacts can only enrich API definitions that already exist.
+	sort.SliceStable(files, func(i, j int) bool {
+		return detectFileType(files[i]).IsPrimary && !detectFileType(files[j]).IsPrimary
+	})
 
 	for _, file := range files {
 		fileType := detectFileType(file)
