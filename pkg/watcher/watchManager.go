@@ -73,7 +73,9 @@ func (wm *WatchManager) Reload() error {
 	for file := range wm.watchEntries {
 
 		if _, exists := newFiles[file]; !exists {
-			wm.fileWatcher.Remove(file)
+			if err := wm.fileWatcher.Remove(file); err != nil {
+				log.Printf("[WARN] Cannot remove watcher for file %s: %v", file, err)
+			}
 		}
 	}
 

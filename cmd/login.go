@@ -256,7 +256,9 @@ func oauth2login(
 	// Authorization redirect callback from OAuth2 auth flow.
 	// Handles both implicit and authorization code flow
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Callback received on: %s\n", r.URL.Path)
+		// G706: Sanitize URL path before logging to prevent log injection via newline characters.
+		safePath := strings.NewReplacer("\n", "", "\r", "").Replace(r.URL.Path)
+		log.Printf("Callback received on: %s\n", safePath) // #nosec G706 -- path is sanitized above
 
 		if formErr := r.FormValue("error"); formErr != "" {
 			handleErr(w, fmt.Sprintf("%s: %s", formErr, r.FormValue("error_description")))
@@ -302,7 +304,11 @@ func oauth2login(
 		completionChan <- ""
 	}
 
-	srv := &http.Server{Addr: "localhost:" + strconv.Itoa(port)}
+	// G112: Set ReadHeaderTimeout to mitigate Slowloris DoS attack.
+	srv := &http.Server{
+		Addr:              "localhost:" + strconv.Itoa(port),
+		ReadHeaderTimeout: 3 * time.Second,
+	}
 	http.HandleFunc("/auth/callback", callbackHandler)
 
 	var url string
