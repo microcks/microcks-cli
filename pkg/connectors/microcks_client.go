@@ -285,12 +285,19 @@ func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
 }
 
+func (c *microcksClient) context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return context.Background()
+}
+
 func (c *microcksClient) GetKeycloakURL() (string, error) {
 	// Ensure we have a correct URL for retrieving Keycloal configuration.
 	rel := &url.URL{Path: "keycloak/config"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.context(), "GET", u.String(), nil)
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak config request: %w", err))
 	}
@@ -391,7 +398,7 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	if err != nil {
 		return "", "", err
 	}
-	kc, err := NewKeycloakClientWithContext(c.ctx, keyCloakUrl, "", "")
+	kc, err := NewKeycloakClientWithContext(c.context(), keyCloakUrl, "", "")
 	if err != nil {
 		return "", "", err
 	}
@@ -403,7 +410,7 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	oauth2Conf.ClientSecret = auth.ClientSecret
 
 	httpClient := c.httpClient
-	ctx := oidc.ClientContext(c.ctx, httpClient)
+	ctx := oidc.ClientContext(c.context(), httpClient)
 
 	t := &oauth2.Token{
 		RefreshToken: c.RefreshToken,
@@ -493,7 +500,7 @@ func (c *microcksClient) getJSON(path string, query url.Values, out any, dumpLab
 	}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.context(), "GET", u.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -568,7 +575,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("failed to marshal test request: %w", err))
 	}
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), bytes.NewReader(input))
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), bytes.NewReader(input))
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating test request: %w", err))
 	}
@@ -673,7 +680,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	rel := &url.URL{Path: "artifact/upload"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), pr)
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), pr)
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating artifact upload request: %w", err))
 	}
@@ -741,7 +748,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	rel := &url.URL{Path: "artifact/download"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), body)
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), body)
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating artifact download request: %w", err))
 	}
