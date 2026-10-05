@@ -6,7 +6,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/go-connections v0.7.0
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/moby/term v0.5.2
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
