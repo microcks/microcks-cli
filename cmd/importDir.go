@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -213,11 +212,17 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 	}
 
 	// Secondary artifacts can only enrich API definitions that already exist.
-	sort.SliceStable(files, func(i, j int) bool {
-		return detectFileType(files[i]).IsPrimary && !detectFileType(files[j]).IsPrimary
-	})
-
+	var primary, secondary []string
 	for _, file := range files {
+		if detectFileType(file).IsPrimary {
+			primary = append(primary, file)
+		} else {
+			secondary = append(secondary, file)
+		}
+	}
+	orderedFiles := append(primary, secondary...)
+
+	for _, file := range orderedFiles {
 		fileType := detectFileType(file)
 
 		msg, err := client.UploadArtifact(file, fileType.IsPrimary)
