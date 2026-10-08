@@ -459,3 +459,22 @@ func TestWatchConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestReadMalformedConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+	watchPath := filepath.Join(tmpDir, "watch")
+
+	// A tab used for indentation is invalid YAML.
+	malformed := []byte("contexts:\n\t- name: ctx1\n")
+	require.NoError(t, os.WriteFile(configPath, malformed, 0o600))
+	require.NoError(t, os.WriteFile(watchPath, malformed, 0o600))
+
+	cfg, err := ReadLocalConfig(configPath)
+	assert.Error(t, err, "Should fail on malformed YAML")
+	assert.Nil(t, cfg)
+
+	wCfg, err := ReadLocalWatchConfig(watchPath)
+	assert.Error(t, err, "Should fail on malformed YAML")
+	assert.Nil(t, wCfg)
+}

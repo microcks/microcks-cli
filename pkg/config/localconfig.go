@@ -104,6 +104,9 @@ func ReadLocalConfig(path string) (*LocalConfig, error) {
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("reading config %s: %w", path, err)
+	}
 
 	err = ValidateLocalConfig(config)
 	if err != nil {
@@ -416,6 +419,9 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 	err = configUtil.UnmarshalLocalFile(path, &config)
 	if os.IsNotExist(err) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading config %s: %w", path, err)
 	}
 
 	return &config, nil
