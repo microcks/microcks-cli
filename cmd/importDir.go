@@ -211,7 +211,18 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 		Errors:       make([]string, 0, len(files)),
 	}
 
+	// Secondary artifacts can only enrich API definitions that already exist.
+	var primary, secondary []string
 	for _, file := range files {
+		if detectFileType(file).IsPrimary {
+			primary = append(primary, file)
+		} else {
+			secondary = append(secondary, file)
+		}
+	}
+	orderedFiles := append(primary, secondary...)
+
+	for _, file := range orderedFiles {
 		fileType := detectFileType(file)
 
 		msg, err := client.UploadArtifact(file, fileType.IsPrimary)
