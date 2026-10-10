@@ -32,6 +32,18 @@ brews:
       owner: microcks
       name: homebrew-tap
 
+nfpms:
+  - id: microcks
+    package_name: microcks
+    vendor: Microcks
+    maintainer: Microcks <info@microcks.io>
+    description: CLI for Microcks.
+    homepage: https://github.com/microcks/microcks-cli
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+
 sboms:
   - artifacts: archive
 
