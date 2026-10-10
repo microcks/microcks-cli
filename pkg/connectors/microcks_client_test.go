@@ -25,7 +25,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/microcks/microcks-cli/pkg/config"
 	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
 )
 
@@ -465,5 +467,69 @@ func TestGetFullTestResultClassifiesNotFound(t *testing.T) {
 	}
 	if got := microckserrors.KindOf(err); got != microckserrors.KindNotFound {
 		t.Fatalf("KindOf = %v, want KindNotFound", got)
+	}
+}
+
+func TestMicrocksClientTimeout(t *testing.T) {
+	previousInsecureTLS := config.InsecureTLS
+	defer func() { config.InsecureTLS = previousInsecureTLS }()
+
+	constructors := []struct {
+		name string
+		new  func() (*http.Client, error)
+	}{
+		{
+			name: "NewClient",
+			new: func() (*http.Client, error) {
+				client, err := NewClient(ClientOptions{})
+				if err != nil {
+					return nil, err
+				}
+				return client.HttpClient(), nil
+			},
+		},
+		{
+			name: "NewMicrocksClient",
+			new: func() (*http.Client, error) {
+				client, err := NewMicrocksClient("http://localhost:8080")
+				if err != nil {
+					return nil, err
+				}
+				return client.HttpClient(), nil
+			},
+		},
+		{
+			name: "NewKeycloakClient",
+			new: func() (*http.Client, error) {
+				client, err := NewKeycloakClient("http://localhost:8080/realms/microcks", "user", "pass")
+				if err != nil {
+					return nil, err
+				}
+				return client.(*keycloakClient).httpClient, nil
+			},
+		},
+	}
+
+	for _, tlsCase := range []struct {
+		name        string
+		insecureTLS bool
+	}{
+		{name: "default"},
+		{name: "custom TLS", insecureTLS: true},
+	} {
+		t.Run(tlsCase.name, func(t *testing.T) {
+			config.InsecureTLS = tlsCase.insecureTLS
+			for _, constructor := range constructors {
+				t.Run(constructor.name, func(t *testing.T) {
+					client, err := constructor.new()
+					if err != nil {
+						t.Fatalf("client constructor returned error: %v", err)
+					}
+					if client.Timeout != 30*time.Second {
+						t.Fatalf("expected 30s timeout, got %v", client.Timeout)
+					}
+				})
+			}
+		})
 	}
 }

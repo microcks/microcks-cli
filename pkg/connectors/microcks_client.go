@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v4"
@@ -231,9 +232,9 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
-		c.httpClient = &http.Client{Transport: tr}
+		c.httpClient = &http.Client{Transport: tr, Timeout: 30 * time.Second}
 	} else {
-		c.httpClient = http.DefaultClient
+		c.httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 
 	if localCfg != nil {
@@ -275,9 +276,9 @@ func NewMicrocksClientWithContext(ctx context.Context, apiURL string) (MicrocksC
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
-		mc.httpClient = &http.Client{Transport: tr}
+		mc.httpClient = &http.Client{Transport: tr, Timeout: 30 * time.Second}
 	} else {
-		mc.httpClient = http.DefaultClient
+		mc.httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 	return &mc, nil
 }
