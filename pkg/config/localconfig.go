@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/microcks/microcks-cli/pkg/errors"
 	configUtil "github.com/microcks/microcks-cli/pkg/util"
 )
 
@@ -105,7 +106,7 @@ func ReadLocalConfig(path string) (*LocalConfig, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("reading config %s: %w", path, err)
+		return nil, errors.Wrapf(errors.KindUsage, "reading config %s: %w", path, err)
 	}
 
 	err = ValidateLocalConfig(config)
@@ -421,7 +422,7 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("reading config %s: %w", path, err)
+		return nil, errors.Wrapf(errors.KindUsage, "reading config %s: %w", path, err)
 	}
 
 	return &config, nil

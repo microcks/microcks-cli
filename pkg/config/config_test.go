@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -473,8 +474,10 @@ func TestReadMalformedConfig(t *testing.T) {
 	cfg, err := ReadLocalConfig(configPath)
 	assert.Error(t, err, "Should fail on malformed YAML")
 	assert.Nil(t, cfg)
+	assert.Equal(t, errors.KindUsage, errors.KindOf(err), "a malformed local config is the user's input, not an environment or connection failure")
 
 	wCfg, err := ReadLocalWatchConfig(watchPath)
 	assert.Error(t, err, "Should fail on malformed YAML")
 	assert.Nil(t, wCfg)
+	assert.Equal(t, errors.KindUsage, errors.KindOf(err), "a malformed local watch config is the user's input, not an environment or connection failure")
 }
