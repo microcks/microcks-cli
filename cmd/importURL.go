@@ -31,12 +31,8 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 		Use:   "import-url",
 		Short: "import API artifacts from URL on Microcks server",
 		Long:  `import API artifacts from URL on Microcks server`,
+		Args:  validateImportURLArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse subcommand args first.
-			if len(args) == 0 {
-				return errors.Wrapf(errors.KindUsage, "import-url requires a <specificationFileURL[:primary[:secret]]> argument")
-			}
-
 			specificationFiles := args[0]
 
 			mc, _, err := newCommandClient(globalClientOpts)
@@ -48,11 +44,7 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				mainArtifact := true
 				secret := ""
 
-				var err error
-				f, mainArtifact, secret, err = parseImportURLArg(f)
-				if err != nil {
-					return err
-				}
+				f, mainArtifact, secret = parseImportURLArg(f)
 
 				// Try downloading the artifcat
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
@@ -68,20 +60,31 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	return importURLCmd
 }
 
-func parseImportURLArg(f string) (string, bool, string, error) {
-	if !strings.HasPrefix(f, "https://") && !strings.HasPrefix(f, "http://") {
-		return "", false, "", errors.Wrapf(
-			errors.KindUsage,
-			"invalid artifact URL '%s': must start with http:// or https://",
-			f,
-		)
+func validateImportURLArgs(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return errors.Wrapf(errors.KindUsage, "import-url requires a <specificationFileURL[:primary[:secret]]> argument")
 	}
 
+	for _, f := range strings.Split(args[0], ",") {
+		lower := strings.ToLower(f)
+		if !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "http://") {
+			return errors.Wrapf(
+				errors.KindUsage,
+				"invalid artifact URL '%s': must start with http:// or https://",
+				f,
+			)
+		}
+	}
+	return nil
+}
+
+func parseImportURLArg(f string) (string, bool, string) {
 	mainArtifact := true
 	secret := ""
 
 	// Check if URL starts with https or http
-	if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
+	lower := strings.ToLower(f)
+	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
 		parts := strings.Split(f, ":")
 		n := len(parts)
 
@@ -96,5 +99,5 @@ func parseImportURLArg(f string) (string, bool, string, error) {
 			}
 		}
 	}
-	return f, mainArtifact, secret, nil
+	return f, mainArtifact, secret
 }
