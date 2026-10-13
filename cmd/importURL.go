@@ -82,21 +82,17 @@ func parseImportURLArg(f string) (string, bool, string) {
 	mainArtifact := true
 	secret := ""
 
-	// Check if URL starts with https or http
-	lower := strings.ToLower(f)
-	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		parts := strings.Split(f, ":")
-		n := len(parts)
+	parts := strings.Split(f, ":")
+	n := len(parts)
 
-		for i := 2; i < n; i++ {
-			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
-				mainArtifact = val
-				if i+1 < n {
-					secret = strings.Join(parts[i+1:], ":")
-				}
-				f = strings.Join(parts[:i], ":")
-				break
+	for i := 2; i < n; i++ {
+		if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
+			mainArtifact = val
+			if i+1 < n {
+				secret = strings.Join(parts[i+1:], ":")
 			}
+			f = strings.Join(parts[:i], ":")
+			break
 		}
 	}
 	return f, mainArtifact, secret
