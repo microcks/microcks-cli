@@ -122,7 +122,7 @@ func DefaultConfigDir() (string, error) {
 
 	homeDir, err := getHomeDir()
 	if err != nil {
-		return "", nil
+		return "", fmt.Errorf("cannot determine user home directory, set MICROCKS_CONFIG_DIR instead: %w", err)
 	}
 
 	configDir = filepath.Join(homeDir, ".config", "microcks")
