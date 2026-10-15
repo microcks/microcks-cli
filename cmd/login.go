@@ -305,15 +305,6 @@ func oauth2login(
 		completionChan <- ""
 	}
 
-	// G112: Set ReadHeaderTimeout to mitigate Slowloris DoS attack.
-	mux := http.NewServeMux()
-	mux.HandleFunc("/auth/callback", callbackHandler)
-	srv := &http.Server{
-		Addr:              "localhost:" + strconv.Itoa(port),
-		Handler:           mux,
-		ReadHeaderTimeout: 3 * time.Second,
-	}
-
 	var url string
 	opts := []oauth2.AuthCodeOption{}
 	opts = append(opts, oauth2.SetAuthURLParam("client_id", "microcks-app-js"))
@@ -325,9 +316,9 @@ func oauth2login(
 	authBaseURL := strings.SplitN(url, "?", 2)[0]
 	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", authBaseURL)
 	time.Sleep(1 * time.Second)
-	listener, err := net.Listen("tcp", srv.Addr)
+	srv, listener, err := newOAuthCallbackServer("localhost:"+strconv.Itoa(port), callbackHandler)
 	if err != nil {
-		return "", "", errors.Wrap(errors.KindEnvironment, fmt.Errorf("starting temporary HTTP server on %s: %w", srv.Addr, err))
+		return "", "", err
 	}
 	defer srv.Close()
 	go func() {
@@ -351,6 +342,21 @@ func oauth2login(
 	}
 
 	return tokenString, refreshToken, nil
+}
+
+func newOAuthCallbackServer(addr string, callbackHandler http.HandlerFunc) (*http.Server, net.Listener, error) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return nil, nil, errors.Wrap(errors.KindEnvironment, fmt.Errorf("starting temporary HTTP server on %s: %w", srv.Addr, err))
+	}
+	return srv, listener, nil
 }
 
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) error {
