@@ -106,7 +106,7 @@ func ReadLocalConfig(path string) (*LocalConfig, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, errors.Wrapf(errors.KindUsage, "reading config %s: %w", path, err)
+		return nil, errors.Wrapf(errors.KindEnvironment, "reading config %s: %w", path, err)
 	}
 
 	err = ValidateLocalConfig(config)
@@ -422,7 +422,7 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, errors.Wrapf(errors.KindUsage, "reading config %s: %w", path, err)
+		return nil, errors.Wrapf(errors.KindEnvironment, "reading config %s: %w", path, err)
 	}
 
 	return &config, nil

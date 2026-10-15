@@ -474,10 +474,10 @@ func TestReadMalformedConfig(t *testing.T) {
 	cfg, err := ReadLocalConfig(configPath)
 	assert.Error(t, err, "Should fail on malformed YAML")
 	assert.Nil(t, cfg)
-	assert.Equal(t, errors.KindUsage, errors.KindOf(err), "a malformed local config is the user's input, not an environment or connection failure")
+	assert.Equal(t, errors.KindEnvironment, errors.KindOf(err), "a malformed local config should match how the commands report config read failures")
 
 	wCfg, err := ReadLocalWatchConfig(watchPath)
 	assert.Error(t, err, "Should fail on malformed YAML")
 	assert.Nil(t, wCfg)
-	assert.Equal(t, errors.KindUsage, errors.KindOf(err), "a malformed local watch config is the user's input, not an environment or connection failure")
+	assert.Equal(t, errors.KindEnvironment, errors.KindOf(err), "a malformed local watch config should match how the commands report config read failures")
 }
