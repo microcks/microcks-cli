@@ -130,13 +130,12 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				mainArtifact := true
 				var err error
 
-				// Check if mainArtifact flag is provided.
-				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						return errors.Wrapf(errors.KindUsage, "cannot parse %q as artifact primary flag", pathAndMainArtifact[1])
+				// Only a trailing parseable boolean is a mainArtifact suffix. This
+				// preserves colons in Windows drive paths and other file names.
+				if separator := strings.LastIndex(f, ":"); separator >= 0 {
+					if parsedMainArtifact, parseErr := strconv.ParseBool(f[separator+1:]); parseErr == nil {
+						f = f[:separator]
+						mainArtifact = parsedMainArtifact
 					}
 				}
 
