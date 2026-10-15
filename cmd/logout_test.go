@@ -17,12 +17,63 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
+
+func runOAuth2LoginWithError(t *testing.T) {
+	t.Helper()
+	l, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	port := l.Addr().(*net.TCPAddr).Port
+	require.NoError(t, l.Close())
+
+	oauth2conf := &oauth2.Config{
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "http://127.0.0.1/auth",
+			TokenURL: "http://127.0.0.1/token",
+		},
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := oauth2login(context.Background(), port, oauth2conf, false)
+		done <- err
+	}()
+
+	// Send an error callback so the login flow ends.
+	callbackURL := fmt.Sprintf("http://localhost:%d/auth/callback?error=access_denied", port)
+	require.Eventually(t, func() bool {
+		resp, err := http.Get(callbackURL) // #nosec G107 -- local test server
+		if err != nil {
+			return false
+		}
+		resp.Body.Close()
+		return true
+	}, 10*time.Second, 100*time.Millisecond)
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("oauth2login did not return")
+	}
+}
+
+func TestOAuth2LoginCanRunTwice(t *testing.T) {
+	runOAuth2LoginWithError(t)
+	// The second login must not panic on a duplicate callback registration.
+	runOAuth2LoginWithError(t)
+}
 
 func TestLogoutContextResolvesNamedContextUser(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config")

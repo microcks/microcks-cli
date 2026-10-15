@@ -304,12 +304,17 @@ func oauth2login(
 		completionChan <- ""
 	}
 
+	// Use a private mux so that several logins in the same process do not
+	// register the callback twice on the global http.DefaultServeMux.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
+
 	// G112: Set ReadHeaderTimeout to mitigate Slowloris DoS attack.
 	srv := &http.Server{
 		Addr:              "localhost:" + strconv.Itoa(port),
+		Handler:           mux,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
-	http.HandleFunc("/auth/callback", callbackHandler)
 
 	var url string
 	opts := []oauth2.AuthCodeOption{}
