@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -228,7 +229,7 @@ func oauth2login(
 	// handledRequests ensures we do not handle more requests than necessary
 	handledRequests := 0
 	// completionChan is to signal flow completed. Non-empty string indicates error
-	completionChan := make(chan string)
+	completionChan := make(chan string, 1)
 
 	stateNonce, err := rand.String(24)
 	if err != nil {
@@ -305,11 +306,13 @@ func oauth2login(
 	}
 
 	// G112: Set ReadHeaderTimeout to mitigate Slowloris DoS attack.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
 	srv := &http.Server{
 		Addr:              "localhost:" + strconv.Itoa(port),
+		Handler:           mux,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
-	http.HandleFunc("/auth/callback", callbackHandler)
 
 	var url string
 	opts := []oauth2.AuthCodeOption{}
@@ -322,15 +325,20 @@ func oauth2login(
 	authBaseURL := strings.SplitN(url, "?", 2)[0]
 	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", authBaseURL)
 	time.Sleep(1 * time.Second)
-	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
-		return "", "", err
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return "", "", errors.Wrap(errors.KindEnvironment, fmt.Errorf("starting temporary HTTP server on %s: %w", srv.Addr, err))
 	}
+	defer srv.Close()
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.Serve(listener); err != http.ErrServerClosed {
 			completionChan <- fmt.Sprintf("temporary HTTP server failed: %s", err)
 		}
 	}()
+	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
+		return "", "", err
+	}
 	errMsg := <-completionChan
 	if errMsg != "" {
 		return "", "", errors.Wrapf(errors.KindGeneric, "%s", errMsg)
