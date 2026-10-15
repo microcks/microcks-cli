@@ -76,9 +76,10 @@ func startTestWatcher(t *testing.T, filenames []string, trigger func(context.Con
 
 func TestRunContextDebouncesWriteBurst(t *testing.T) {
 	imports := make(chan string, 10)
-	files, _ := startTestWatcher(t, []string{"api.yaml"}, func(_ context.Context, entry config.WatchEntry) {
+	files, cancel := startTestWatcher(t, []string{"api.yaml"}, func(_ context.Context, entry config.WatchEntry) {
 		imports <- entry.FilePath
 	})
+	defer cancel()
 
 	for i := 0; i < 20; i++ {
 		if err := os.WriteFile(files[0], []byte("updated"), 0600); err != nil {
@@ -108,7 +109,7 @@ func TestRunContextSerializesImportsAndWatchesAtomicReplacement(t *testing.T) {
 	release := make(chan struct{}, 10)
 	var active atomic.Int32
 	var maxActive atomic.Int32
-	files, _ := startTestWatcher(t, []string{"api.yaml"}, func(ctx context.Context, entry config.WatchEntry) {
+	files, cancel := startTestWatcher(t, []string{"api.yaml"}, func(ctx context.Context, entry config.WatchEntry) {
 		current := active.Add(1)
 		for observed := maxActive.Load(); current > observed && !maxActive.CompareAndSwap(observed, current); observed = maxActive.Load() {
 		}
@@ -119,6 +120,7 @@ func TestRunContextSerializesImportsAndWatchesAtomicReplacement(t *testing.T) {
 		}
 		active.Add(-1)
 	})
+	defer cancel()
 
 	target := files[0]
 	temp := target + ".tmp"
