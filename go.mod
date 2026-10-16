@@ -17,7 +17,7 @@ require (
 	golang.org/x/term v0.46.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	microcks.io/testcontainers-go v0.3.3
+	microcks.io/testcontainers-go v0.4.0
 )
 
 require (
@@ -55,7 +55,7 @@ require (
 	github.com/moby/sys/user v0.4.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/oapi-codegen/runtime v1.1.1 // indirect
+	github.com/oapi-codegen/runtime v1.6.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -76,7 +76,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.45.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	microcks.io/go-client v0.3.1 // indirect
+	microcks.io/go-client v0.5.0 // indirect
 )
