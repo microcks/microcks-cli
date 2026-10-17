@@ -17,6 +17,7 @@
 package cmd
 
 import (
+	"io"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
@@ -243,6 +244,30 @@ func TestValidateImportURLArgs(t *testing.T) {
 			expectedErrMsg: "invalid artifact URL '': must start with http:// or https://",
 		},
 		{
+			name:           "bare http scheme",
+			args:           []string{"http://"},
+			wantErr:        true,
+			expectedErrMsg: "invalid artifact URL 'http://': must start with http:// or https://",
+		},
+		{
+			name:           "bare https scheme",
+			args:           []string{"https://"},
+			wantErr:        true,
+			expectedErrMsg: "invalid artifact URL 'https://': must start with http:// or https://",
+		},
+		{
+			name:           "bare uppercase HTTP scheme",
+			args:           []string{"HTTP://"},
+			wantErr:        true,
+			expectedErrMsg: "invalid artifact URL 'HTTP://': must start with http:// or https://",
+		},
+		{
+			name:           "multiple positional arguments",
+			args:           []string{"https://example.com/spec1.yaml", "https://example.com/spec2.yaml"},
+			wantErr:        true,
+			expectedErrMsg: "import-url accepts only 1 positional argument; specify multiple URLs as a comma-separated list: <url1,url2>",
+		},
+		{
 			name:    "comma-separated valid URLs",
 			args:    []string{"https://example.com/spec1.yaml,http://example.com/spec2.yaml"},
 			wantErr: false,
@@ -279,6 +304,8 @@ func TestImportURLCommandExecutionRejectsInvalidArgsBeforeRunE(t *testing.T) {
 	// If Args validator did not reject the arguments upfront, RunE would proceed
 	// to newCommandClient, which would fail with a missing microcksURL connection/usage error.
 	cmd := NewImportURLCommand(&connectors.ClientOptions{})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 	cmd.SetArgs([]string{"https://example.com/spec1.yaml,spec2.yaml:true"})
 
 	err := cmd.Execute()

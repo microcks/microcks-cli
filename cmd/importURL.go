@@ -64,10 +64,13 @@ func validateImportURLArgs(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return errors.Wrapf(errors.KindUsage, "import-url requires a <specificationFileURL[:primary[:secret]]> argument")
 	}
+	if len(args) > 1 {
+		return errors.Wrapf(errors.KindUsage, "import-url accepts only 1 positional argument; specify multiple URLs as a comma-separated list: <url1,url2>")
+	}
 
 	for _, f := range strings.Split(args[0], ",") {
 		lower := strings.ToLower(f)
-		if !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "http://") {
+		if (!strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "http://")) || lower == "http://" || lower == "https://" {
 			return errors.Wrapf(
 				errors.KindUsage,
 				"invalid artifact URL '%s': must start with http:// or https://",
