@@ -256,9 +256,7 @@ func (l *LocalConfig) RemoveToken(serverName string) bool {
 
 // GetUser retrieves a user by name.
 func (l *LocalConfig) GetUser(name string) (*User, error) {
-	for _, u := range l.Users {
-		if u.Name == name {
-			return &u, nil
+	for i := range l.Users {`r`n`t`tif l.Users[i].Name == name {`r`n`t`t`treturn &l.Users[i], nil
 		}
 	}
 	return nil, fmt.Errorf("User '%s' undefined", name)
@@ -288,9 +286,7 @@ func (l *LocalConfig) RemoveUser(serverName string) bool {
 }
 
 func (l *LocalConfig) GetServer(name string) (*Server, error) {
-	for _, s := range l.Servers {
-		if s.Server == name {
-			return &s, nil
+	for i := range l.Servers {`r`n`t`tif l.Servers[i].Server == name {`r`n`t`t`treturn &l.Servers[i], nil
 		}
 	}
 	return nil, fmt.Errorf("Server '%s' undefined", name)
@@ -318,9 +314,7 @@ func (l *LocalConfig) RemoveServer(serverName string) bool {
 }
 
 func (l *LocalConfig) GetInstance(name string) (*Instance, error) {
-	for _, i := range l.Instances {
-		if i.Name == name {
-			return &i, nil
+	for i := range l.Instances {`r`n`t`tif l.Instances[i].Name == name {`r`n`t`t`treturn &l.Instances[i], nil
 		}
 	}
 	return nil, fmt.Errorf("Instance '%s' undefined", name)
@@ -355,9 +349,7 @@ func (l *LocalConfig) IsEmpty() bool {
 }
 
 func (l *LocalConfig) GetAuth(server string) (*Auth, error) {
-	for _, a := range l.Auths {
-		if a.Server == server {
-			return &a, nil
+	for i := range l.Auths {`r`n`t`tif l.Auths[i].Server == server {`r`n`t`t`treturn &l.Auths[i], nil
 		}
 	}
 
@@ -429,3 +421,5 @@ func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
 	}
 	return configUtil.MarshalLocalYAMLFile(cfgPath, &config)
 }
+
+
