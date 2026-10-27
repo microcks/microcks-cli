@@ -467,3 +467,64 @@ func TestGetFullTestResultClassifiesNotFound(t *testing.T) {
 		t.Fatalf("KindOf = %v, want KindNotFound", got)
 	}
 }
+
+func TestGetResources(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/resources/service/svc-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if err := json.NewEncoder(w).Encode([]Resource{
+			{
+				ID:        "res-1",
+				Name:      "petstore.yaml",
+				Content:   "openapi: 3.0.0",
+				Type:      "OPEN_API_SPEC",
+				ServiceID: "svc-1",
+			},
+		}); err != nil {
+			t.Fatalf("failed to encode resources: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	resources, err := client.GetResources("svc-1")
+	if err != nil {
+		t.Fatalf("GetResources returned error: %v", err)
+	}
+	if len(resources) != 1 || resources[0].Name != "petstore.yaml" {
+		t.Fatalf("unexpected resources: %#v", resources)
+	}
+}
+
+func TestExportSnapshot(t *testing.T) {
+	const snapshotJSON = `{"services":[{"id":"svc-1","name":"Petstore","version":"1.0"}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/export" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("serviceIds") != "svc-1" {
+			t.Fatalf("unexpected serviceIds query: %s", r.URL.Query().Get("serviceIds"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(snapshotJSON)); err != nil {
+			t.Fatalf("failed to write snapshot response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	data, err := client.ExportSnapshot([]string{"svc-1"})
+	if err != nil {
+		t.Fatalf("ExportSnapshot returned error: %v", err)
+	}
+	if string(data) != snapshotJSON {
+		t.Fatalf("expected snapshot %q, got %q", snapshotJSON, string(data))
+	}
+}

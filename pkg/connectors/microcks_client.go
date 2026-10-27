@@ -58,6 +58,18 @@ type MicrocksClient interface {
 	GetFullTestResult(testResultID string) (*TestResult, error)
 	UploadArtifact(specificationFilePath string, mainArtifact bool) (string, error)
 	DownloadArtifact(artifactURL string, mainArtifact bool, secret string) (string, error)
+	GetResources(serviceID string) ([]Resource, error)
+	ExportSnapshot(serviceIDs []string) ([]byte, error)
+}
+
+// Resource represents an artifact or schema specification associated with a Service.
+type Resource struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Content        string `json:"content"`
+	Type           string `json:"type"`
+	ServiceID      string `json:"serviceId"`
+	SourceArtifact string `json:"sourceArtifact,omitempty"`
 }
 
 // Service represents a Microcks service summary.
@@ -146,15 +158,15 @@ type OAuth2ClientContext struct {
 
 type ClientOptions struct {
 	RequestContext context.Context
-	ServerAddr   string
-	Context      string
-	ConfigPath   string
-	AuthToken    string
-	InsecureTLS  bool
-	Verbose      bool
-	CaCertPaths  string
-	ClientId     string
-	ClientSecret string
+	ServerAddr     string
+	Context        string
+	ConfigPath     string
+	AuthToken      string
+	InsecureTLS    bool
+	Verbose        bool
+	CaCertPaths    string
+	ClientId       string
+	ClientSecret   string
 }
 
 type microcksClient struct {
@@ -771,6 +783,74 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	}
 
 	return string(respBody), nil
+}
+
+func (c *microcksClient) GetResources(serviceID string) ([]Resource, error) {
+	id := serviceID
+	if strings.Contains(serviceID, ":") {
+		resolvedID, err := c.resolveServiceID(serviceID)
+		if err != nil {
+			return nil, err
+		}
+		id = resolvedID
+	}
+
+	var resources []Resource
+	if err := c.getJSON("resources/service/"+id, nil, &resources, "Microcks for getting service resources"); err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
+func (c *microcksClient) ExportSnapshot(serviceIDs []string) ([]byte, error) {
+	rel := &url.URL{Path: "export"}
+	values := url.Values{}
+	for _, id := range serviceIDs {
+		if strings.Contains(id, ":") {
+			resolvedID, err := c.resolveServiceID(id)
+			if err != nil {
+				return nil, err
+			}
+			id = resolvedID
+		}
+		values.Add("serviceIds", id)
+	}
+	if len(values) > 0 {
+		rel.RawQuery = values.Encode()
+	}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
+	if err != nil {
+		return nil, errors.Wrap(errors.KindGeneric, fmt.Errorf("creating export request: %w", err))
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	config.DumpRequestIfRequired("Microcks for exporting snapshot", req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(errors.KindConnection, err)
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired("Microcks for exporting snapshot", resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(errors.KindConnection, fmt.Errorf("reading export response: %w", err))
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return nil, errors.Wrapf(kind, "Microcks export returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return body, nil
 }
 
 func ensureValidOperationsList(filteredOperations string) error {
