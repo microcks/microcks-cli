@@ -450,7 +450,13 @@ func emitDryRunError(events *dryRunEventWriter, sourceErr error) error {
 	return nil
 }
 
+func normalizeServerURL(serverAddr string) string {
+	serverAddr = strings.TrimSuffix(serverAddr, "/")
+	serverAddr = strings.TrimSuffix(serverAddr, "/api")
+	return strings.TrimSuffix(serverAddr, "/")
+}
+
 func printDetailsLink(progress io.Writer, serverAddr, testResultID string) error {
-	_, err := fmt.Fprintf(progress, "Test details (live while watching): %s/#/tests/%s\n", serverAddr, testResultID)
+	_, err := fmt.Fprintf(progress, "Test details (live while watching): %s/#/tests/%s\n", normalizeServerURL(serverAddr), testResultID)
 	return errors.Wrap(errors.KindEnvironment, err)
 }
