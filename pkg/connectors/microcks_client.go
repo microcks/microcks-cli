@@ -352,6 +352,10 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	if err != nil {
 		return err
 	}
+	if configCtx.User.AuthToken == "" {
+		// No access token stored — user needs to log in.
+		return errors.Wrapf(errors.KindUsage, "not authenticated. Run `microcks login` first")
+	}
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 	var claims jwt.RegisteredClaims
 	_, _, err = parser.ParseUnverified(configCtx.User.AuthToken, &claims)
