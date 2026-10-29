@@ -32,8 +32,18 @@ func NewCommand() (*cobra.Command, error) {
 		// exits, so Cobra must not also print them.
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			clientOpts.RequestContext = cmd.Context()
+			// Resolve the default config path only after flags are parsed, so an
+			// explicit --config still works when the home directory is unknown.
+			if clientOpts.ConfigPath == "" {
+				defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
+				if err != nil {
+					return err
+				}
+				clientOpts.ConfigPath = defaultLocalConfigPath
+			}
+			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
@@ -56,11 +66,7 @@ func NewCommand() (*cobra.Command, error) {
 	command.AddCommand(NewLoginCommand(&clientOpts))
 	command.AddCommand(NewLogoutCommand(&clientOpts))
 
-	defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
-	if err != nil {
-		return nil, err
-	}
-	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config")
+	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", "", "Path to Microcks config (default \"$HOME/.config/microcks/config\")")
 	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use")
 	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
 	command.PersistentFlags().BoolVar(&clientOpts.InsecureTLS, "insecure-tls", false, "Whether to accept insecure HTTPS connection")

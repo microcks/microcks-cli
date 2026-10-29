@@ -243,6 +243,30 @@ func TestDefaultPaths(t *testing.T) {
 	assert.Contains(t, dir, "microcks")
 }
 
+func TestDefaultPathsWithoutHomeDir(t *testing.T) {
+	t.Setenv("MICROCKS_CONFIG_DIR", "")
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("USERPROFILE", "")
+	case "plan9":
+		t.Setenv("home", "")
+	default:
+		t.Setenv("HOME", "")
+	}
+
+	dir, err := DefaultConfigDir()
+	assert.Error(t, err)
+	assert.Empty(t, dir)
+
+	cfgPath, err := DefaultLocalConfigPath()
+	assert.Error(t, err)
+	assert.Empty(t, cfgPath)
+
+	watchPath, err := DefaultLocalWatchPath()
+	assert.Error(t, err)
+	assert.Empty(t, watchPath)
+}
+
 func TestLocalConfigCRUDAndValidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "local.config")
