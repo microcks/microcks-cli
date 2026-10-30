@@ -78,11 +78,16 @@ func unknownCommandError(cmd *cobra.Command, arg string) error {
 	return wrapUsageError(cmd, fmt.Errorf("unknown command %q for %q%s", arg, cmdPath, sb.String()))
 }
 
-func setupUsageErrors(c *cobra.Command) {
-	c.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+func setupUsageErrors(root *cobra.Command) {
+	// Child commands inherit FlagErrorFunc from the root command in Cobra.
+	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		return wrapUsageError(cmd, err)
 	})
 
+	wrapArgs(root)
+}
+
+func wrapArgs(c *cobra.Command) {
 	if c.Args != nil {
 		origArgs := c.Args
 		c.Args = func(cmd *cobra.Command, args []string) error {
@@ -101,6 +106,6 @@ func setupUsageErrors(c *cobra.Command) {
 	}
 
 	for _, child := range c.Commands() {
-		setupUsageErrors(child)
+		wrapArgs(child)
 	}
 }
