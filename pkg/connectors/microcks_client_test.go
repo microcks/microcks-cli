@@ -467,3 +467,108 @@ func TestGetFullTestResultClassifiesNotFound(t *testing.T) {
 		t.Fatalf("KindOf = %v, want KindNotFound", got)
 	}
 }
+
+func TestDeleteService_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/services/svc-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	err = client.DeleteService("svc-1")
+	if err != nil {
+		t.Fatalf("DeleteService returned unexpected error: %v", err)
+	}
+}
+
+func TestDeleteService_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		http.Error(w, "service not found", http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	err = client.DeleteService("missing")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if got := microckserrors.KindOf(err); got != microckserrors.KindNotFound {
+		t.Fatalf("KindOf = %v, want KindNotFound", got)
+	}
+}
+
+func TestDeleteService_ResolveNameVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/services":
+			if err := json.NewEncoder(w).Encode([]Service{{
+				ID:      "svc-1",
+				Name:    "Test API",
+				Version: "1.0",
+				Type:    "REST",
+			}}); err != nil {
+				t.Fatalf("failed to encode services response: %v", err)
+			}
+		case "/api/services/svc-1":
+			if r.Method != http.MethodDelete {
+				t.Fatalf("unexpected method: %s", r.Method)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	err = client.DeleteService("Test API:1.0")
+	if err != nil {
+		t.Fatalf("DeleteService returned unexpected error: %v", err)
+	}
+}
+
+func TestDeleteService_MultipleMatches(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/services" {
+			if err := json.NewEncoder(w).Encode([]Service{
+				{ID: "svc-1", Name: "Dup API", Version: "1.0", Type: "REST"},
+				{ID: "svc-2", Name: "Dup API", Version: "1.0", Type: "SOAP"},
+			}); err != nil {
+				t.Fatalf("failed to encode services response: %v", err)
+			}
+			return
+		}
+		t.Fatalf("unexpected path: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	client, err := NewMicrocksClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewMicrocksClient returned error: %v", err)
+	}
+	err = client.DeleteService("Dup API:1.0")
+	if err == nil {
+		t.Fatal("expected error for multiple matches, got nil")
+	}
+	if got := microckserrors.KindOf(err); got != microckserrors.KindUsage {
+		t.Fatalf("KindOf = %v, want KindUsage", got)
+	}
+}

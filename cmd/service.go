@@ -17,7 +17,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -26,16 +28,25 @@ import (
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
+)
+
+var (
+	isTerminal = func() bool {
+		return term.IsTerminal(int(os.Stdin.Fd()))
+	}
+	stdinReader io.Reader = os.Stdin
 )
 
 func NewServiceCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	serviceCmd := &cobra.Command{
 		Use:   "service",
-		Short: "List and inspect Microcks services",
+		Short: "List, inspect, and delete Microcks services",
 	}
 
 	serviceCmd.AddCommand(newServiceListCommand(globalClientOpts))
 	serviceCmd.AddCommand(newServiceGetCommand(globalClientOpts))
+	serviceCmd.AddCommand(newServiceDeleteCommand(globalClientOpts))
 
 	return serviceCmd
 }
@@ -149,4 +160,48 @@ func printServiceDetail(detail *connectors.ServiceDetail) error {
 		}
 	}
 	return nil
+}
+
+func newServiceDeleteCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var force bool
+
+	cmd := &cobra.Command{
+		Use:   "delete <id-or-name-version>",
+		Short: "Delete a Microcks service",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			serviceRef := args[0]
+
+			if !force {
+				if !isTerminal() {
+					return errors.Wrapf(errors.KindUsage, "--force flag is required for non-interactive deletion")
+				}
+				fmt.Printf("Are you sure you want to delete service '%s'? [y/N]: ", serviceRef)
+				reader := bufio.NewReader(stdinReader)
+				input, err := reader.ReadString('\n')
+				if err != nil {
+					return errors.Wrap(errors.KindGeneric, err)
+				}
+				input = strings.TrimSpace(strings.ToLower(input))
+				if input != "y" && input != "yes" {
+					fmt.Println("Service deletion aborted")
+					return nil
+				}
+			}
+
+			mc, _, err := newCommandClient(globalClientOpts)
+			if err != nil {
+				return err
+			}
+
+			if err := mc.DeleteService(serviceRef); err != nil {
+				return err
+			}
+
+			fmt.Printf("Service '%s' deleted successfully\n", serviceRef)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion without confirmation prompt")
+	return cmd
 }

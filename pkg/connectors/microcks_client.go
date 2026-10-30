@@ -52,6 +52,7 @@ type MicrocksClient interface {
 	SetOAuthToken(oauthToken string)
 	ListServices(page int, size int) ([]Service, error)
 	GetService(ref string) (*ServiceDetail, error)
+	DeleteService(ref string) error
 	ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
@@ -414,7 +415,11 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	if err != nil {
 		return "", "", err
 	}
+	// Apply effective insecure setting for Keycloak client initialization.
+	prevInsecure := config.InsecureTLS
+	config.InsecureTLS = config.InsecureTLS || c.InsecureTLS
 	kc, err := NewKeycloakClientWithContext(c.ctx, keyCloakUrl, "", "")
+	config.InsecureTLS = prevInsecure
 	if err != nil {
 		return "", "", err
 	}
@@ -472,6 +477,53 @@ func (c *microcksClient) GetService(ref string) (*ServiceDetail, error) {
 	return &detail, nil
 }
 
+// DeleteService deletes a service by ID or name:version reference.
+func (c *microcksClient) DeleteService(ref string) error {
+	id := ref
+	if strings.Contains(ref, ":") {
+		serviceID, err := c.resolveServiceID(ref)
+		if err != nil {
+			return err
+		}
+		id = serviceID
+	}
+
+	rel := &url.URL{Path: "services/" + id}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequestWithContext(c.ctx, "DELETE", u.String(), nil)
+	if err != nil {
+		return errors.Wrap(errors.KindGeneric, fmt.Errorf("creating delete service request: %w", err))
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	config.DumpRequestIfRequired("Microcks for deleting service", req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, err)
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired("Microcks for deleting service", resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, fmt.Errorf("reading Microcks response: %w", err))
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return errors.Wrapf(kind, "Microcks returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return nil
+}
+
 func (c *microcksClient) ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error) {
 	values := url.Values{}
 	values.Set("page", strconv.Itoa(page))
@@ -492,6 +544,7 @@ func (c *microcksClient) resolveServiceID(ref string) (string, error) {
 	if !ok || name == "" || version == "" {
 		return "", errors.Wrapf(errors.KindUsage, "service reference %q must be <name>:<version>", ref)
 	}
+	var matches []Service
 	for page := 0; ; page++ {
 		services, err := c.ListServices(page, serviceLookupPageSize)
 		if err != nil {
@@ -499,14 +552,24 @@ func (c *microcksClient) resolveServiceID(ref string) (string, error) {
 		}
 		for _, service := range services {
 			if service.Name == name && service.Version == version {
-				return service.ID, nil
+				matches = append(matches, service)
 			}
 		}
 		if len(services) < serviceLookupPageSize {
 			break
 		}
 	}
-	return "", errors.Wrapf(errors.KindNotFound, "service %q does not exist", ref)
+	if len(matches) == 0 {
+		return "", errors.Wrapf(errors.KindNotFound, "service %q does not exist", ref)
+	}
+	if len(matches) > 1 {
+		var ids []string
+		for _, m := range matches {
+			ids = append(ids, fmt.Sprintf("%s (%s)", m.ID, m.Type))
+		}
+		return "", errors.Wrapf(errors.KindUsage, "multiple services matched %q: %s; please specify by ID", ref, strings.Join(ids, ", "))
+	}
+	return matches[0].ID, nil
 }
 
 func (c *microcksClient) getJSON(path string, query url.Values, out any, dumpLabel string) error {
