@@ -200,7 +200,17 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		}
 		c.ServerAddr = configCtx.Server.Server
 
-		c.InsecureTLS = configCtx.Server.InsecureTLS
+		// Honor the persisted insecureTLS only when it was written by the new
+		// login (TLSExplicit == true). Old login always wrote insecureTLS: true
+		// even without --insecure-tls, so we must not blindly trust it.
+		if configCtx.Server.TLSExplicit {
+			c.InsecureTLS = configCtx.Server.InsecureTLS
+		} else if configCtx.Server.InsecureTLS {
+			// Legacy config: insecureTLS was set unconditionally by older login.
+			// Warn the user and keep TLS verification enabled for safety.
+			log.Printf("Warning: saved context %q has insecureTLS: true but was written by an older microcks-cli that always persisted that value. TLS certificate verification will be enforced. Re-run 'microcks login' with --insecure-tls if needed.\n", configCtx.Name)
+			c.InsecureTLS = false
+		}
 		c.AuthToken = configCtx.User.AuthToken
 		c.RefreshToken = configCtx.User.RefreshToken
 
@@ -226,8 +236,17 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		c.Verbose = opts.Verbose
 	}
 
-	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+	// Build the HTTP transport. config.InsecureTLS is set by the --insecure-tls
+	// CLI flag and always takes precedence. c.InsecureTLS comes from the saved
+	// context and is honoured only when it was written by the new login code
+	// (TLSExplicit == true in the stored Server entry).
+	effectiveInsecure := config.InsecureTLS || c.InsecureTLS
+	if effectiveInsecure || len(config.CaCertPaths) > 0 {
+		// Temporarily set the global flag so CreateTLSConfig picks it up.
+		prevInsecure := config.InsecureTLS
+		config.InsecureTLS = effectiveInsecure
 		tlsConfig := config.CreateTLSConfig()
+		config.InsecureTLS = prevInsecure
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
