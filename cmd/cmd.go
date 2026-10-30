@@ -32,8 +32,15 @@ func NewCommand() (*cobra.Command, error) {
 		// exits, so Cobra must not also print them.
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			clientOpts.RequestContext = cmd.Context()
+			if err := cmd.ValidateRequiredFlags(); err != nil {
+				return wrapUsageError(cmd, err)
+			}
+			if err := cmd.ValidateFlagGroups(); err != nil {
+				return wrapUsageError(cmd, err)
+			}
+			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
@@ -69,6 +76,8 @@ func NewCommand() (*cobra.Command, error) {
 	command.PersistentFlags().StringVar(&clientOpts.ClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
 	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL")
 	command.MarkFlagsRequiredTogether("keycloakClientId", "keycloakClientSecret")
+
+	setupUsageErrors(command)
 
 	return command, nil
 }
