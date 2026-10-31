@@ -111,7 +111,9 @@ func TestLoginHonorsConfigFlag(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/keycloak/config" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"enabled": false}`))
+			if _, err := w.Write([]byte(`{"enabled": false}`)); err != nil {
+				t.Errorf("writing Keycloak config response: %v", err)
+			}
 			return
 		}
 		http.NotFound(w, r)
@@ -147,7 +149,9 @@ func TestLoginHonorsConfigFlagWithCustomContextName(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/keycloak/config" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"enabled": false}`))
+			if _, err := w.Write([]byte(`{"enabled": false}`)); err != nil {
+				t.Errorf("writing Keycloak config response: %v", err)
+			}
 			return
 		}
 		http.NotFound(w, r)
@@ -174,7 +178,9 @@ func TestLoginPreservesExistingContextsInCustomConfig(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/keycloak/config" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"enabled": false}`))
+			if _, err := w.Write([]byte(`{"enabled": false}`)); err != nil {
+				t.Errorf("writing Keycloak config response: %v", err)
+			}
 			return
 		}
 		http.NotFound(w, r)
