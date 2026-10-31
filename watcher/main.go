@@ -17,8 +17,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/watcher"
@@ -38,5 +41,7 @@ func main() {
 	}
 
 	fmt.Println("[INFO] microcks-watcher started...")
-	wm.Run()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	wm.RunContext(ctx)
 }

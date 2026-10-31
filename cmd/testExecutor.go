@@ -73,13 +73,14 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 	future := now + params.waitForMillis + 10000
 
 	var success = false
+	var inProgress = true
 	for nowInMilliseconds() < future {
 		testResultSummary, err := mc.GetTestResult(testResultID)
 		if err != nil {
 			return false, "", fmt.Errorf("checking test result: %w", err)
 		}
 		success = testResultSummary.Success
-		inProgress := testResultSummary.InProgress
+		inProgress = testResultSummary.InProgress
 		if _, err := fmt.Fprintf(progress, "MicrocksClient got status for test \"%s\" - success: %s, inProgress: %s \n", testResultID, fmt.Sprint(success), fmt.Sprint(inProgress)); err != nil {
 			return false, testResultID, errors.Wrap(errors.KindEnvironment, err)
 		}
@@ -92,6 +93,13 @@ func runTestAndWait(mc connectors.MicrocksClient, params testParams) (bool, stri
 			return false, testResultID, errors.Wrap(errors.KindEnvironment, err)
 		}
 		time.Sleep(2 * time.Second)
+	}
+
+	// If the polling deadline expired while the test was still running, return a KindConnection error
+	if inProgress {
+		return false, testResultID, errors.Wrapf(errors.KindConnection,
+			"test polling timed out after %dms waiting for result %s",
+			params.waitForMillis+10000, testResultID)
 	}
 
 	if !params.suppressOutput {

@@ -27,7 +27,7 @@ func newCommandClient(globalClientOpts *connectors.ClientOptions) (connectors.Mi
 	config.Verbose = globalClientOpts.Verbose
 
 	if globalClientOpts.ServerAddr != "" {
-		mc, err := connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
+		mc, err := connectors.NewMicrocksClientWithContext(globalClientOpts.RequestContext, globalClientOpts.ServerAddr)
 		if err != nil {
 			return nil, "", err
 		}
@@ -40,7 +40,7 @@ func newCommandClient(globalClientOpts *connectors.ClientOptions) (connectors.Mi
 
 			oauthToken := "unauthenticated-token"
 			if keycloakURL != "null" {
-				kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+				kc, err := connectors.NewKeycloakClientWithContext(globalClientOpts.RequestContext, keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 				if err != nil {
 					return nil, "", err
 				}

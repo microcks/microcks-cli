@@ -171,7 +171,7 @@ func ValidateLocalConfig(config LocalConfig) error {
 
 // WriteLocalConfig writes a new local configuration file.
 func WriteLocalConfig(config LocalConfig, configPath string) error {
-	err := os.MkdirAll(filepath.Dir(configPath), os.ModePerm)
+	err := os.MkdirAll(filepath.Dir(configPath), 0750) // G301: Use restrictive permissions instead of os.ModePerm (0777)
 	if err != nil {
 		return err
 	}
@@ -337,12 +337,12 @@ func (l *LocalConfig) UpsertInstance(instance Instance) {
 }
 
 // Returns true if server was removed successfully
-func (l *LocalConfig) RemoveInstance(instanceName string) bool {
-	if instanceName == "" {
+func (l *LocalConfig) RemoveInstance(instanceID string) bool {
+	if instanceID == "" {
 		return true
 	}
 	for a, i := range l.Instances {
-		if i.Name == instanceName {
+		if i.ContainerID == instanceID {
 			l.Instances = append(l.Instances[:a], l.Instances[a+1:]...)
 			return true
 		}
@@ -361,7 +361,7 @@ func (l *LocalConfig) GetAuth(server string) (*Auth, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Auth for '%s' is undifined", server)
+	return nil, fmt.Errorf("Auth for '%s' is undefined", server)
 }
 
 func (l *LocalConfig) UpsertAuth(auth Auth) {
@@ -423,7 +423,7 @@ func ReadLocalWatchConfig(path string) (*WatchConfig, error) {
 
 // WriteLocalWatchConfig writes a new local watch configuration file.
 func WriteLocalWatchConfig(config WatchConfig, cfgPath string) error {
-	err := os.MkdirAll(filepath.Dir(cfgPath), os.ModePerm)
+	err := os.MkdirAll(filepath.Dir(cfgPath), 0750) // G301: Use restrictive permissions instead of os.ModePerm (0777)
 	if err != nil {
 		return err
 	}

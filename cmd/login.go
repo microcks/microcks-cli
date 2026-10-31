@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -56,7 +57,7 @@ func NewLoginCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		Use:   "login SERVER",
 		Short: "Login into Microcks instance",
 		Long:  "Login into Microcks instance",
-		Example: `microcks login http://locahost:8080
+		Example: `microcks login http://localhost:8080
 
 # Provide name to your logged in context (Default context name is server name)
 microcks login http://localhost:8080 --name
@@ -87,7 +88,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 			config.Verbose = globalClientOpts.Verbose
 
 			server = args[0]
-			mc, err := connectors.NewMicrocksClient(server)
+			mc, err := connectors.NewMicrocksClientWithContext(ctx, server)
 			if err != nil {
 				return err
 			}
@@ -110,9 +111,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				ClientSecret: "",
 			}
 
-			configFile, err := config.DefaultLocalConfigPath()
-			if err != nil {
-				return err
+			configFile := globalClientOpts.ConfigPath
+			if configFile == "" {
+				var err error
+				configFile, err = config.DefaultLocalConfigPath()
+				if err != nil {
+					return err
+				}
 			}
 			localConfig, err := config.ReadLocalConfig(configFile)
 			if err != nil {
@@ -140,7 +145,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 						return errors.Wrapf(errors.KindUsage, "please set 'MICROCKS_CLIENT_ID' & 'MICROCKS_CLIENT_SECRET' to perform password login")
 					}
 					//Perform login and retrive tokens
-					authToken, refreshToken, err = passwordLogin(keycloakUrl, clientID, clientSecret, username, password)
+					authToken, refreshToken, err = passwordLogin(ctx, keycloakUrl, clientID, clientSecret, username, password)
 					if err != nil {
 						return err
 					}
@@ -149,7 +154,7 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				} else {
 					httpClient := mc.HttpClient()
 					ctx = oidc.ClientContext(ctx, httpClient)
-					kc, err := connectors.NewKeycloakClient(keycloakUrl, "", "")
+					kc, err := connectors.NewKeycloakClientWithContext(ctx, keycloakUrl, "", "")
 					if err != nil {
 						return err
 					}
@@ -228,7 +233,7 @@ func oauth2login(
 	// handledRequests ensures we do not handle more requests than necessary
 	handledRequests := 0
 	// completionChan is to signal flow completed. Non-empty string indicates error
-	completionChan := make(chan string)
+	completionChan := make(chan string, 1)
 
 	stateNonce, err := rand.String(24)
 	if err != nil {
@@ -256,7 +261,9 @@ func oauth2login(
 	// Authorization redirect callback from OAuth2 auth flow.
 	// Handles both implicit and authorization code flow
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Callback received on: %s\n", r.URL.Path)
+		// G706: Sanitize URL path before logging to prevent log injection via newline characters.
+		safePath := strings.NewReplacer("\n", "", "\r", "").Replace(r.URL.Path)
+		log.Printf("Callback received on: %s\n", safePath) // #nosec G706 -- path is sanitized above
 
 		if formErr := r.FormValue("error"); formErr != "" {
 			handleErr(w, fmt.Sprintf("%s: %s", formErr, r.FormValue("error_description")))
@@ -302,9 +309,6 @@ func oauth2login(
 		completionChan <- ""
 	}
 
-	srv := &http.Server{Addr: "localhost:" + strconv.Itoa(port)}
-	http.HandleFunc("/auth/callback", callbackHandler)
-
 	var url string
 	opts := []oauth2.AuthCodeOption{}
 	opts = append(opts, oauth2.SetAuthURLParam("client_id", "microcks-app-js"))
@@ -316,15 +320,20 @@ func oauth2login(
 	authBaseURL := strings.SplitN(url, "?", 2)[0]
 	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", authBaseURL)
 	time.Sleep(1 * time.Second)
-	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
+	srv, listener, err := newOAuthCallbackServer("localhost:"+strconv.Itoa(port), callbackHandler)
+	if err != nil {
 		return "", "", err
 	}
+	defer srv.Close()
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.Serve(listener); err != http.ErrServerClosed {
 			completionChan <- fmt.Sprintf("temporary HTTP server failed: %s", err)
 		}
 	}()
+	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
+		return "", "", err
+	}
 	errMsg := <-completionChan
 	if errMsg != "" {
 		return "", "", errors.Wrapf(errors.KindGeneric, "%s", errMsg)
@@ -339,6 +348,21 @@ func oauth2login(
 	return tokenString, refreshToken, nil
 }
 
+func newOAuthCallbackServer(addr string, callbackHandler http.HandlerFunc) (*http.Server, net.Listener, error) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return nil, nil, errors.Wrap(errors.KindEnvironment, fmt.Errorf("starting temporary HTTP server on %s: %w", srv.Addr, err))
+	}
+	return srv, listener, nil
+}
+
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) error {
 	if ssoLaunchBrowser {
 		fmt.Printf("Opening system default browser for authentication\n")
@@ -351,8 +375,8 @@ func ssoAuthFlow(url string, ssoLaunchBrowser bool) error {
 	return nil
 }
 
-func passwordLogin(keycloakURL, clientId, clientSecret, Username, Password string) (string, string, error) {
-	kc, err := connectors.NewKeycloakClient(keycloakURL, clientId, clientSecret)
+func passwordLogin(ctx context.Context, keycloakURL, clientId, clientSecret, Username, Password string) (string, string, error) {
+	kc, err := connectors.NewKeycloakClientWithContext(ctx, keycloakURL, clientId, clientSecret)
 	if err != nil {
 		return "", "", err
 	}

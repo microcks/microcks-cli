@@ -31,12 +31,8 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 		Use:   "import-url",
 		Short: "import API artifacts from URL on Microcks server",
 		Long:  `import API artifacts from URL on Microcks server`,
+		Args:  validateImportURLArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse subcommand args first.
-			if len(args) == 0 {
-				return errors.Wrapf(errors.KindUsage, "import-url requires a <specificationFileURL[:primary[:secret]]> argument")
-			}
-
 			specificationFiles := args[0]
 
 			mc, _, err := newCommandClient(globalClientOpts)
@@ -64,24 +60,42 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	return importURLCmd
 }
 
+func validateImportURLArgs(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return errors.Wrapf(errors.KindUsage, "import-url requires a <specificationFileURL[:primary[:secret]]> argument")
+	}
+	if len(args) > 1 {
+		return errors.Wrapf(errors.KindUsage, "import-url accepts only 1 positional argument; specify multiple URLs as a comma-separated list: <url1,url2>")
+	}
+
+	for _, f := range strings.Split(args[0], ",") {
+		lower := strings.ToLower(f)
+		if (!strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "http://")) || lower == "http://" || lower == "https://" {
+			return errors.Wrapf(
+				errors.KindUsage,
+				"invalid artifact URL '%s': must start with http:// or https://",
+				f,
+			)
+		}
+	}
+	return nil
+}
+
 func parseImportURLArg(f string) (string, bool, string) {
 	mainArtifact := true
 	secret := ""
 
-	// Check if URL starts with https or http
-	if strings.HasPrefix(f, "https://") || strings.HasPrefix(f, "http://") {
-		parts := strings.Split(f, ":")
-		n := len(parts)
+	parts := strings.Split(f, ":")
+	n := len(parts)
 
-		for i := 2; i < n; i++ {
-			if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
-				mainArtifact = val
-				if i+1 < n {
-					secret = strings.Join(parts[i+1:], ":")
-				}
-				f = strings.Join(parts[:i], ":")
-				break
+	for i := 2; i < n; i++ {
+		if val, parseErr := strconv.ParseBool(parts[i]); parseErr == nil {
+			mainArtifact = val
+			if i+1 < n {
+				secret = strings.Join(parts[i+1:], ":")
 			}
+			f = strings.Join(parts[:i], ":")
+			break
 		}
 	}
 	return f, mainArtifact, secret

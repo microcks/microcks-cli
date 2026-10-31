@@ -9,21 +9,21 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
       day: sunday
     open-pull-requests-limit: 3
     rebase-strategy: disabled
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
       day: sunday
     open-pull-requests-limit: 3
     rebase-strategy: disabled
   - package-ecosystem: docker
     directory: build/
     schedule:
-      interval: monthly
+      interval: weekly
       day: sunday
     registries:
     - dhi

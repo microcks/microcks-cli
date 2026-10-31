@@ -108,7 +108,8 @@ func writeStepSummary(r *connectors.TestResult) error {
 	}
 	b.WriteString("\n")
 
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
+	// #nosec G703,G304 -- path is the GITHUB_OUTPUT env var set by the Actions runner; it is a trusted system value, not user web input.
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600) // G302: restrictive permissions
 	if err != nil {
 		return err
 	}

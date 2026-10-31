@@ -17,40 +17,59 @@
 package watcher
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/microcks/microcks-cli/pkg/config"
 )
 
+const importDebounce = 300 * time.Millisecond
+
+type pendingImport struct {
+	entry    config.WatchEntry
+	deadline time.Time
+}
+
 type WatchManager struct {
-	fileWatcher  *fsnotify.Watcher
-	configPath   string
-	watchEntries map[string]config.WatchEntry
-	lock         sync.Mutex
+	fileWatcher   *fsnotify.Watcher
+	configPath    string
+	watchEntries  map[string]config.WatchEntry
+	watchDirs     map[string]struct{}
+	triggerImport func(context.Context, config.WatchEntry)
+	lock          sync.Mutex
 }
 
 func NewWatchManger(configPath string) (*WatchManager, error) {
+	absConfigPath, err := filepath.Abs(configPath)
+	if err != nil {
+		return nil, err
+	}
+
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 
-	err = fw.Add(configPath)
-	if err != nil {
+	configDir := filepath.Dir(absConfigPath)
+	if err := fw.Add(configDir); err != nil {
+		fw.Close()
 		return nil, err
 	}
 
 	wm := &WatchManager{
 		fileWatcher:  fw,
-		configPath:   configPath,
+		configPath:   absConfigPath,
 		watchEntries: make(map[string]config.WatchEntry),
+		watchDirs:    map[string]struct{}{configDir: {}},
 	}
 
-	err = wm.Reload()
-	if err != nil {
+	if err := wm.Reload(); err != nil {
+		fw.Close()
 		return nil, err
 	}
 
@@ -64,59 +83,177 @@ func (wm *WatchManager) Reload() error {
 	}
 
 	newFiles := map[string]config.WatchEntry{}
+	newDirs := map[string]struct{}{filepath.Dir(wm.configPath): {}}
 	for _, entry := range cfg.Entries {
-		newFiles[entry.FilePath] = entry
+		absPath, err := filepath.Abs(entry.FilePath)
+		if err != nil {
+			log.Printf("[WARN] Cannot resolve watched file %s: %v", entry.FilePath, err)
+			continue
+		}
+		newFiles[filepath.Clean(absPath)] = entry
+		newDirs[filepath.Dir(filepath.Clean(absPath))] = struct{}{}
 	}
 
-	// Remove stale watchers
-	for file := range wm.watchEntries {
+	// Watch containing directories so replacing a file atomically doesn't
+	// detach the watcher from its inode.
+	for dir := range newDirs {
+		if _, exists := wm.watchDirs[dir]; exists {
+			continue
+		}
+		if err := wm.fileWatcher.Add(dir); err != nil {
+			log.Printf("[WARN] Cannot watch directory %s: %v", dir, err)
+			delete(newDirs, dir)
+			continue
+		}
+		log.Printf("[INFO] Watcher added on directory %s", dir)
+	}
 
-		if _, exists := newFiles[file]; !exists {
-			wm.fileWatcher.Remove(file)
+	for dir := range wm.watchDirs {
+		if _, exists := newDirs[dir]; exists {
+			continue
+		}
+		if err := wm.fileWatcher.Remove(dir); err != nil {
+			log.Printf("[WARN] Cannot remove watcher for directory %s: %v", dir, err)
 		}
 	}
 
-	// Add new watchers
 	for file := range newFiles {
 		if _, exists := wm.watchEntries[file]; !exists {
-			err := wm.fileWatcher.Add(file)
-			if err != nil {
-				log.Printf("[WARN] Cannot watch file %s: %v", file, err)
-				continue
-			}
-			log.Printf("[INFO] Watcher added on %s", file)
+			log.Printf("[INFO] Watching file %s", file)
 		}
 	}
 
 	wm.watchEntries = newFiles
+	wm.watchDirs = newDirs
 	return nil
 }
 
 func (wm *WatchManager) Run() {
-	for {
-		select {
-		case event := <-wm.fileWatcher.Events:
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				if event.Name == wm.configPath {
-					fmt.Println("[INFO] Reloading config...")
-					wm.lock.Lock()
-					err := wm.Reload()
-					wm.lock.Unlock()
-					if err != nil {
-						// A bad config edit shouldn't kill the watcher; log and
-						// keep the previous config until the next valid save.
-						log.Printf("[ERROR] Config reload failed, keeping previous config: %v", err)
-					}
+	wm.RunContext(context.Background())
+}
+
+func (wm *WatchManager) RunContext(ctx context.Context) {
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer wm.fileWatcher.Close()
+
+	imports := make(chan config.WatchEntry)
+	go func() {
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case entry := <-imports:
+				if runCtx.Err() != nil {
+					return
+				}
+				if wm.triggerImport != nil {
+					wm.triggerImport(runCtx, entry)
 				} else {
-					wm.lock.Lock()
-					entry, exists := wm.watchEntries[event.Name]
-					wm.lock.Unlock()
-					if exists {
-						go TriggerImport(entry)
-					}
+					TriggerImportWithContext(runCtx, entry)
 				}
 			}
-		case err := <-wm.fileWatcher.Errors:
+		}
+	}()
+
+	pending := make(map[string]pendingImport)
+	queued := make(map[string]config.WatchEntry)
+	ready := make([]string, 0)
+	debounceTimer := time.NewTimer(time.Hour)
+	if !debounceTimer.Stop() {
+		<-debounceTimer.C
+	}
+	defer debounceTimer.Stop()
+
+	eventErrors := wm.fileWatcher.Errors
+	for {
+		var debounceC <-chan time.Time
+		if len(pending) > 0 {
+			var deadline time.Time
+			for _, item := range pending {
+				if deadline.IsZero() || item.deadline.Before(deadline) {
+					deadline = item.deadline
+				}
+			}
+			if !debounceTimer.Stop() {
+				select {
+				case <-debounceTimer.C:
+				default:
+				}
+			}
+			delay := time.Until(deadline)
+			if delay < 0 {
+				delay = 0
+			}
+			debounceTimer.Reset(delay)
+			debounceC = debounceTimer.C
+		}
+
+		var importC chan config.WatchEntry
+		var nextImport config.WatchEntry
+		if len(ready) > 0 {
+			importC = imports
+			nextImport = queued[ready[0]]
+		}
+
+		select {
+		case <-runCtx.Done():
+			return
+		case event, ok := <-wm.fileWatcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
+				continue
+			}
+
+			eventPath, err := filepath.Abs(event.Name)
+			if err != nil {
+				continue
+			}
+			eventPath = filepath.Clean(eventPath)
+			if eventPath == wm.configPath {
+				fmt.Println("[INFO] Reloading config...")
+				wm.lock.Lock()
+				err := wm.Reload()
+				wm.lock.Unlock()
+				if err != nil {
+					log.Printf("[ERROR] Config reload failed, keeping previous config: %v", err)
+				}
+				continue
+			}
+
+			wm.lock.Lock()
+			entry, exists := wm.watchEntries[eventPath]
+			wm.lock.Unlock()
+			if exists {
+				pending[eventPath] = pendingImport{
+					entry:    entry,
+					deadline: time.Now().Add(importDebounce),
+				}
+			}
+		case <-debounceC:
+			now := time.Now()
+			for file, item := range pending {
+				if item.deadline.After(now) {
+					continue
+				}
+				delete(pending, file)
+				if _, exists := queued[file]; exists {
+					queued[file] = item.entry
+					continue
+				}
+				queued[file] = item.entry
+				ready = append(ready, file)
+			}
+		case importC <- nextImport:
+			delete(queued, ready[0])
+			ready = ready[1:]
+		case err, ok := <-eventErrors:
+			if !ok {
+				eventErrors = nil
+				continue
+			}
 			log.Printf("[ERROR] Watcher error: %v", err)
 		}
 	}

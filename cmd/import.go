@@ -30,6 +30,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func parseImportFileArg(file string) (string, bool) {
+	mainArtifact := true
+	if separator := strings.LastIndex(file, ":"); separator >= 0 {
+		if parsedMainArtifact, err := strconv.ParseBool(file[separator+1:]); err == nil {
+			return file[:separator], parsedMainArtifact
+		}
+	}
+	return file, mainArtifact
+}
+
 func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var watch bool
 	var outputFormat string
@@ -70,7 +80,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			if globalClientOpts.ServerAddr != "" && globalClientOpts.ClientId != "" && globalClientOpts.ClientSecret != "" {
 				// Create client with server address.
 				var err error
-				mc, err = connectors.NewMicrocksClient(globalClientOpts.ServerAddr)
+				mc, err = connectors.NewMicrocksClientWithContext(cmd.Context(), globalClientOpts.ServerAddr)
 				if err != nil {
 					return err
 				}
@@ -83,7 +93,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				oauthToken := "unauthenticated-token"
 				if keycloakURL != "null" {
 					// If Keycloak is enabled, retrieve an OAuth token using Keycloak Client.
-					kc, err := connectors.NewKeycloakClient(keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
+					kc, err := connectors.NewKeycloakClientWithContext(cmd.Context(), keycloakURL, globalClientOpts.ClientId, globalClientOpts.ClientSecret)
 					if err != nil {
 						return err
 					}
@@ -127,18 +137,8 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			results := make([]artifactImportResult, 0, len(sepSpecificationFiles))
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
+				f, mainArtifact := parseImportFileArg(f)
 				var err error
-
-				// Check if mainArtifact flag is provided.
-				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						return errors.Wrapf(errors.KindUsage, "cannot parse %q as artifact primary flag", pathAndMainArtifact[1])
-					}
-				}
 
 				// Try uploading this artifact.
 				msg, err := mc.UploadArtifact(f, mainArtifact)
@@ -205,7 +205,7 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 				if _, err := fmt.Println("Watch mode enabled - microcks-watcher started..."); err != nil {
 					return errors.Wrap(errors.KindEnvironment, err)
 				}
-				wm.Run()
+				wm.RunContext(cmd.Context())
 			}
 			if outputFormat == "json" {
 				return errors.Wrap(errors.KindEnvironment, output.WriteJSON(os.Stdout, results))

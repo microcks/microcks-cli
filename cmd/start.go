@@ -50,7 +50,7 @@ microcks start
 microcks start --port [Port you want]
 
 # Define your driver (by default docker)
-microcks start --driver [driver you wnat either 'docker' or 'podman']
+microcks start --driver [driver you want either 'docker' or 'podman']
 
 # Define name of your microcks container/instance
 microcks start --name [name of you container/instance]`,
@@ -99,8 +99,9 @@ microcks start --name [name of you container/instance]`,
 					if _, err := fmt.Fprintf(progress, "Container for instance %s no longer exists, recreating it\n", name); err != nil {
 						return errors.Wrap(errors.KindEnvironment, err)
 					}
+
+					localConfig.RemoveInstance(instance.ContainerID)
 					instance.Status = ""
-					instance.ContainerID = ""
 				}
 			}
 
@@ -263,7 +264,9 @@ func waitForReady(serverURL string, timeout time.Duration) error {
 	for time.Now().Before(deadline) {
 		resp, err := httpClient.Get(url)
 		if err == nil {
-			resp.Body.Close()
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				// G104: error intentionally ignored in health-check polling loop
+			}
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
