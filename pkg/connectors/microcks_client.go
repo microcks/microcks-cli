@@ -25,6 +25,7 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -45,6 +46,8 @@ var (
 )
 
 const serviceLookupPageSize = 100
+
+const httpTimeout = 30 * time.Second
 
 // MicrocksClient allows interacting with Microcks APIs
 type MicrocksClient interface {
@@ -221,15 +224,11 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		c.Verbose = opts.Verbose
 	}
 
+	var tlsConfig *tls.Config
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
-		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		c.httpClient = &http.Client{Transport: tr, Timeout: 30 * time.Second}
-	} else {
-		c.httpClient = &http.Client{Timeout: 30 * time.Second}
+		tlsConfig = config.CreateTLSConfig()
 	}
+	c.httpClient = newHTTPClient(tlsConfig)
 
 	if localCfg != nil {
 		err = c.refreshAuthToken(localCfg, ctxName, opts.ConfigPath)
@@ -257,16 +256,20 @@ func NewMicrocksClient(apiURL string) (MicrocksClient, error) {
 	}
 	mc.APIURL = u
 
+	var tlsConfig *tls.Config
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
-		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		mc.httpClient = &http.Client{Transport: tr, Timeout: 30 * time.Second}
-	} else {
-		mc.httpClient = &http.Client{Timeout: 30 * time.Second}
+		tlsConfig = config.CreateTLSConfig()
 	}
+	mc.httpClient = newHTTPClient(tlsConfig)
 	return &mc, nil
+}
+
+func newHTTPClient(tlsConfig *tls.Config) *http.Client {
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = tlsConfig
+	tr.DialContext = (&net.Dialer{Timeout: httpTimeout}).DialContext
+	tr.ResponseHeaderTimeout = httpTimeout
+	return &http.Client{Transport: tr}
 }
 func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient

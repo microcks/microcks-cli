@@ -521,8 +521,18 @@ func TestMicrocksClientTimeout(t *testing.T) {
 					if err != nil {
 						t.Fatalf("client constructor returned error: %v", err)
 					}
-					if client.Timeout != 30*time.Second {
-						t.Fatalf("expected 30s timeout, got %v", client.Timeout)
+					if client.Timeout != 0 {
+						t.Fatalf("expected no client-wide timeout, got %v", client.Timeout)
+					}
+					transport, ok := client.Transport.(*http.Transport)
+					if !ok {
+						t.Fatalf("expected *http.Transport, got %T", client.Transport)
+					}
+					if transport.ResponseHeaderTimeout != 30*time.Second {
+						t.Fatalf("expected 30s response header timeout, got %v", transport.ResponseHeaderTimeout)
+					}
+					if transport.DialContext == nil {
+						t.Fatal("expected dial timeout to be configured")
 					}
 				})
 			}
