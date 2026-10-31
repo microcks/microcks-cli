@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -56,7 +57,7 @@ func NewLoginCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command 
 		Use:   "login SERVER",
 		Short: "Login into Microcks instance",
 		Long:  "Login into Microcks instance",
-		Example: `microcks login http://locahost:8080
+		Example: `microcks login http://localhost:8080
 
 # Provide name to your logged in context (Default context name is server name)
 microcks login http://localhost:8080 --name
@@ -110,9 +111,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				ClientSecret: "",
 			}
 
-			configFile, err := config.DefaultLocalConfigPath()
-			if err != nil {
-				return err
+			configFile := globalClientOpts.ConfigPath
+			if configFile == "" {
+				var err error
+				configFile, err = config.DefaultLocalConfigPath()
+				if err != nil {
+					return err
+				}
 			}
 			localConfig, err := config.ReadLocalConfig(configFile)
 			if err != nil {
@@ -228,7 +233,7 @@ func oauth2login(
 	// handledRequests ensures we do not handle more requests than necessary
 	handledRequests := 0
 	// completionChan is to signal flow completed. Non-empty string indicates error
-	completionChan := make(chan string)
+	completionChan := make(chan string, 1)
 
 	stateNonce, err := rand.String(24)
 	if err != nil {
@@ -304,13 +309,6 @@ func oauth2login(
 		completionChan <- ""
 	}
 
-	// G112: Set ReadHeaderTimeout to mitigate Slowloris DoS attack.
-	srv := &http.Server{
-		Addr:              "localhost:" + strconv.Itoa(port),
-		ReadHeaderTimeout: 3 * time.Second,
-	}
-	http.HandleFunc("/auth/callback", callbackHandler)
-
 	var url string
 	opts := []oauth2.AuthCodeOption{}
 	opts = append(opts, oauth2.SetAuthURLParam("client_id", "microcks-app-js"))
@@ -322,15 +320,20 @@ func oauth2login(
 	authBaseURL := strings.SplitN(url, "?", 2)[0]
 	fmt.Printf("Performing %s flow login: %s\n", "authorization_code", authBaseURL)
 	time.Sleep(1 * time.Second)
-	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
+	srv, listener, err := newOAuthCallbackServer("localhost:"+strconv.Itoa(port), callbackHandler)
+	if err != nil {
 		return "", "", err
 	}
+	defer srv.Close()
 	go func() {
 		log.Printf("Listen: %s\n", srv.Addr)
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.Serve(listener); err != http.ErrServerClosed {
 			completionChan <- fmt.Sprintf("temporary HTTP server failed: %s", err)
 		}
 	}()
+	if err := ssoAuthFlow(url, ssoLaunchBrowser); err != nil {
+		return "", "", err
+	}
 	errMsg := <-completionChan
 	if errMsg != "" {
 		return "", "", errors.Wrapf(errors.KindGeneric, "%s", errMsg)
@@ -343,6 +346,21 @@ func oauth2login(
 	}
 
 	return tokenString, refreshToken, nil
+}
+
+func newOAuthCallbackServer(addr string, callbackHandler http.HandlerFunc) (*http.Server, net.Listener, error) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/auth/callback", callbackHandler)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return nil, nil, errors.Wrap(errors.KindEnvironment, fmt.Errorf("starting temporary HTTP server on %s: %w", srv.Addr, err))
+	}
+	return srv, listener, nil
 }
 
 func ssoAuthFlow(url string, ssoLaunchBrowser bool) error {

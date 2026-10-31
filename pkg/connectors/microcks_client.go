@@ -293,7 +293,7 @@ func (c *microcksClient) context() context.Context {
 }
 
 func (c *microcksClient) GetKeycloakURL() (string, error) {
-	// Ensure we have a correct URL for retrieving Keycloal configuration.
+	// Ensure we have a correct URL for retrieving Keycloak configuration.
 	rel := &url.URL{Path: "keycloak/config"}
 	u := c.APIURL.ResolveReference(rel)
 
@@ -360,6 +360,13 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 		return err
 	}
 	needsRefresh, err := accessTokenNeedsRefresh(configCtx.User.AuthToken)
+	if configCtx.User.AuthToken == "" {
+		// No access token stored — user needs to log in.
+		return errors.Wrapf(errors.KindUsage, "not authenticated. Run `microcks login` first")
+	}
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	var claims jwt.RegisteredClaims
+	_, _, err = parser.ParseUnverified(configCtx.User.AuthToken, &claims)
 	if err != nil {
 		return err
 	}

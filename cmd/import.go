@@ -30,6 +30,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func parseImportFileArg(file string) (string, bool) {
+	mainArtifact := true
+	if separator := strings.LastIndex(file, ":"); separator >= 0 {
+		if parsedMainArtifact, err := strconv.ParseBool(file[separator+1:]); err == nil {
+			return file[:separator], parsedMainArtifact
+		}
+	}
+	return file, mainArtifact
+}
+
 func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var watch bool
 	var outputFormat string
@@ -127,18 +137,8 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
 			results := make([]artifactImportResult, 0, len(sepSpecificationFiles))
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
+				f, mainArtifact := parseImportFileArg(f)
 				var err error
-
-				// Check if mainArtifact flag is provided.
-				if strings.Contains(f, ":") {
-					pathAndMainArtifact := strings.Split(f, ":")
-					f = pathAndMainArtifact[0]
-					mainArtifact, err = strconv.ParseBool(pathAndMainArtifact[1])
-					if err != nil {
-						return errors.Wrapf(errors.KindUsage, "cannot parse %q as artifact primary flag", pathAndMainArtifact[1])
-					}
-				}
 
 				// Try uploading this artifact.
 				msg, err := mc.UploadArtifact(f, mainArtifact)
