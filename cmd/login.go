@@ -111,9 +111,13 @@ microcks login http://localhost:8080 --sso --sso-launch-browser=false
 				ClientSecret: "",
 			}
 
-			configFile, err := config.DefaultLocalConfigPath()
-			if err != nil {
-				return err
+			configFile := globalClientOpts.ConfigPath
+			if configFile == "" {
+				var err error
+				configFile, err = config.DefaultLocalConfigPath()
+				if err != nil {
+					return err
+				}
 			}
 			localConfig, err := config.ReadLocalConfig(configFile)
 			if err != nil {

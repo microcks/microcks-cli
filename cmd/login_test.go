@@ -20,9 +20,14 @@ import (
 	stderrors "errors"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
+	"github.com/microcks/microcks-cli/pkg/config"
 	clierrors "github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOAuthCallbackServerUsesIsolatedMuxes(t *testing.T) {
@@ -100,4 +105,110 @@ func startOAuthCallbackTestServer(t *testing.T, status int) int {
 		}
 	}()
 	return response.StatusCode
+}
+
+func TestLoginHonorsConfigFlag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/keycloak/config" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"enabled": false}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	customConfigPath := filepath.Join(t.TempDir(), "custom-config.yaml")
+
+	out, err := executeCLIForTest(t, "login", server.URL, "--config", customConfigPath)
+	require.NoError(t, err, "output: %s", out)
+	assert.Contains(t, out, "No login required...")
+	assert.Contains(t, out, "Context '"+server.URL+"' updated")
+
+	// Verify the custom configuration file was created and populated
+	cfg, err := config.ReadLocalConfig(customConfigPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, server.URL, cfg.CurrentContext)
+	require.Len(t, cfg.Contexts, 1)
+	assert.Equal(t, server.URL, cfg.Contexts[0].Name)
+	assert.Equal(t, server.URL, cfg.Contexts[0].Server)
+
+	require.Len(t, cfg.Servers, 1)
+	assert.Equal(t, server.URL, cfg.Servers[0].Server)
+	assert.False(t, cfg.Servers[0].KeycloakEnable)
+
+	require.Len(t, cfg.Users, 1)
+	assert.Equal(t, server.URL, cfg.Users[0].Name)
+}
+
+func TestLoginHonorsConfigFlagWithCustomContextName(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/keycloak/config" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"enabled": false}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	customConfigPath := filepath.Join(t.TempDir(), "custom-config.yaml")
+
+	out, err := executeCLIForTest(t, "login", server.URL, "--name", "my-env", "--config", customConfigPath)
+	require.NoError(t, err, "output: %s", out)
+	assert.Contains(t, out, "Context 'my-env' updated")
+
+	cfg, err := config.ReadLocalConfig(customConfigPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "my-env", cfg.CurrentContext)
+	require.Len(t, cfg.Contexts, 1)
+	assert.Equal(t, "my-env", cfg.Contexts[0].Name)
+	assert.Equal(t, server.URL, cfg.Contexts[0].Server)
+}
+
+func TestLoginPreservesExistingContextsInCustomConfig(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/keycloak/config" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"enabled": false}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	customConfigPath := filepath.Join(t.TempDir(), "custom-config.yaml")
+
+	initialCfg := config.LocalConfig{
+		CurrentContext: "existing-env",
+		Contexts: []config.ContextRef{
+			{Name: "existing-env", Server: "http://existing:8080", User: "existing-user"},
+		},
+		Servers: []config.Server{
+			{Server: "http://existing:8080"},
+		},
+		Users: []config.User{
+			{Name: "existing-user"},
+		},
+	}
+	require.NoError(t, config.WriteLocalConfig(initialCfg, customConfigPath))
+
+	out, err := executeCLIForTest(t, "login", server.URL, "--name", "new-env", "--config", customConfigPath)
+	require.NoError(t, err, "output: %s", out)
+	assert.Contains(t, out, "Context 'new-env' updated")
+
+	cfg, err := config.ReadLocalConfig(customConfigPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "new-env", cfg.CurrentContext)
+	require.Len(t, cfg.Contexts, 2)
+	assert.Equal(t, "existing-env", cfg.Contexts[0].Name)
+	assert.Equal(t, "new-env", cfg.Contexts[1].Name)
+	require.Len(t, cfg.Servers, 2)
+	require.Len(t, cfg.Users, 2)
 }
