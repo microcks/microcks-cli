@@ -58,6 +58,7 @@ type Server struct {
 	Name           string `yaml:"name"`
 	Server         string `yaml:"server"`
 	InsecureTLS    bool   `yaml:"insecureTLS"`
+	TLSExplicit    bool   `yaml:"tlsExplicit,omitempty"`
 	KeycloakEnable bool   `yaml:"keycloakEnable"`
 }
 

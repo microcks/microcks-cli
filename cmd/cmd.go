@@ -62,6 +62,7 @@ func NewCommand() (*cobra.Command, error) {
 	command.AddCommand(NewContextCommand(&clientOpts))
 	command.AddCommand(NewLoginCommand(&clientOpts))
 	command.AddCommand(NewLogoutCommand(&clientOpts))
+	command.AddCommand(newDeleteAliasCommand(&clientOpts))
 
 	defaultLocalConfigPath, err := config.DefaultLocalConfigPath()
 	if err != nil {
@@ -80,4 +81,10 @@ func NewCommand() (*cobra.Command, error) {
 	setupUsageErrors(command)
 
 	return command, nil
+}
+
+func newDeleteAliasCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	cmd := newServiceDeleteCommand(globalClientOpts)
+	cmd.Hidden = true
+	return cmd
 }
