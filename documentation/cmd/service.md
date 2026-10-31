@@ -52,3 +52,6 @@ summary includes `id`, `name`, `version`, and `type`, and may include
 available, `messagesMap`. Integrations should check for the
 `service.list.json` and `service.get.json` capabilities before depending on
 these contracts.
+
+See [JSON output contracts](../json-output.md) for the stream conventions and
+capability detection shared by all machine-readable commands.

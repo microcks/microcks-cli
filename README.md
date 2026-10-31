@@ -71,10 +71,17 @@ microcks [command] [flags]
 | `stop`       | Stop a local Microcks instance                           | [`stop`](documentation/cmd/stop.md)             |
 | `import`     | Import API spec files from local filesystem              | [`import`](documentation/cmd/import.md)         |
 | `import-dir`  | Scan a directory and import API spec files.              | [`import-dir`](documentation/cmd/importDir.md)     |
-| `import-url` | Import API spec files directly from a remote URL         | [`import-url`](documentation/cmd/importUrl.md) |
+| `import-url` | Import API spec files directly from a remote URL         | [`import-url`](documentation/cmd/importURL.md) |
 | `service`    | List and inspect Microcks services                       | [`service`](documentation/cmd/service.md)       |
 | `test`       | Run tests against a deployed API using selected runner   | [`test`](documentation/cmd/test.md)             |
 | `version`    | Print Microcks CLI version                               | [`version`](documentation/cmd/version.md)       |
+
+### Reference
+
+| Topic | Documentation |
+| ----- | ------------- |
+| Consuming the CLI from a script, CI job or editor extension | [JSON output contracts](documentation/json-output.md) |
+| Exit codes and the error-handling model | [Error handling](documentation/error-handling.md) |
 
 ### Options
 
@@ -140,12 +147,16 @@ microcks test --dry-run --watch \
 | `--image` | `quay.io/microcks/microcks-uber:latest-native` | Uber image override (must be a `*-native` tag) |
 | `--ready-timeout` | `90s` | How long to wait for the container to be ready |
 | `--watch` | `false` | Re-run the test when the artifact file changes |
+| `--driver` | _(auto-detect)_ | Container runtime: `docker` or `podman` |
 
 Notes:
 
 - A `localhost`/`127.0.0.1` test endpoint is automatically reachable from inside the container — the CLI exposes the port and rewrites the endpoint for you.
 - The container is removed on every exit path, including `Ctrl+C` mid-test.
-- Docker is the primary runtime; Podman works through its Docker-compatible socket (`DOCKER_HOST`).
+- Without `--driver`, Podman is selected only when `DOCKER_HOST` is unset, `podman` is on the `PATH` and `docker` is not — an existing Docker or remote-daemon setup keeps working untouched. `--driver podman` verifies the Podman socket before starting the container and fails with exit code `14` when it is unreachable, instead of falling back to Docker.
+- Watch mode combined with `--output=json` emits a newline-delimited event stream — see [documentation/json-output.md](documentation/json-output.md).
+
+Full reference, including the runtime-selection rules and watch-mode behavior: [documentation/cmd/test.md](documentation/cmd/test.md).
 
 ### Building from Source
 
@@ -174,12 +185,20 @@ Binary releases for Linux, MacOS or Windows platform are available on the GitHub
 
 ### Container image
 
-The `microcks-cli` is available as a container image. So that you'd be able to easily use it from a GitLab CI or a [Tekton pipeline](https://github.com/tektoncd/pipeline). The hosting repository is on Quay.io [here](https://quay.io/repository/microcks/microcks-cli).
+The `microcks-cli` is also distributed as a container image, so you can run it from a GitLab CI job or a [Tekton pipeline](https://github.com/tektoncd/pipeline) without installing the binary. The image is hosted on the [Quay.io microcks-cli repository](https://quay.io/repository/microcks/microcks-cli).
 
-Below a sample on how to use the image without getting the CLI binary:
+To run a test using the image:
 
-```
-$ docker run -it quay.io/microcks/microcks-cli:latest microcks test 'Beer Catalog API:0.9' http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ POSTMAN --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ --keycloakClientId=microcks-serviceaccount --keycloakClientSecret=7deb71e8-8c80-4376-95ad-00a399ee3ca1 --waitFor=8sec  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
+```sh
+docker run -it quay.io/microcks/microcks-cli:latest microcks test \
+  'Beer Catalog API:0.9' \
+  http://beer-catalog-impl-beer-catalog-dev.apps.144.76.24.92.nip.io/api/ \
+  POSTMAN \
+  --microcksURL=http://microcks.apps.144.76.24.92.nip.io/api/ \
+  --keycloakClientId=microcks-serviceaccount \
+  --keycloakClientSecret=<client-secret> \
+  --waitFor=8sec \
+  --operationsHeaders='{"globals": [{"name": "x-api-key", "values": "my-values"}], "GET /beer": [{"name": "x-trace-id", "values": "xcvbnsdfghjklm"}]}'
 ```
 
 
@@ -202,6 +221,10 @@ parsed cleanly:
 microcks test "Pastry API:1.0.0" http://localhost:8080/api OPEN_API_SCHEMA \
   --microcksURL=http://localhost:8585/api --output=json > result.json
 ```
+
+Other commands (`service`, `context`, `start`, `import`, `test list`, `test get`,
+`capabilities`) accept `--output json` too. Payload shapes, the dry-run event stream
+and capability detection are documented in [documentation/json-output.md](documentation/json-output.md).
 
 ### GitHub Actions
 
