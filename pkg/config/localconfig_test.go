@@ -69,3 +69,23 @@ func TestRemoveInstance_NoDuplicatesAfterRecreate(t *testing.T) {
 		}
 	}
 }
+
+func TestWatchConfigEmptyContext(t *testing.T) {
+	watchConfig := &WatchConfig{}
+
+	if err := watchConfig.UpsertEntry(WatchEntry{
+		FilePath: "petstore.yaml",
+		Context:  []string{"default"},
+	}); err != nil {
+		t.Fatalf("expected valid watch entry to be accepted: %v", err)
+	}
+	if err := watchConfig.UpsertEntry(WatchEntry{
+		FilePath: "petstore.yaml",
+		Context:  nil,
+	}); err == nil {
+		t.Fatal("expected empty watch entry context to return an error")
+	}
+	if len(watchConfig.Entries) != 1 {
+		t.Fatalf("expected invalid watch entry not to be persisted, got %d entries", len(watchConfig.Entries))
+	}
+}

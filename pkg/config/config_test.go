@@ -446,11 +446,11 @@ func TestWatchConfig(t *testing.T) {
 	assert.Equal(t, "file1.yaml", loadedWCfg.Entries[0].FilePath)
 
 	// 4. Upsert entry (new path)
-	loadedWCfg.UpsertEntry(WatchEntry{FilePath: "file2.yaml", Context: []string{"ctx2"}, MainArtifact: false})
+	assert.NoError(t, loadedWCfg.UpsertEntry(WatchEntry{FilePath: "file2.yaml", Context: []string{"ctx2"}, MainArtifact: false}))
 	assert.Len(t, loadedWCfg.Entries, 2)
 
 	// 5. Upsert entry (existing path, append context)
-	loadedWCfg.UpsertEntry(WatchEntry{FilePath: "file1.yaml", Context: []string{"ctx3"}, MainArtifact: true})
+	assert.NoError(t, loadedWCfg.UpsertEntry(WatchEntry{FilePath: "file1.yaml", Context: []string{"ctx3"}, MainArtifact: true}))
 	assert.Len(t, loadedWCfg.Entries, 2)
 	for _, e := range loadedWCfg.Entries {
 		if e.FilePath == "file1.yaml" {

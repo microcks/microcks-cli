@@ -386,7 +386,11 @@ func (l *LocalConfig) RemoveAuth(server string) bool {
 }
 
 // UpsertEntry upserts a watch entry.
-func (w *WatchConfig) UpsertEntry(entry WatchEntry) {
+func (w *WatchConfig) UpsertEntry(entry WatchEntry) error {
+	if len(entry.Context) == 0 {
+		return fmt.Errorf("watch entry context must not be empty")
+	}
+
 	for i, e := range w.Entries {
 		if e.FilePath == entry.FilePath {
 			contexts := w.Entries[i].Context
@@ -394,10 +398,11 @@ func (w *WatchConfig) UpsertEntry(entry WatchEntry) {
 				entry.Context = append(entry.Context, contexts...)
 			}
 			w.Entries[i] = entry
-			return
+			return nil
 		}
 	}
 	w.Entries = append(w.Entries, entry)
+	return nil
 }
 
 // ReadLocalWatchConfig loads up the local watch configuration file. Returns nil if config does not exist
