@@ -359,13 +359,11 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	if err != nil {
 		return err
 	}
-	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-	var claims jwt.RegisteredClaims
-	_, _, err = parser.ParseUnverified(configCtx.User.AuthToken, &claims)
+	needsRefresh, err := accessTokenNeedsRefresh(configCtx.User.AuthToken)
 	if err != nil {
 		return err
 	}
-	if claims.Valid() == nil {
+	if !needsRefresh {
 		// token is still valid
 		return nil
 	}
@@ -377,6 +375,10 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	}
 	authToken, refreshToken, err := c.redeemRefreshToken(*auth)
 	if err != nil {
+		var retrieveErr *oauth2.RetrieveError
+		if errs.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
+			return errors.Wrapf(errors.KindUsage, "refresh token is expired or invalid. Run `microcks login` first")
+		}
 		return err
 	}
 	c.AuthToken = authToken
@@ -391,6 +393,23 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 		return err
 	}
 	return nil
+}
+
+// accessTokenNeedsRefresh parses the access token without verifying its
+// signature. Signature verification is performed by the server; this check is
+// only used to avoid sending an expired token with a request. Tokens without a
+// usable expiry claim cannot be proven to be fresh, so they are refreshed.
+func accessTokenNeedsRefresh(token string) (bool, error) {
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	var claims jwt.RegisteredClaims
+	_, _, err := parser.ParseUnverified(token, &claims)
+	if err != nil {
+		return false, err
+	}
+	if claims.ExpiresAt == nil {
+		return true, nil
+	}
+	return claims.Valid() != nil, nil
 }
 
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {

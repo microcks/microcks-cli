@@ -480,6 +480,40 @@ func createDummyJWT(exp int64) string {
 	return header + "." + payload + "."
 }
 
+func createJWTWithPayload(payload string) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	return header + "." + base64.RawURLEncoding.EncodeToString([]byte(payload)) + "."
+}
+
+func TestAccessTokenNeedsRefresh(t *testing.T) {
+	now := time.Now().Unix()
+	tests := []struct {
+		name        string
+		token       string
+		wantRefresh bool
+		wantErr     bool
+	}{
+		{name: "future expiry", token: createDummyJWT(now + 3600)},
+		{name: "expiry at current time", token: createDummyJWT(now), wantRefresh: true},
+		{name: "expired", token: createDummyJWT(now - 3600), wantRefresh: true},
+		{name: "missing expiry", token: createJWTWithPayload(`{"sub":"user"}`), wantRefresh: true},
+		{name: "non numeric expiry", token: createJWTWithPayload(`{"exp":"later"}`), wantErr: true},
+		{name: "malformed token", token: "not-a-jwt", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRefresh, err := accessTokenNeedsRefresh(tt.token)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("accessTokenNeedsRefresh error = %v, want error = %t", err, tt.wantErr)
+			}
+			if gotRefresh != tt.wantRefresh {
+				t.Fatalf("accessTokenNeedsRefresh = %t, want %t", gotRefresh, tt.wantRefresh)
+			}
+		})
+	}
+}
+
 func TestRefreshAuthToken_ValidTokenNoRefresh(t *testing.T) {
 	// A token with expiration 1 hour in the future
 	futureTime := time.Now().Add(1 * time.Hour).Unix()
@@ -633,5 +667,64 @@ func TestRefreshAuthToken_ExpiredTokenTriggersRefresh(t *testing.T) {
 	}
 	if user.RefreshToken != "new-refresh-token" {
 		t.Errorf("expected config RefreshToken to be %q, got %q", "new-refresh-token", user.RefreshToken)
+	}
+}
+
+func TestRefreshAuthToken_ExpiredRefreshTokenRequiresLogin(t *testing.T) {
+	expiredToken := createDummyJWT(time.Now().Add(-time.Hour).Unix())
+	localCfg := &config.LocalConfig{
+		CurrentContext: "test-context",
+		Contexts:       []config.ContextRef{{Name: "test-context", Server: "http://localhost", User: "test-context"}},
+		Servers:        []config.Server{{Server: "http://localhost"}},
+		Users:          []config.User{{Name: "test-context", AuthToken: expiredToken, RefreshToken: "expired-refresh-token"}},
+		Auths:          []config.Auth{{Server: "http://localhost", ClientId: "cli", ClientSecret: "secret"}},
+	}
+
+	var mockServer *httptest.Server
+	mockServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/keycloak/config":
+			json.NewEncoder(w).Encode(map[string]any{
+				"enabled": true, "auth-server-url": mockServer.URL, "realm": "microcks",
+			})
+		case "/realms/microcks/.well-known/openid-configuration":
+			json.NewEncoder(w).Encode(map[string]string{
+				"authorization_endpoint": mockServer.URL + "/realms/microcks/protocol/openid-connect/auth",
+				"token_endpoint": mockServer.URL + "/realms/microcks/protocol/openid-connect/token",
+			})
+		case "/realms/microcks/protocol/openid-connect/token":
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "invalid_grant", "error_description": "refresh token is not active",
+			})
+		default:
+			t.Fatalf("unexpected request to: %s", r.URL.Path)
+		}
+	}))
+	defer mockServer.Close()
+
+	apiURL, err := url.Parse(mockServer.URL + "/api/")
+	if err != nil {
+		t.Fatalf("failed to parse URL: %v", err)
+	}
+
+	mc := &microcksClient{
+		ctx:          context.Background(),
+		APIURL:       apiURL,
+		AuthToken:    expiredToken,
+		RefreshToken: "expired-refresh-token",
+		httpClient:   mockServer.Client(),
+	}
+
+	err = mc.refreshAuthToken(localCfg, "test-context", filepath.Join(t.TempDir(), "config.yaml"))
+	if err == nil {
+		t.Fatal("refreshAuthToken returned nil error")
+	}
+	if got := microckserrors.KindOf(err); got != microckserrors.KindUsage {
+		t.Fatalf("KindOf = %v, want %v (error: %v)", got, microckserrors.KindUsage, err)
+	}
+	if !strings.Contains(err.Error(), "microcks login") {
+		t.Fatalf("error %q does not tell the user to log in again", err.Error())
 	}
 }
