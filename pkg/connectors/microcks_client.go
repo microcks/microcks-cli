@@ -285,12 +285,19 @@ func (c *microcksClient) HttpClient() *http.Client {
 	return c.httpClient
 }
 
+func (c *microcksClient) context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return context.Background()
+}
+
 func (c *microcksClient) GetKeycloakURL() (string, error) {
 	// Ensure we have a correct URL for retrieving Keycloak configuration.
 	rel := &url.URL{Path: "keycloak/config"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.context(), "GET", u.String(), nil)
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak config request: %w", err))
 	}
@@ -352,6 +359,7 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	if err != nil {
 		return err
 	}
+	needsRefresh, err := accessTokenNeedsRefresh(configCtx.User.AuthToken)
 	if configCtx.User.AuthToken == "" {
 		// No access token stored — user needs to log in.
 		return errors.Wrapf(errors.KindUsage, "not authenticated. Run `microcks login` first")
@@ -362,7 +370,7 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	if err != nil {
 		return err
 	}
-	if claims.Valid() == nil {
+	if !needsRefresh {
 		// token is still valid
 		return nil
 	}
@@ -374,6 +382,10 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	}
 	authToken, refreshToken, err := c.redeemRefreshToken(*auth)
 	if err != nil {
+		var retrieveErr *oauth2.RetrieveError
+		if errs.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
+			return errors.Wrapf(errors.KindUsage, "refresh token is expired or invalid. Run `microcks login` first")
+		}
 		return err
 	}
 	c.AuthToken = authToken
@@ -390,12 +402,29 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	return nil
 }
 
+// accessTokenNeedsRefresh parses the access token without verifying its
+// signature. Signature verification is performed by the server; this check is
+// only used to avoid sending an expired token with a request. Tokens without a
+// usable expiry claim cannot be proven to be fresh, so they are refreshed.
+func accessTokenNeedsRefresh(token string) (bool, error) {
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	var claims jwt.RegisteredClaims
+	_, _, err := parser.ParseUnverified(token, &claims)
+	if err != nil {
+		return false, err
+	}
+	if claims.ExpiresAt == nil {
+		return true, nil
+	}
+	return claims.Valid() != nil, nil
+}
+
 func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, error) {
 	keyCloakUrl, err := c.GetKeycloakURL()
 	if err != nil {
 		return "", "", err
 	}
-	kc, err := NewKeycloakClientWithContext(c.ctx, keyCloakUrl, "", "")
+	kc, err := NewKeycloakClientWithContext(c.context(), keyCloakUrl, "", "")
 	if err != nil {
 		return "", "", err
 	}
@@ -407,7 +436,7 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	oauth2Conf.ClientSecret = auth.ClientSecret
 
 	httpClient := c.httpClient
-	ctx := oidc.ClientContext(c.ctx, httpClient)
+	ctx := oidc.ClientContext(c.context(), httpClient)
 
 	t := &oauth2.Token{
 		RefreshToken: c.RefreshToken,
@@ -497,7 +526,7 @@ func (c *microcksClient) getJSON(path string, query url.Values, out any, dumpLab
 	}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.context(), "GET", u.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -572,7 +601,7 @@ func (c *microcksClient) CreateTestResult(serviceID string, testEndpoint string,
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("failed to marshal test request: %w", err))
 	}
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), bytes.NewReader(input))
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), bytes.NewReader(input))
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating test request: %w", err))
 	}
@@ -677,7 +706,7 @@ func (c *microcksClient) UploadArtifact(specificationFilePath string, mainArtifa
 	rel := &url.URL{Path: "artifact/upload"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), pr)
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), pr)
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating artifact upload request: %w", err))
 	}
@@ -745,7 +774,7 @@ func (c *microcksClient) DownloadArtifact(artifactURL string, mainArtifact bool,
 	rel := &url.URL{Path: "artifact/download"}
 	u := c.APIURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), body)
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), body)
 	if err != nil {
 		return "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating artifact download request: %w", err))
 	}

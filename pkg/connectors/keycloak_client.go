@@ -79,12 +79,19 @@ func NewKeycloakClientWithContext(ctx context.Context, realmURL string, username
 	return &kc, nil
 }
 
+func (c *keycloakClient) context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return context.Background()
+}
+
 // ConnectAndGetToken implementation on keycloakClient structure
 func (c *keycloakClient) ConnectAndGetToken() (string, error) {
 	rel := &url.URL{Path: "protocol/openid-connect/token"}
 	u := c.BaseURL.ResolveReference(rel)
 
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), strings.NewReader(url.Values{"grant_type": {"client_credentials"}}.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -132,7 +139,7 @@ func (c *keycloakClient) GetOIDCConfig() (*oauth2.Config, error) {
 	u := c.BaseURL.ResolveReference(rel)
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(c.ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(c.context(), "GET", u.String(), nil)
 	if err != nil {
 		return nil, errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak OIDC request: %w", err))
 	}
@@ -186,7 +193,7 @@ func (c *keycloakClient) ConnectAndGetTokenAndRefreshToken(username, password st
 	data.Set("password", password)
 	data.Set("grant_type", "password")
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(c.ctx, "POST", u.String(), bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequestWithContext(c.context(), "POST", u.String(), bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return "", "", errors.Wrap(errors.KindGeneric, fmt.Errorf("creating Keycloak token request: %w", err))
 	}
