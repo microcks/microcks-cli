@@ -97,3 +97,55 @@ func TestDryRunFlagsRegistered(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeServerURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "URL with API path",
+			input: "http://localhost:18089/api",
+			want:  "http://localhost:18089",
+		},
+		{
+			name:  "URL without API path",
+			input: "http://localhost:18089",
+			want:  "http://localhost:18089",
+		},
+		{
+			name:  "URL with trailing slash",
+			input: "http://localhost:18089/",
+			want:  "http://localhost:18089",
+		},
+		{
+			name:  "URL with API path and trailing slash",
+			input: "http://localhost:18089/api/",
+			want:  "http://localhost:18089",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeServerURL(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizeServerURL(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPrintDetailsLinkNormalizesServerURL(t *testing.T) {
+	var output strings.Builder
+
+	err := printDetailsLink(&output, "http://localhost:18089/api/", "test-123")
+	if err != nil {
+		t.Fatalf("printDetailsLink() returned an error: %v", err)
+	}
+
+	want := "Test details (live while watching): http://localhost:18089/#/tests/test-123\n"
+	if output.String() != want {
+		t.Errorf("printDetailsLink() = %q, want %q", output.String(), want)
+	}
+}
