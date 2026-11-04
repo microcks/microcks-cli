@@ -33,7 +33,7 @@ jobs:
             
             Thanks and congrats 🎉 for opening your first issue here! Be sure to follow the issue template or please update it accordingly.
 
-            🏷️ A maintainer will triage it soon. If you'd like to work on it, please wait for the `triage/accepted` label, then comment `/assign`. See the [triage commands](https://github.com/microcks/microcks-cli/blob/master/documentation/triage-commands.md).
+            🏷️ A maintainer will triage it soon. If you'd like to work on it, please wait for the `triage/accepted` label before opening a pull request. See the [triage commands](https://github.com/microcks/microcks-cli/blob/master/documentation/triage-commands.md).
 
             📢 If you're using Microcks in your organization, please [add your company name to this list](https://github.com/microcks/.github/blob/main/ADOPTERS.md). 🙏 It really helps the project to gain momentum and credibility. It's a small contribution back to the project with a big impact.
             

@@ -109,36 +109,18 @@ test('triaging and flagging in the same comment works', () => {
   assert.deepEqual(r.errors, []);
 });
 
-test('contributors can self-assign only accepted issues', () => {
-  const pending = plan(parseCommands('/assign'), contributor);
-  assert.deepEqual(pending.assign, []);
-  assert.match(pending.errors[0], /not been accepted yet/);
-
-  const accepted = plan(parseCommands('/assign'), { ...contributor, labels: ['triage/accepted'] });
-  assert.deepEqual(accepted.assign, ['carol']);
-  assert.deepEqual(accepted.errors, []);
+test('non-maintainers cannot assign or unassign, even on accepted issues', () => {
+  for (const body of ['/assign', '/assign @dave', '/unassign', '/unassign @dave']) {
+    const r = plan(parseCommands(body), { ...contributor, labels: ['triage/accepted'] });
+    assert.deepEqual([...r.assign, ...r.unassign], []);
+    assert.match(r.errors[0], /Issues are not assigned here/);
+  }
 });
 
-test('contributors cannot assign others or pull requests', () => {
-  const others = plan(parseCommands('/assign @dave'), { ...contributor, labels: ['triage/accepted'] });
-  assert.deepEqual(others.assign, []);
-  assert.match(others.errors[0], /Only maintainers can assign other people/);
-
-  const pr = plan(parseCommands('/assign'), { ...contributor, isPullRequest: true });
-  assert.deepEqual(pr.assign, []);
-  assert.match(pr.errors[0], /pull requests/);
-});
-
-test('maintainers can assign anyone, before triage', () => {
-  const r = plan(parseCommands('/assign @dave @erin'), maintainer);
-  assert.deepEqual(r.assign, ['dave', 'erin']);
-});
-
-test('anyone can unassign themselves but not others', () => {
-  assert.deepEqual(plan(parseCommands('/unassign'), contributor).unassign, ['carol']);
-  const r = plan(parseCommands('/unassign @dave'), contributor);
-  assert.deepEqual(r.unassign, []);
-  assert.equal(r.errors.length, 1);
+test('maintainers can assign and unassign anyone, before triage', () => {
+  assert.deepEqual(plan(parseCommands('/assign @dave @erin'), maintainer).assign, ['dave', 'erin']);
+  assert.deepEqual(plan(parseCommands('/assign'), maintainer).assign, [maintainer.commenter]);
+  assert.deepEqual(plan(parseCommands('/unassign @dave'), maintainer).unassign, ['dave']);
 });
 
 test('/close and /reopen work for maintainers and the author only', () => {

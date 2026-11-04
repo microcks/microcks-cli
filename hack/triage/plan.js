@@ -234,32 +234,14 @@ function plan(commands, ctx) {
         if (!needMaintainer(name)) break;
         remove(FLAGS[name.slice('remove-'.length)]);
         break;
-      case 'assign': {
-        const targets = args.length ? args : [ctx.commenter];
-        const others = targets.filter((u) => u.toLowerCase() !== ctx.commenter.toLowerCase());
-        if (others.length && !ctx.isMaintainer) {
-          out.errors.push('Only maintainers can assign other people. Use `/assign` on its own to assign yourself.');
-          break;
-        }
-        if (!ctx.isMaintainer && !ctx.isPullRequest && !labels.has(TRIAGE_ACCEPTED)) {
-          out.errors.push('This issue has not been accepted yet. A maintainer will triage it first; please wait for the `triage/accepted` label before picking it up.');
-          break;
-        }
-        if (!ctx.isMaintainer && ctx.isPullRequest) {
-          out.errors.push('Only maintainers can assign pull requests.');
-          break;
-        }
-        out.assign.push(...targets);
-        break;
-      }
+      // Microcks doesn't assign issues to contributors: the first complete pull request is accepted.
+      case 'assign':
       case 'unassign': {
-        const targets = args.length ? args : [ctx.commenter];
-        const others = targets.filter((u) => u.toLowerCase() !== ctx.commenter.toLowerCase());
-        if (others.length && !ctx.isMaintainer) {
-          out.errors.push('Only maintainers can unassign other people. Use `/unassign` on its own to unassign yourself.');
+        if (!ctx.isMaintainer) {
+          out.errors.push('Issues are not assigned here. Once an issue has `triage/accepted`, open a pull request that references it; the first complete one is accepted.');
           break;
         }
-        out.unassign.push(...targets);
+        out[name].push(...(args.length ? args : [ctx.commenter]));
         break;
       }
       case 'close':

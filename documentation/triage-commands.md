@@ -6,7 +6,7 @@ Issues and pull requests in this repository can be triaged with Prow-style slash
 
 1. Every new issue gets the `needs-triage` label.
 2. A maintainer or contributor checks it and comments `/triage accepted`, or `/triage needs-information` if more details are needed from the reporter.
-3. Once an issue has `triage/accepted`, contributors can pick it up with `/assign` and open a pull request that references it.
+3. Once an issue has `triage/accepted`, anyone can open a pull request that references it. Issues are not assigned: the first complete pull request is accepted. If one is already open, please collaborate there instead of opening another.
 
 Please wait for `triage/accepted` before starting work. It avoids spending time on a fix or feature that the maintainers would not merge.
 
@@ -14,8 +14,6 @@ Please wait for `triage/accepted` before starting work. It avoids spending time 
 
 | Command | Effect |
 | --- | --- |
-| `/assign` | Assigns yourself. On issues, only once the issue has `triage/accepted`. |
-| `/unassign` | Unassigns yourself. |
 | `/close`, `/reopen` | Closes or reopens an issue or pull request you opened. You can only reopen it if you closed it yourself; if a maintainer closed it, ask them. |
 
 ## Commands for contributors and maintainers
@@ -42,7 +40,7 @@ Maintainers are people with write access to this repository. They can use every 
 | `/remove-kind`, `/remove-area`, `/remove-platform` | Removes the matching label, for example `/remove-kind bug`. |
 | `/remove-good-first-issue`, `/remove-help` | Removes `good first issue` or `help wanted`. |
 | `/keep-open` | Adds `keep-open`, so the stale bot skips the item. `/remove-keep-open` removes it. |
-| `/assign @user`, `/unassign @user` | Assigns or unassigns someone else. GitHub only lets you assign people who have commented on the issue or have access to the repository. |
+| `/assign [@user]`, `/unassign [@user]` | Assigns or unassigns yourself or someone else, for example for mentorship work. GitHub only lets you assign people who have commented on the issue or have access to the repository. |
 | `/close`, `/reopen` | Closes or reopens any issue or pull request. `/reopen` also removes the `status/*` label. |
 | `/close duplicate\|wontfix\|invalid` | Closes with a reason and adds the matching `status/*` label. On issues it also sets GitHub's close reason (duplicate or not planned). |
 | `/priority critical-urgent\|important-soon\|important-longterm\|backlog` | Sets the `priority/*` label, replacing any other priority. `/remove-priority` removes it. |
@@ -59,7 +57,7 @@ These commands only work in pull request comments. `lgtm`, `approved` and `do-no
 | `/remove-lgtm` (`/lgtm cancel`), `/remove-approve` (`/approve cancel`) | Maintainers | Removes `lgtm` or `approved`. |
 | `/hold` | Contributors, maintainers and the author | Adds `do-not-merge/hold`. The `hold` check fails while the label is set. |
 | `/unhold` (`/hold cancel`) | Maintainers | Removes `do-not-merge/hold`. |
-| `/retest` | Maintainers and the author | Re-runs the failed checks on the latest commit. |
+| `/retest` | Maintainers and the author | Re-runs the failed checks on the latest commit. Re-running from the Actions tab needs write access, so this lets contributors retry a flaky check (for example a network error during `go mod download`) without pushing an empty commit. |
 | `/cc @user`, `/uncc @user` | Contributors, maintainers and the author | Requests or removes a review from someone. |
 
 Commands inside code blocks, quoted lines (`> /kind bug`) and HTML comments are ignored, and unknown commands are ignored silently. If a command can't be applied, the bot reacts with 😕 and explains why, once per person and issue.

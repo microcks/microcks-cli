@@ -117,8 +117,8 @@ test('run lets past contributors triage using the comment author association', a
 test('run uses current labels, not the event payload snapshot', async () => {
   // A maintainer accepted the issue after this comment's event was created.
   const { github, calls } = fakeGithub({ permission: 'read', labels: ['triage/accepted'] });
-  await run({ github, context: contextFor('/assign', { login: 'carol', labels: ['needs-triage'] }), core });
-  assert.deepEqual(calls.find(([n]) => n === 'addAssignees')[1].assignees, ['carol']);
+  await run({ github, context: contextFor('/help', { login: 'carol', labels: ['needs-triage'], association: 'CONTRIBUTOR' }), core });
+  assert.deepEqual(calls.find(([n]) => n === 'addLabels')[1].labels, ['help wanted']);
   assert.equal(calls.at(-1)[1].content, '+1');
 });
 
