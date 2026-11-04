@@ -177,11 +177,13 @@ func NewImportCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command
 					f = filepath.Clean(f)
 
 					// Upsert entry.
-					watchCfg.UpsertEntry(config.WatchEntry{
+					if err := watchCfg.UpsertEntry(config.WatchEntry{
 						FilePath:     f,
 						Context:      []string{globalClientOpts.Context},
 						MainArtifact: mainArtifact,
-					})
+					}); err != nil {
+						return errors.Wrap(errors.KindEnvironment, err)
+					}
 
 					// Write watch file.
 					if err := config.WriteLocalWatchConfig(*watchCfg, watchFile); err != nil {
