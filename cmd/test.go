@@ -150,7 +150,7 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 				return err
 			}
 
-			fmt.Fprintf(progressWriter(outputFormat), "Full TestResult details are available here: %s/#/tests/%s \n", serverAddr, testResultID)
+			fmt.Fprintf(progressWriter(outputFormat), "Full TestResult details are available here: %s/#/tests/%s \n", normalizeServerURL(serverAddr), testResultID)
 
 			if !success {
 				return errors.ErrTestFailed
