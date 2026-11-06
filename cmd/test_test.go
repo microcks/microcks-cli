@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,4 +60,33 @@ func TestTestCommandMissingRunnerWithGlobalFlagsDoesNotPanic(t *testing.T) {
 	assert.Equal(t, 1, exitError.ExitCode())
 	assert.Contains(t, string(output), missingTestArgsMessage)
 	assert.NotContains(t, string(output), "panic:") // core regression guard: must never crash with a stack trace
+}
+
+func TestValidateTestEndpoint(t *testing.T) {
+	tests := []struct {
+		name      string
+		endpoint  string
+		wantError bool
+	}{
+		{name: "http URL", endpoint: "http://example.com/api"},
+		{name: "https URL", endpoint: "https://example.com/api"},
+		{name: "uppercase HTTP scheme", endpoint: "HTTP://example.com/api"},
+		{name: "file URL", endpoint: "file:///etc/passwd", wantError: true},
+		{name: "ftp URL", endpoint: "ftp://example.com/api", wantError: true},
+		{name: "scheme-less host and port", endpoint: "localhost:8080", wantError: true},
+		{name: "malformed URL", endpoint: "http://[::1", wantError: true},
+		{name: "missing host", endpoint: "http://", wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTestEndpoint(tt.endpoint)
+			if tt.wantError {
+				assert.Equal(t, errors.KindUsage, errors.KindOf(err))
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }

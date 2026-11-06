@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -64,6 +65,9 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 			}
 			if len(testEndpoint) == 0 || strings.HasPrefix(testEndpoint, "-") {
 				return errors.Wrapf(errors.KindUsage, "missing required argument: <testEndpoint> (e.g. 'http://localhost:8080/api')")
+			}
+			if err := validateTestEndpoint(testEndpoint); err != nil {
+				return err
 			}
 			if len(runnerType) == 0 || strings.HasPrefix(runnerType, "-") {
 				return errors.Wrapf(errors.KindUsage, "missing required argument: <runner> (e.g. 'HTTP', 'POSTMAN', 'OPEN_API_SCHEMA')")
@@ -176,4 +180,12 @@ func NewTestCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	testCmd.AddCommand(newTestGetCommand(globalClientOpts))
 
 	return testCmd
+}
+
+func validateTestEndpoint(testEndpoint string) error {
+	u, err := url.Parse(testEndpoint)
+	if err != nil || u.Host == "" || (strings.ToLower(u.Scheme) != "http" && strings.ToLower(u.Scheme) != "https") {
+		return errors.Wrapf(errors.KindUsage, "invalid test endpoint %q: must be a valid http:// or https:// URL", testEndpoint)
+	}
+	return nil
 }
