@@ -110,3 +110,108 @@ func executeCLIForTest(t *testing.T, args ...string) (string, error) {
 	}
 	return string(out), execErr
 }
+
+func TestServiceDeleteCommandRequiresForceInNonTerminal(t *testing.T) {
+	oldIsTerminal := isTerminal
+	isTerminal = func() bool { return false }
+	defer func() { isTerminal = oldIsTerminal }()
+
+	_, err := executeCLIForTest(t, "service", "delete", "svc-1", "--microcksURL", "http://localhost:8080")
+	if err == nil {
+		t.Fatal("expected error when running in non-terminal without --force, got nil")
+	}
+	if !strings.Contains(err.Error(), "--force flag is required") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestServiceDeleteCommandWithForce(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/services/svc-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(t, "service", "delete", "svc-1", "--force", "--microcksURL", server.URL)
+	if err != nil {
+		t.Fatalf("command returned unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service 'svc-1' deleted successfully") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestServiceDeleteCommandWithConfirmationAccepted(t *testing.T) {
+	oldIsTerminal := isTerminal
+	oldStdinReader := stdinReader
+	isTerminal = func() bool { return true }
+	stdinReader = strings.NewReader("y\n")
+	defer func() {
+		isTerminal = oldIsTerminal
+		stdinReader = oldStdinReader
+	}()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/services/svc-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(t, "service", "delete", "svc-1", "--microcksURL", server.URL)
+	if err != nil {
+		t.Fatalf("command returned unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service 'svc-1' deleted successfully") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestServiceDeleteCommandWithConfirmationAborted(t *testing.T) {
+	oldIsTerminal := isTerminal
+	oldStdinReader := stdinReader
+	isTerminal = func() bool { return true }
+	stdinReader = strings.NewReader("n\n")
+	defer func() {
+		isTerminal = oldIsTerminal
+		stdinReader = oldStdinReader
+	}()
+
+	out, err := executeCLIForTest(t, "service", "delete", "svc-1", "--microcksURL", "http://localhost:8080")
+	if err != nil {
+		t.Fatalf("command returned unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service deletion aborted") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestRootDeleteAliasCommandWithForce(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/services/svc-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(t, "delete", "svc-1", "--force", "--microcksURL", server.URL)
+	if err != nil {
+		t.Fatalf("command returned unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service 'svc-1' deleted successfully") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
