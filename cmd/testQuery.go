@@ -96,17 +96,18 @@ func newTestGetCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comman
 			if outputFormat == "json" {
 				return output.WriteJSON(os.Stdout, result)
 			}
-			return printTestResults([]connectors.TestResultSummary{{
-				ID:             result.ID,
-				Version:        result.Version,
-				TestNumber:     result.TestNumber,
-				TestDate:       result.TestDate,
-				TestedEndpoint: result.TestedEndpoint,
-				ServiceID:      result.ServiceID,
-				ElapsedTime:    result.ElapsedTime,
-				Success:        result.Success,
-				InProgress:     result.InProgress,
-			}})
+			formatter, err := output.NewFormatter(output.FormatText)
+			if err != nil {
+				return err
+			}
+			rendered, err := formatter.Format(result)
+			if err != nil {
+				return err
+			}
+			if rendered != "" {
+				fmt.Print(rendered)
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text or json")
