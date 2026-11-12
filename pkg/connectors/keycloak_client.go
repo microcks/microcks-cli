@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"bytes"
+	"crypto/tls"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -67,15 +68,11 @@ func NewKeycloakClientWithContext(ctx context.Context, realmURL string, username
 	kc.Username = username
 	kc.Password = password
 
+	var tlsConfig *tls.Config
 	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
-		tlsConfig := config.CreateTLSConfig()
-		tr := &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		kc.httpClient = &http.Client{Transport: tr}
-	} else {
-		kc.httpClient = http.DefaultClient
+		tlsConfig = config.CreateTLSConfig()
 	}
+	kc.httpClient = newHTTPClient(tlsConfig)
 	return &kc, nil
 }
 
