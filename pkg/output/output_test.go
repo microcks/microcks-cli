@@ -69,6 +69,21 @@ func TestTextFormatter(t *testing.T) {
 	}
 }
 
+func TestTextFormatter_InProgress(t *testing.T) {
+	r := &connectors.TestResult{
+		ID:         "test-in-progress",
+		InProgress: true,
+		Success:    false,
+	}
+	out, err := (&TextFormatter{}).Format(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "IN_PROGRESS") {
+		t.Errorf("expected IN_PROGRESS in output, got: %s", out)
+	}
+}
+
 func TestJSONFormatter(t *testing.T) {
 	out, err := (&JSONFormatter{}).Format(sampleResult())
 	if err != nil {

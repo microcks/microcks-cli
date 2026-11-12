@@ -74,3 +74,48 @@ func TestTestGetCommandOutputsJSON(t *testing.T) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
+
+func TestTestGetCommandOutputsText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/tests/test-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"id":          "test-1",
+			"serviceId":   "svc-1",
+			"success":     false,
+			"elapsedTime": 150,
+			"testCaseResults": []map[string]any{
+				{
+					"operationName": "POST /orders",
+					"success":       false,
+					"elapsedTime":   150,
+					"testStepResults": []map[string]any{
+						{
+							"requestName": "order-1",
+							"success":     false,
+							"message":     "price: expected number got string",
+						},
+					},
+				},
+			},
+		}); err != nil {
+			t.Fatalf("failed to encode test result response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(t, "test", "get", "test-1", "--microcksURL", server.URL)
+	if err != nil {
+		t.Fatalf("command returned error: %v", err)
+	}
+	if !strings.Contains(out, "Test test-1: FAILURE (150ms)") {
+		t.Errorf("expected failure header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "[FAIL] POST /orders") {
+		t.Errorf("expected operation name in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "price: expected number got string") {
+		t.Errorf("expected error message in output, got:\n%s", out)
+	}
+}
