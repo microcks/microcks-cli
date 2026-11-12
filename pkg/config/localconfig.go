@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	configUtil "github.com/microcks/microcks-cli/pkg/util"
 )
@@ -386,18 +387,39 @@ func (l *LocalConfig) RemoveAuth(server string) bool {
 }
 
 // UpsertEntry upserts a watch entry.
-func (w *WatchConfig) UpsertEntry(entry WatchEntry) {
-	for i, e := range w.Entries {
-		if e.FilePath == entry.FilePath {
-			contexts := w.Entries[i].Context
-			if !slices.Contains(contexts, entry.Context[0]) {
-				entry.Context = append(entry.Context, contexts...)
-			}
-			w.Entries[i] = entry
-			return
+func (w *WatchConfig) UpsertEntry(entry WatchEntry) error {
+	if len(entry.Context) == 0 {
+		return fmt.Errorf("watch entry context must not be empty")
+	}
+	for _, c := range entry.Context {
+		if strings.TrimSpace(c) == "" {
+			return fmt.Errorf("watch entry context must not contain blank context names")
 		}
 	}
+
+	for i, e := range w.Entries {
+		if e.FilePath == entry.FilePath {
+			merged := w.Entries[i].Context
+			for _, c := range entry.Context {
+				if !slices.Contains(merged, c) {
+					merged = append(merged, c)
+				}
+			}
+			entry.Context = merged
+			w.Entries[i] = entry
+			return nil
+		}
+	}
+
+	var uniqueContexts []string
+	for _, c := range entry.Context {
+		if !slices.Contains(uniqueContexts, c) {
+			uniqueContexts = append(uniqueContexts, c)
+		}
+	}
+	entry.Context = uniqueContexts
 	w.Entries = append(w.Entries, entry)
+	return nil
 }
 
 // ReadLocalWatchConfig loads up the local watch configuration file. Returns nil if config does not exist
