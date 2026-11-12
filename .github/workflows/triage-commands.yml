@@ -1,0 +1,69 @@
+# Prow-style slash commands for issues and PRs: /triage accepted, /kind bug, /assign,
+# and on PRs /lgtm, /approve, /hold, /retest, /cc, ...
+# See documentation/triage-commands.md for the command list.
+#
+# Security: both events run in the context of the default branch, and the job only
+# checks out hack/triage from it. Pull request code is never checked out or run;
+# commands are read from the comment text only.
+
+name: triage-commands
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+# Explicitly disable all default GITHUB_TOKEN permissions at the workflow level.
+# Each job then declares only the minimal required permissions.
+permissions: {}
+
+jobs:
+  label-new-issue:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout triage scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          sparse-checkout: hack/triage
+          persist-credentials: false
+
+      - name: Add needs-triage label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { labelNewIssue } = require('./hack/triage/run.js')
+            await labelNewIssue({ github, context })
+
+  commands:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(github.event.comment.body, '/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      # /retest re-runs failed workflow runs of a pull request.
+      actions: write
+    # No concurrency group: GitHub keeps only one pending run per group and
+    # cancels the others, which silently drops commands from quick comments.
+    # Each run reads the current labels instead.
+    steps:
+      - name: Checkout triage scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          sparse-checkout: hack/triage
+          persist-credentials: false
+
+      - name: Apply slash commands
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { run } = require('./hack/triage/run.js')
+            await run({ github, context, core })
