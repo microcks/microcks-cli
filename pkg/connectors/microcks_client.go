@@ -52,6 +52,7 @@ type MicrocksClient interface {
 	SetOAuthToken(oauthToken string)
 	ListServices(page int, size int) ([]Service, error)
 	GetService(ref string) (*ServiceDetail, error)
+	DeleteService(ref string) error
 	ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error)
 	CreateTestResult(serviceID string, testEndpoint string, runnerType string, secretName string, timeout int64, filteredOperations string, operationsHeaders string, oAuth2Context string) (string, error)
 	GetTestResult(testResultID string) (*TestResultSummary, error)
@@ -200,7 +201,17 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		}
 		c.ServerAddr = configCtx.Server.Server
 
-		c.InsecureTLS = configCtx.Server.InsecureTLS
+		// Honor the persisted insecureTLS only when it was written by the new
+		// login (TLSExplicit == true). Old login always wrote insecureTLS: true
+		// even without --insecure-tls, so we must not blindly trust it.
+		if configCtx.Server.TLSExplicit {
+			c.InsecureTLS = configCtx.Server.InsecureTLS
+		} else if configCtx.Server.InsecureTLS {
+			// Legacy config: insecureTLS was set unconditionally by older login.
+			// Warn the user and keep TLS verification enabled for safety.
+			log.Printf("Warning: saved context %q has insecureTLS: true but was written by an older microcks-cli that always persisted that value. TLS certificate verification will be enforced. Re-run 'microcks login' with --insecure-tls if needed.\n", configCtx.Name)
+			c.InsecureTLS = false
+		}
 		c.AuthToken = configCtx.User.AuthToken
 		c.RefreshToken = configCtx.User.RefreshToken
 
@@ -226,8 +237,17 @@ func NewClient(opts ClientOptions) (MicrocksClient, error) {
 		c.Verbose = opts.Verbose
 	}
 
-	if config.InsecureTLS || len(config.CaCertPaths) > 0 {
+	// Build the HTTP transport. config.InsecureTLS is set by the --insecure-tls
+	// CLI flag and always takes precedence. c.InsecureTLS comes from the saved
+	// context and is honoured only when it was written by the new login code
+	// (TLSExplicit == true in the stored Server entry).
+	effectiveInsecure := config.InsecureTLS || c.InsecureTLS
+	if effectiveInsecure || len(config.CaCertPaths) > 0 {
+		// Temporarily set the global flag so CreateTLSConfig picks it up.
+		prevInsecure := config.InsecureTLS
+		config.InsecureTLS = effectiveInsecure
 		tlsConfig := config.CreateTLSConfig()
+		config.InsecureTLS = prevInsecure
 		tr := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
@@ -395,7 +415,11 @@ func (c *microcksClient) redeemRefreshToken(auth config.Auth) (string, string, e
 	if err != nil {
 		return "", "", err
 	}
+	// Apply effective insecure setting for Keycloak client initialization.
+	prevInsecure := config.InsecureTLS
+	config.InsecureTLS = config.InsecureTLS || c.InsecureTLS
 	kc, err := NewKeycloakClientWithContext(c.ctx, keyCloakUrl, "", "")
+	config.InsecureTLS = prevInsecure
 	if err != nil {
 		return "", "", err
 	}
@@ -453,6 +477,53 @@ func (c *microcksClient) GetService(ref string) (*ServiceDetail, error) {
 	return &detail, nil
 }
 
+// DeleteService deletes a service by ID or name:version reference.
+func (c *microcksClient) DeleteService(ref string) error {
+	id := ref
+	if strings.Contains(ref, ":") {
+		serviceID, err := c.resolveServiceID(ref)
+		if err != nil {
+			return err
+		}
+		id = serviceID
+	}
+
+	rel := &url.URL{Path: "services/" + id}
+	u := c.APIURL.ResolveReference(rel)
+
+	req, err := http.NewRequestWithContext(c.ctx, "DELETE", u.String(), nil)
+	if err != nil {
+		return errors.Wrap(errors.KindGeneric, fmt.Errorf("creating delete service request: %w", err))
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+
+	config.DumpRequestIfRequired("Microcks for deleting service", req, false)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, err)
+	}
+	defer resp.Body.Close()
+
+	config.DumpResponseIfRequired("Microcks for deleting service", resp, true)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Wrap(errors.KindConnection, fmt.Errorf("reading Microcks response: %w", err))
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		kind := errors.KindAPI
+		if resp.StatusCode == http.StatusNotFound {
+			kind = errors.KindNotFound
+		}
+		return errors.Wrapf(kind, "Microcks returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return nil
+}
+
 func (c *microcksClient) ListTestResults(serviceID string, page int, size int) ([]TestResultSummary, error) {
 	values := url.Values{}
 	values.Set("page", strconv.Itoa(page))
@@ -473,6 +544,7 @@ func (c *microcksClient) resolveServiceID(ref string) (string, error) {
 	if !ok || name == "" || version == "" {
 		return "", errors.Wrapf(errors.KindUsage, "service reference %q must be <name>:<version>", ref)
 	}
+	var matches []Service
 	for page := 0; ; page++ {
 		services, err := c.ListServices(page, serviceLookupPageSize)
 		if err != nil {
@@ -480,14 +552,24 @@ func (c *microcksClient) resolveServiceID(ref string) (string, error) {
 		}
 		for _, service := range services {
 			if service.Name == name && service.Version == version {
-				return service.ID, nil
+				matches = append(matches, service)
 			}
 		}
 		if len(services) < serviceLookupPageSize {
 			break
 		}
 	}
-	return "", errors.Wrapf(errors.KindNotFound, "service %q does not exist", ref)
+	if len(matches) == 0 {
+		return "", errors.Wrapf(errors.KindNotFound, "service %q does not exist", ref)
+	}
+	if len(matches) > 1 {
+		var ids []string
+		for _, m := range matches {
+			ids = append(ids, fmt.Sprintf("%s (%s)", m.ID, m.Type))
+		}
+		return "", errors.Wrapf(errors.KindUsage, "multiple services matched %q: %s; please specify by ID", ref, strings.Join(ids, ", "))
+	}
+	return matches[0].ID, nil
 }
 
 func (c *microcksClient) getJSON(path string, query url.Values, out any, dumpLabel string) error {
