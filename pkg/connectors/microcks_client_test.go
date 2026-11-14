@@ -17,15 +17,20 @@
 package connectors
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/microcks/microcks-cli/pkg/config"
 	microckserrors "github.com/microcks/microcks-cli/pkg/errors"
 )
 
@@ -465,5 +470,142 @@ func TestGetFullTestResultClassifiesNotFound(t *testing.T) {
 	}
 	if got := microckserrors.KindOf(err); got != microckserrors.KindNotFound {
 		t.Fatalf("KindOf = %v, want KindNotFound", got)
+	}
+}
+
+func createExpiredJWT(t *testing.T, exp time.Time) string {
+	t.Helper()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(exp),
+	})
+	tokenString, err := token.SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatalf("failed to sign test JWT: %v", err)
+	}
+	return tokenString
+}
+
+func TestRefreshAuthToken_PersistsTokensAgainstContextUser(t *testing.T) {
+	expiredToken := createExpiredJWT(t, time.Now().Add(-1*time.Hour))
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	const (
+		contextName = "dev-context"
+		userName    = "http://localhost:8080"
+	)
+
+	var mockServer *httptest.Server
+	mockServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/keycloak/config":
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"enabled":         true,
+				"auth-server-url": mockServer.URL,
+				"realm":           "microcks",
+			}); err != nil {
+				t.Fatalf("failed to encode keycloak config: %v", err)
+			}
+		case "/realms/microcks/.well-known/openid-configuration":
+			if err := json.NewEncoder(w).Encode(map[string]string{
+				"authorization_endpoint": mockServer.URL + "/realms/microcks/protocol/openid-connect/auth",
+				"token_endpoint":         mockServer.URL + "/realms/microcks/protocol/openid-connect/token",
+			}); err != nil {
+				t.Fatalf("failed to encode openid config: %v", err)
+			}
+		case "/realms/microcks/protocol/openid-connect/token":
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("failed to parse form: %v", err)
+			}
+			if got := r.FormValue("grant_type"); got != "refresh_token" {
+				t.Errorf("unexpected grant_type: %q", got)
+			}
+			if got := r.FormValue("refresh_token"); got != "old-refresh-token" {
+				t.Errorf("unexpected refresh_token: %q", got)
+			}
+			if err := json.NewEncoder(w).Encode(map[string]string{
+				"access_token":  "new-access-token",
+				"refresh_token": "new-refresh-token",
+				"token_type":    "Bearer",
+			}); err != nil {
+				t.Fatalf("failed to encode token response: %v", err)
+			}
+		default:
+			t.Fatalf("unexpected request to: %s", r.URL.Path)
+		}
+	}))
+	defer mockServer.Close()
+
+	initialCfg := &config.LocalConfig{
+		CurrentContext: contextName,
+		Contexts: []config.ContextRef{
+			{Name: contextName, Server: mockServer.URL, User: userName},
+		},
+		Servers: []config.Server{
+			{Server: mockServer.URL},
+		},
+		Users: []config.User{
+			{Name: userName, AuthToken: expiredToken, RefreshToken: "old-refresh-token"},
+		},
+		Auths: []config.Auth{
+			{Server: mockServer.URL, ClientId: "microcks-cli", ClientSecret: "secret"},
+		},
+	}
+
+	if err := config.WriteLocalConfig(*initialCfg, configPath); err != nil {
+		t.Fatalf("failed to write initial config: %v", err)
+	}
+
+	apiURL, err := url.Parse(mockServer.URL + "/api/")
+	if err != nil {
+		t.Fatalf("failed to parse API URL: %v", err)
+	}
+
+	client := &microcksClient{
+		ctx:          context.Background(),
+		APIURL:       apiURL,
+		AuthToken:    expiredToken,
+		RefreshToken: "old-refresh-token",
+		httpClient:   mockServer.Client(),
+	}
+
+	err = client.refreshAuthToken(initialCfg, contextName, configPath)
+	if err != nil {
+		t.Fatalf("refreshAuthToken returned error: %v", err)
+	}
+
+	if client.AuthToken != "new-access-token" {
+		t.Errorf("expected client AuthToken %q, got %q", "new-access-token", client.AuthToken)
+	}
+	if client.RefreshToken != "new-refresh-token" {
+		t.Errorf("expected client RefreshToken %q, got %q", "new-refresh-token", client.RefreshToken)
+	}
+
+	updatedCfg, err := config.ReadLocalConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to read updated config: %v", err)
+	}
+
+	if len(updatedCfg.Users) != 1 {
+		t.Fatalf("expected exactly 1 user in config, got %d: %#v", len(updatedCfg.Users), updatedCfg.Users)
+	}
+
+	user, err := updatedCfg.GetUser(userName)
+	if err != nil {
+		t.Fatalf("failed to get user %q from updated config: %v", userName, err)
+	}
+
+	if user.AuthToken != "new-access-token" {
+		t.Errorf("expected user AuthToken to be updated to %q, got %q", "new-access-token", user.AuthToken)
+	}
+	if user.RefreshToken != "new-refresh-token" {
+		t.Errorf("expected user RefreshToken to be updated to %q, got %q", "new-refresh-token", user.RefreshToken)
+	}
+
+	for _, u := range updatedCfg.Users {
+		if u.Name == contextName {
+			t.Errorf("unexpected orphan user %q created in config", contextName)
+		}
 	}
 }

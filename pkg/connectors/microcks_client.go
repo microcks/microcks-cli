@@ -379,7 +379,7 @@ func (c *microcksClient) refreshAuthToken(localCfg *config.LocalConfig, ctxName,
 	c.AuthToken = authToken
 	c.RefreshToken = refreshToken
 	localCfg.UpsertUser(config.User{
-		Name:         ctxName,
+		Name:         configCtx.User.Name,
 		AuthToken:    authToken,
 		RefreshToken: refreshToken,
 	})
