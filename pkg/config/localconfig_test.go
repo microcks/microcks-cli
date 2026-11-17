@@ -16,6 +16,7 @@
 package config
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -67,5 +68,115 @@ func TestRemoveInstance_NoDuplicatesAfterRecreate(t *testing.T) {
 		if i.Name == "microcks" && i.ContainerID != "new-id-789" {
 			t.Errorf("expected new-id-789, got %s", i.ContainerID)
 		}
+	}
+}
+
+func TestWatchConfig_UpsertEntry_RejectsEmptyContext(t *testing.T) {
+	w := &WatchConfig{}
+
+	err := w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  nil,
+	})
+	if err == nil {
+		t.Fatal("expected error for nil context, got nil")
+	}
+
+	err = w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  []string{},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty context slice, got nil")
+	}
+}
+
+func TestWatchConfig_UpsertEntry_RejectsBlankContext(t *testing.T) {
+	w := &WatchConfig{}
+
+	err := w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  []string{""},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty string context, got nil")
+	}
+
+	err = w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  []string{"   "},
+	})
+	if err == nil {
+		t.Fatal("expected error for whitespace-only context, got nil")
+	}
+
+	err = w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  []string{"valid", " "},
+	})
+	if err == nil {
+		t.Fatal("expected error when one context is blank, got nil")
+	}
+}
+
+func TestWatchConfig_UpsertEntry_MergesAndDeduplicatesContexts(t *testing.T) {
+	w := &WatchConfig{}
+
+	// Add new entry with duplicate contexts in input
+	if err := w.UpsertEntry(WatchEntry{
+		FilePath:     "api.yaml",
+		Context:      []string{"dev", "dev"},
+		MainArtifact: false,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(w.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(w.Entries))
+	}
+	if len(w.Entries[0].Context) != 1 || w.Entries[0].Context[0] != "dev" {
+		t.Fatalf("expected [dev], got %v", w.Entries[0].Context)
+	}
+
+	// Upsert with new context "staging"
+	if err := w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  []string{"staging"},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(w.Entries[0].Context) != 2 {
+		t.Fatalf("expected 2 contexts, got %v", w.Entries[0].Context)
+	}
+
+	// Re-upsert with already existing context "staging" -> must preserve "dev" and not wipe out contexts
+	if err := w.UpsertEntry(WatchEntry{
+		FilePath:     "api.yaml",
+		Context:      []string{"staging"},
+		MainArtifact: true,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(w.Entries[0].Context) != 2 {
+		t.Fatalf("expected contexts to be preserved, got %v", w.Entries[0].Context)
+	}
+	if !slices.Contains(w.Entries[0].Context, "dev") || !slices.Contains(w.Entries[0].Context, "staging") {
+		t.Fatalf("expected [dev, staging], got %v", w.Entries[0].Context)
+	}
+	if !w.Entries[0].MainArtifact {
+		t.Fatal("expected MainArtifact to be updated to true")
+	}
+
+	// Upsert with multiple contexts including existing and new
+	if err := w.UpsertEntry(WatchEntry{
+		FilePath: "api.yaml",
+		Context:  []string{"prod", "dev", "prod"},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(w.Entries[0].Context) != 3 {
+		t.Fatalf("expected 3 contexts [dev, staging, prod], got %v", w.Entries[0].Context)
+	}
+	if !slices.Contains(w.Entries[0].Context, "prod") {
+		t.Fatalf("expected prod to be added, got %v", w.Entries[0].Context)
 	}
 }
