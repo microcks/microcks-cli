@@ -12,6 +12,12 @@ microcks stop
 microcks stop    
 ```
 
+### Options
+| Flag         | Description                              |
+| ------------ | ---------------------------------------- |
+| `-h, --help` | help for stop                            |
+| `--output`   | Output format: `text` or `json` (default: `text`) |
+
 ### Options Inherited from Parent Commands
 | Flag                     | Description                                 |
 | ------------------------ | ------------------------------------------- |

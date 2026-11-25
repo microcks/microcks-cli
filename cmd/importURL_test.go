@@ -17,12 +17,16 @@
 package cmd
 
 import (
+	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseImportURLArg(t *testing.T) {
@@ -312,4 +316,74 @@ func TestImportURLCommandExecutionRejectsInvalidArgsBeforeRunE(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, errors.KindUsage, errors.KindOf(err))
 	assert.EqualError(t, err, "invalid artifact URL 'spec2.yaml:true': must start with http:// or https://")
+}
+
+func TestImportURLCommandRejectsUnsupportedOutput(t *testing.T) {
+	_, err := executeCLIForTest(t, "import-url", "https://example.com/spec.yaml", "--output", "yaml")
+	require.Error(t, err)
+	assert.Equal(t, errors.KindUsage, errors.KindOf(err))
+}
+
+func TestImportURLCommandOutputsJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/artifact/download", r.URL.Path)
+		require.NoError(t, r.ParseMultipartForm(1<<20))
+		artifactURL := r.FormValue("url")
+		w.WriteHeader(http.StatusCreated)
+		if artifactURL == "https://example.com/openapi.yaml" {
+			_, writeErr := w.Write([]byte("Petstore:1.0.0"))
+			require.NoError(t, writeErr)
+			return
+		}
+		_, writeErr := w.Write([]byte("Petstore-postman:1.0.0"))
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(
+		t,
+		"import-url",
+		"https://example.com/openapi.yaml,https://example.com/postman.json:false:my-secret",
+		"--microcksURL",
+		server.URL,
+		"--output",
+		"json",
+	)
+	require.NoError(t, err)
+
+	var results []urlArtifactImportResult
+	require.NoError(t, json.Unmarshal([]byte(out), &results))
+	assert.Equal(t, []urlArtifactImportResult{
+		{
+			URL:     "https://example.com/openapi.yaml",
+			ID:      "Petstore:1.0.0",
+			Primary: true,
+			Action:  "discovered",
+		},
+		{
+			URL:     "https://example.com/postman.json",
+			ID:      "Petstore-postman:1.0.0",
+			Primary: false,
+			Action:  "completed",
+		},
+	}, results)
+}
+
+func TestImportURLCommandOutputsText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, writeErr := w.Write([]byte("Petstore:1.0.0"))
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(
+		t,
+		"import-url",
+		"https://example.com/openapi.yaml",
+		"--microcksURL",
+		server.URL,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "Microcks has discovered 'Petstore:1.0.0'\n", out)
 }

@@ -263,9 +263,19 @@ func (cli *containerClient) StartContainer(containerId string) error {
 }
 
 func (cli *containerClient) StopContainer(containerId string) error {
-	ctx := context.Background()
+	return cli.StopContainerWithOutput(containerId, os.Stdout)
+}
 
-	fmt.Print("Stopping container ", containerId, "... ")
+// StopContainerWithOutput stops containerId while writing progress to out.
+func (cli *containerClient) StopContainerWithOutput(containerId string, out io.Writer) error {
+	ctx := context.Background()
+	if out == nil {
+		out = os.Stdout
+	}
+
+	if _, err := fmt.Fprintf(out, "Stopping container %s...\n", containerId); err != nil {
+		return err
+	}
 	noWaitTimeout := 0 // to not wait for the container to exit gracefully
 	return cli.cli.ContainerStop(ctx, containerId, container.StopOptions{Timeout: &noWaitTimeout})
 }

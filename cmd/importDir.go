@@ -17,12 +17,14 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -37,18 +39,19 @@ type FileType struct {
 }
 
 type ImportResult struct {
-	TotalFiles   int
-	SuccessCount int
-	FailedCount  int
-	SuccessFiles []string
-	FailedFiles  []string
-	Errors       []string
+	TotalFiles   int      `json:"totalFiles"`
+	SuccessCount int      `json:"successCount"`
+	FailedCount  int      `json:"failedCount"`
+	SuccessFiles []string `json:"successFiles"`
+	FailedFiles  []string `json:"failedFiles"`
+	Errors       []string `json:"errors"`
 }
 
 type ImportConfig struct {
 	Recursive bool
 	Pattern   string
 	Verbose   bool
+	Output    io.Writer
 }
 
 type FileSystem interface {
@@ -97,9 +100,10 @@ func (e ValidationError) Error() string {
 
 func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
 	var (
-		recursive bool
-		pattern   string
-		verbose   bool
+		recursive    bool
+		pattern      string
+		verbose      bool
+		outputFormat string
 	)
 
 	var importDirCmd = &cobra.Command{
@@ -116,6 +120,9 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 			microcks import-dir ./api-specs --pattern "*.yaml"
 			microcks import-dir ./api-specs --recursive --pattern "openapi.*"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !output.IsTextOrJSON(outputFormat) {
+				return errors.Wrapf(errors.KindUsage, "--output must be one of: text, json")
+			}
 			if len(args) == 0 {
 				return errors.Wrapf(errors.KindUsage, "import-dir requires a directory path argument")
 			}
@@ -129,10 +136,15 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 
 			// Set up business logic dependencies
 			fs := &RealFileSystem{}
+			var importOut io.Writer = os.Stdout
+			if outputFormat == "json" {
+				importOut = io.Discard
+			}
 			importConfig := ImportConfig{
 				Recursive: recursive,
 				Pattern:   pattern,
 				Verbose:   verbose,
+				Output:    importOut,
 			}
 
 			// Execute business logic
@@ -142,6 +154,13 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 					return errors.Wrap(errors.KindUsage, err)
 				}
 				return err
+			}
+
+			if outputFormat == "json" {
+				if err := output.WriteJSON(os.Stdout, result); err != nil {
+					return errors.Wrap(errors.KindEnvironment, err)
+				}
+				return importDirectoryPartialFailure(result)
 			}
 
 			// Display results
@@ -179,6 +198,7 @@ func NewImportDirCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 	importDirCmd.Flags().BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
 	importDirCmd.Flags().StringVar(&pattern, "pattern", "", "File pattern to match (e.g., '*.yaml', 'openapi.*')")
 	importDirCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed progress")
+	importDirCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text or json")
 
 	return importDirCmd
 }
@@ -222,6 +242,11 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 	}
 	orderedFiles := append(primary, secondary...)
 
+	out := config.Output
+	if out == nil {
+		out = os.Stdout
+	}
+
 	for _, file := range orderedFiles {
 		fileType := detectFileType(file)
 
@@ -236,7 +261,9 @@ func ImportDirectory(client MicrocksClient, fs FileSystem, dirPath string, confi
 			if !fileType.IsPrimary {
 				action = "completed"
 			}
-			fmt.Printf("Microcks has %s '%s'\n", action, msg)
+			if _, err := fmt.Fprintf(out, "Microcks has %s '%s'\n", action, msg); err != nil {
+				return ImportResult{}, fmt.Errorf("writing import output: %w", err)
+			}
 		}
 
 		result.SuccessCount++
