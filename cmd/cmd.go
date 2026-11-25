@@ -16,10 +16,47 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/microcks/microcks-cli/pkg/config"
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/spf13/cobra"
 )
+
+type envFlagBinding struct {
+	flagName string
+	envName  string
+}
+
+var persistentEnvBindings = []envFlagBinding{
+	{flagName: "config", envName: "MICROCKS_CONFIG"},
+	{flagName: "microcks-context", envName: "MICROCKS_CONTEXT"},
+	{flagName: "verbose", envName: "MICROCKS_VERBOSE"},
+	{flagName: "insecure-tls", envName: "MICROCKS_INSECURE_TLS"},
+	{flagName: "caCerts", envName: "MICROCKS_CA_CERTS"},
+	{flagName: "keycloakClientId", envName: "MICROCKS_KEYCLOAK_CLIENT_ID"},
+	{flagName: "keycloakClientSecret", envName: "MICROCKS_KEYCLOAK_CLIENT_SECRET"},
+	{flagName: "microcksURL", envName: "MICROCKS_URL"},
+}
+
+func applyPersistentFlagEnvFallbacks(cmd *cobra.Command) error {
+	rootFlags := cmd.Root().PersistentFlags()
+	for _, binding := range persistentEnvBindings {
+		flag := rootFlags.Lookup(binding.flagName)
+		if flag == nil || flag.Changed {
+			continue
+		}
+		val, ok := os.LookupEnv(binding.envName)
+		if !ok || val == "" {
+			continue
+		}
+		if err := rootFlags.Set(binding.flagName, val); err != nil {
+			return wrapUsageError(cmd, fmt.Errorf("invalid value for %s: %w", binding.envName, err))
+		}
+	}
+	return nil
+}
 
 func NewCommand() (*cobra.Command, error) {
 
@@ -34,6 +71,9 @@ func NewCommand() (*cobra.Command, error) {
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			clientOpts.RequestContext = cmd.Context()
+			if err := applyPersistentFlagEnvFallbacks(cmd); err != nil {
+				return err
+			}
 			if err := cmd.ValidateRequiredFlags(); err != nil {
 				return wrapUsageError(cmd, err)
 			}
@@ -67,14 +107,14 @@ func NewCommand() (*cobra.Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config")
-	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use")
-	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges")
-	command.PersistentFlags().BoolVar(&clientOpts.InsecureTLS, "insecure-tls", false, "Whether to accept insecure HTTPS connection")
-	command.PersistentFlags().StringVar(&clientOpts.CaCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs")
-	command.PersistentFlags().StringVar(&clientOpts.ClientId, "keycloakClientId", "", "Keycloak Realm Service Account ClientId")
-	command.PersistentFlags().StringVar(&clientOpts.ClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret")
-	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL")
+	command.PersistentFlags().StringVar(&clientOpts.ConfigPath, "config", defaultLocalConfigPath, "Path to Microcks config (env: MICROCKS_CONFIG)")
+	command.PersistentFlags().StringVar(&clientOpts.Context, "microcks-context", "", "Name of the Microcks context to use (env: MICROCKS_CONTEXT)")
+	command.PersistentFlags().BoolVar(&clientOpts.Verbose, "verbose", false, "Produce dumps of HTTP exchanges (env: MICROCKS_VERBOSE)")
+	command.PersistentFlags().BoolVar(&clientOpts.InsecureTLS, "insecure-tls", false, "Whether to accept insecure HTTPS connection (env: MICROCKS_INSECURE_TLS)")
+	command.PersistentFlags().StringVar(&clientOpts.CaCertPaths, "caCerts", "", "Comma separated paths of CRT files to add to Root CAs (env: MICROCKS_CA_CERTS)")
+	command.PersistentFlags().StringVar(&clientOpts.ClientId, "keycloakClientId", "", "Keycloak Realm Service Account ClientId (env: MICROCKS_KEYCLOAK_CLIENT_ID)")
+	command.PersistentFlags().StringVar(&clientOpts.ClientSecret, "keycloakClientSecret", "", "Keycloak Realm Service Account ClientSecret (env: MICROCKS_KEYCLOAK_CLIENT_SECRET)")
+	command.PersistentFlags().StringVar(&clientOpts.ServerAddr, "microcksURL", "", "Microcks API URL (env: MICROCKS_URL)")
 	command.MarkFlagsRequiredTogether("keycloakClientId", "keycloakClientSecret")
 
 	setupUsageErrors(command)
