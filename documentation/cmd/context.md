@@ -17,9 +17,17 @@ microcks context/ctx http://localhost:8080
 # Delete the context
 microcks context/ctx http://localhost:8080 --delete/-d 
 
+# Stop a running local instance before deleting its context
+microcks stop
+microcks context/ctx http://localhost:8080 --delete/-d
+
 # List contexts for editor and automation integrations
 microcks context --output json
 ```
+
+A context backed by a running local instance created by `microcks start` must be
+stopped first. Deleting it while the container is running returns a usage error
+and leaves the config unchanged so `microcks stop` can still find the container.
 
 JSON mode writes an array of `{name, server, current}` objects. When no local
 config exists yet, it writes `[]`; this is a valid disconnected state for

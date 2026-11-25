@@ -43,7 +43,7 @@ microcks context
 # Switch Microcks context
 microcks context http://localhost:8080 
 
-# Delete Microcks context
+# Delete Microcks context (stop a running local instance first)
 microcks context http://localhost:8080 --delete`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !output.IsTextOrJSON(outputFormat) {
@@ -127,6 +127,11 @@ func deleteContext(context, configPath string) error {
 	if err != nil {
 		return errors.Wrap(errors.KindEnvironment, err)
 	}
+	if resolved.Instance.ContainerID != "" && resolved.Instance.Status == "Running" {
+		return errors.Wrapf(errors.KindUsage,
+			"context %q is backed by running local instance %q; run 'microcks stop' before deleting it",
+			context, resolved.Instance.Name)
+	}
 	serverName, ok := localCfg.RemoveContext(context)
 	if !ok {
 		return errors.Wrapf(errors.KindAPI, "context %q disappeared while deleting it", context)
@@ -140,8 +145,15 @@ func deleteContext(context, configPath string) error {
 	serverStillReferenced := slices.ContainsFunc(localCfg.Contexts, func(ref config.ContextRef) bool {
 		return ref.Server == serverName
 	})
-	if !serverStillReferenced && !localCfg.RemoveServer(serverName) {
-		return errors.Wrapf(errors.KindAPI, "server %q referenced by context %q does not exist", serverName, context)
+	if !serverStillReferenced {
+		if !localCfg.RemoveServer(serverName) {
+			return errors.Wrapf(errors.KindAPI, "server %q referenced by context %q does not exist", serverName, context)
+		}
+		localCfg.RemoveAuth(serverName)
+	}
+
+	if localCfg.CurrentContext == context {
+		localCfg.CurrentContext = ""
 	}
 
 	if localCfg.IsEmpty() {
@@ -149,9 +161,6 @@ func deleteContext(context, configPath string) error {
 			return errors.Wrap(errors.KindEnvironment, err)
 		}
 	} else {
-		if localCfg.CurrentContext == context {
-			localCfg.CurrentContext = ""
-		}
 		if err := config.ValidateLocalConfig(*localCfg); err != nil {
 			return errors.Wrap(errors.KindEnvironment, err)
 		}

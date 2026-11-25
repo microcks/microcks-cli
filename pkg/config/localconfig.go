@@ -351,7 +351,12 @@ func (l *LocalConfig) RemoveInstance(instanceID string) bool {
 }
 
 func (l *LocalConfig) IsEmpty() bool {
-	return len(l.Servers) == 0
+	return l.CurrentContext == "" &&
+		len(l.Contexts) == 0 &&
+		len(l.Servers) == 0 &&
+		len(l.Users) == 0 &&
+		len(l.Instances) == 0 &&
+		len(l.Auths) == 0
 }
 
 func (l *LocalConfig) GetAuth(server string) (*Auth, error) {

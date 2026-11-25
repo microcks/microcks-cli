@@ -404,6 +404,24 @@ func TestLocalConfigCRUDAndValidation(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
+func TestLocalConfigIsEmptyChecksAllState(t *testing.T) {
+	assert.True(t, (&LocalConfig{}).IsEmpty())
+
+	configs := map[string]LocalConfig{
+		"current-context": {CurrentContext: "ctx1"},
+		"contexts":        {Contexts: []ContextRef{{Name: "ctx1"}}},
+		"servers":         {Servers: []Server{{Server: "https://microcks.example.com"}}},
+		"users":           {Users: []User{{Name: "usr1"}}},
+		"instances":       {Instances: []Instance{{Name: "inst1", ContainerID: "cont123"}}},
+		"auths":           {Auths: []Auth{{Server: "https://microcks.example.com"}}},
+	}
+	for name, cfg := range configs {
+		t.Run(name, func(t *testing.T) {
+			assert.False(t, cfg.IsEmpty())
+		})
+	}
+}
+
 func TestReadLocalConfigPermission(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping OS file permission failure test on Windows since files always have 0666 or 0444 permissions")
