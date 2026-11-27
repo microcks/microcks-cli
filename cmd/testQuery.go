@@ -105,7 +105,9 @@ func newTestGetCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comman
 				return err
 			}
 			if rendered != "" {
-				fmt.Print(rendered)
+				if _, err := fmt.Print(rendered); err != nil {
+    return errors.Wrap(errors.KindEnvironment, err)
+}
 			}
 			return nil
 		},
