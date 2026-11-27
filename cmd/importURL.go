@@ -18,21 +18,29 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
 	"github.com/microcks/microcks-cli/pkg/errors"
+	"github.com/microcks/microcks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
 
 func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Command {
+	var outputFormat string
+
 	var importURLCmd = &cobra.Command{
 		Use:   "import-url",
 		Short: "import API artifacts from URL on Microcks server",
 		Long:  `import API artifacts from URL on Microcks server`,
 		Args:  validateImportURLArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !output.IsTextOrJSON(outputFormat) {
+				return errors.Wrapf(errors.KindUsage, "--output must be one of: text, json")
+			}
+
 			specificationFiles := args[0]
 
 			mc, _, err := newCommandClient(globalClientOpts)
@@ -40,24 +48,47 @@ func NewImportURLCommand(globalClientOpts *connectors.ClientOptions) *cobra.Comm
 				return err
 			}
 			sepSpecificationFiles := strings.Split(specificationFiles, ",")
+			results := make([]urlArtifactImportResult, 0, len(sepSpecificationFiles))
 			for _, f := range sepSpecificationFiles {
-				mainArtifact := true
-				secret := ""
+				f, mainArtifact, secret := parseImportURLArg(f)
 
-				f, mainArtifact, secret = parseImportURLArg(f)
-
-				// Try downloading the artifcat
+				// Try downloading the artifact.
 				msg, err := mc.DownloadArtifact(f, mainArtifact, secret)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Microcks has discovered '%s'\n", msg)
+				action := "discovered"
+				if !mainArtifact {
+					action = "completed"
+				}
+				results = append(results, urlArtifactImportResult{
+					URL:     f,
+					ID:      msg,
+					Primary: mainArtifact,
+					Action:  action,
+				})
+				if outputFormat == "text" {
+					if _, err := fmt.Printf("Microcks has discovered '%s'\n", msg); err != nil {
+						return errors.Wrap(errors.KindEnvironment, err)
+					}
+				}
+			}
+			if outputFormat == "json" {
+				return errors.Wrap(errors.KindEnvironment, output.WriteJSON(os.Stdout, results))
 			}
 			return nil
 		},
 	}
 
+	importURLCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text or json")
 	return importURLCmd
+}
+
+type urlArtifactImportResult struct {
+	URL     string `json:"url"`
+	ID      string `json:"id"`
+	Primary bool   `json:"primary"`
+	Action  string `json:"action"`
 }
 
 func validateImportURLArgs(cmd *cobra.Command, args []string) error {

@@ -16,7 +16,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +27,7 @@ import (
 	"time"
 
 	"github.com/microcks/microcks-cli/pkg/connectors"
+	"github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +73,7 @@ func (m *MockFileSystem) Walk(root string, walkFn filepath.WalkFunc) error {
 	}
 
 	for path, isDir := range m.Files {
-        if path == root || strings.HasPrefix(path, root+string(filepath.Separator)) {
+		if path == root || strings.HasPrefix(path, root+string(filepath.Separator)) {
 			info := &MockFileInfo{name: filepath.Base(path), isDir: isDir}
 			if err := walkFn(path, info, nil); err != nil {
 				return err
@@ -379,6 +383,81 @@ func TestNewImportDirCommand(t *testing.T) {
 	verboseFlag := cmd.Flags().Lookup("verbose")
 	assert.NotNil(t, verboseFlag)
 	assert.Equal(t, "bool", verboseFlag.Value.Type())
+
+	outputFlag := cmd.Flags().Lookup("output")
+	assert.NotNil(t, outputFlag)
+	assert.Equal(t, "string", outputFlag.Value.Type())
+	assert.Equal(t, "text", outputFlag.DefValue)
+}
+
+func TestImportDirCommandRejectsUnsupportedOutput(t *testing.T) {
+	_, err := executeCLIForTest(t, "import-dir", t.TempDir(), "--output", "yaml")
+	require.Error(t, err)
+	assert.Equal(t, errors.KindUsage, errors.KindOf(err))
+}
+
+func TestImportDirCommandOutputsJSON(t *testing.T) {
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "openapi.yaml")
+	postmanPath := filepath.Join(dir, "postman.json")
+	require.NoError(t, os.WriteFile(specPath, []byte("openapi: 3.0.0"), 0o600))
+	require.NoError(t, os.WriteFile(postmanPath, []byte("{}"), 0o600))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/artifact/upload", r.URL.Path)
+		w.WriteHeader(http.StatusCreated)
+		_, writeErr := w.Write([]byte("Petstore:1.0.0"))
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(t, "import-dir", dir, "--microcksURL", server.URL, "--output", "json")
+	require.NoError(t, err)
+
+	var result ImportResult
+	require.NoError(t, json.Unmarshal([]byte(out), &result))
+	assert.Equal(t, 2, result.TotalFiles)
+	assert.Equal(t, 2, result.SuccessCount)
+	assert.Equal(t, 0, result.FailedCount)
+	assert.Equal(t, []string{specPath, postmanPath}, result.SuccessFiles)
+	assert.Empty(t, result.FailedFiles)
+	assert.Empty(t, result.Errors)
+}
+
+func TestImportDirCommandOutputsJSONOnPartialFailure(t *testing.T) {
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "openapi.yaml")
+	postmanPath := filepath.Join(dir, "postman.json")
+	require.NoError(t, os.WriteFile(specPath, []byte("openapi: 3.0.0"), 0o600))
+	require.NoError(t, os.WriteFile(postmanPath, []byte("{}"), 0o600))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, r.ParseMultipartForm(1<<20))
+		if r.FormValue("mainArtifact") == "false" {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, writeErr := w.Write([]byte("upload failed"))
+			require.NoError(t, writeErr)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, writeErr := w.Write([]byte("Petstore:1.0.0"))
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+
+	out, err := executeCLIForTest(t, "import-dir", dir, "--microcksURL", server.URL, "--output", "json")
+	require.Error(t, err)
+	assert.Equal(t, errors.KindAPI, errors.KindOf(err))
+
+	var result ImportResult
+	require.NoError(t, json.Unmarshal([]byte(out), &result))
+	assert.Equal(t, 2, result.TotalFiles)
+	assert.Equal(t, 1, result.SuccessCount)
+	assert.Equal(t, 1, result.FailedCount)
+	assert.Equal(t, []string{specPath}, result.SuccessFiles)
+	assert.Equal(t, []string{postmanPath}, result.FailedFiles)
+	require.Len(t, result.Errors, 1)
+	assert.Contains(t, result.Errors[0], postmanPath)
 }
 
 // TestImportResult tests the ImportResult struct

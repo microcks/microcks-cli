@@ -30,11 +30,14 @@ Example output:
     "instance.start",
     "instance.start.json",
     "instance.stop",
+    "instance.stop.json",
     "artifact.import.file",
     "artifact.import.file.json",
     "artifact.import.file.watch",
     "artifact.import.directory",
+    "artifact.import.directory.json",
     "artifact.import.url",
+    "artifact.import.url.json",
     "service.list.json",
     "service.get.json",
     "test.run",
@@ -66,11 +69,14 @@ Example output:
 | `instance.start` | Start a local Microcks container |
 | `instance.start.json` | Start an instance and return its server/context as JSON |
 | `instance.stop` | Stop a local Microcks container |
+| `instance.stop.json` | Stop a local Microcks container and return its status as JSON |
 | `artifact.import.file` | Import one or more local artifact files |
 | `artifact.import.file.json` | Import local artifacts and return their identifiers as JSON |
 | `artifact.import.file.watch` | Re-import local artifacts when files change |
 | `artifact.import.directory` | Import artifacts discovered in a directory |
+| `artifact.import.directory.json` | Import directory artifacts and return a summary as JSON |
 | `artifact.import.url` | Import artifacts from remote URLs |
+| `artifact.import.url.json` | Import URL artifacts and return their identifiers as JSON |
 | `service.list.json` | List services using the stable JSON contract |
 | `service.get.json` | Retrieve service details using the stable JSON contract |
 | `test.run` | Run a test against a target endpoint |

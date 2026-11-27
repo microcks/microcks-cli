@@ -20,6 +20,7 @@ Arguments
 | `--recursive`           | bool    | ❌        | Scan subdirectories recursively (default false)                            |
 | `--pattern`             | string  | ❌        | File pattern to match (e.g., '*.yaml', 'openapi.*')                       |
 | `--verbose`             | bool    | ❌        | Show detailed progress during import                                       |
+| `--output`              | string  | ❌        | Output format: `text` or `json` (default `text`)                           |
 
 🧪 Examples
 

@@ -21,6 +21,12 @@ microcks import-url https://example.com/openapi.yaml \
     --keycloakClientSecret <client-secret> 
 ```
 
+### Options
+| Flag         | Description                              |
+| ------------ | ---------------------------------------- |
+| `-h, --help` | help for import-url                      |
+| `--output`   | Output format: `text` or `json` (default: `text`) |
+
 ### Options Inherited from Parent Commands
 | Flag                     | Description                                 |
 | ------------------------ | ------------------------------------------- |
