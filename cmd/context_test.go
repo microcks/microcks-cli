@@ -19,9 +19,12 @@ package cmd
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microcks/microcks-cli/pkg/config"
+	clierrors "github.com/microcks/microcks-cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,6 +99,41 @@ users:
   auth-token: ""
   refresh-token: ""`
 
+const localInstanceConfig = `current-context: http://localhost:8585
+contexts:
+- name: http://localhost:8585
+  server: http://localhost:8585
+  user: http://localhost:8585
+  instance: demo
+servers:
+- server: http://localhost:8585
+  insecureTLS: true
+  keycloakEnable: false
+users:
+- name: http://localhost:8585
+  auth-token: ""
+  refresh-token: ""
+instances:
+- name: demo
+  image: quay.io/microcks/microcks-uber:latest-native
+  status: Running
+  port: "8585"
+  containerID: abc123
+  autoRemove: false
+  driver: docker
+auths:
+- server: http://localhost:8585
+  clientid: ""
+  clientsecret: ""
+`
+
+func writeLocalConfigForTest(t *testing.T, contents string) string {
+	t.Helper()
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(contents), 0o600))
+	return configPath
+}
+
 const testConfigFilePath = "./testdata/local.config"
 
 func TestDeleteContext(t *testing.T) {
@@ -129,4 +167,43 @@ func TestDeleteContext(t *testing.T) {
 func TestDeleteContextEmpty(t *testing.T) {
 	err := deleteContext("http://localhost:8080", "./testdata/non-existent-file.config")
 	require.EqualError(t, err, "nothing to delete")
+}
+
+func TestDeleteContextRejectsRunningLocalInstance(t *testing.T) {
+	configPath := writeLocalConfigForTest(t, localInstanceConfig)
+
+	err := deleteContext("http://localhost:8585", configPath)
+	require.EqualError(t, err, `context "http://localhost:8585" is backed by running local instance "demo"; run 'microcks stop' before deleting it`)
+	assert.Equal(t, clierrors.KindUsage, clierrors.KindOf(err))
+
+	_, err = os.Stat(configPath)
+	require.NoError(t, err, "config must be unchanged when deletion is rejected")
+
+	localCfg, err := config.ReadLocalConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, localCfg)
+	require.Len(t, localCfg.Contexts, 1)
+	require.Len(t, localCfg.Instances, 1)
+	assert.Equal(t, "abc123", localCfg.Instances[0].ContainerID)
+}
+
+func TestDeleteContextAllowsStoppedLocalInstance(t *testing.T) {
+	stoppedConfig := strings.Replace(localInstanceConfig, "status: Running", "status: Exited", 1)
+	configPath := writeLocalConfigForTest(t, stoppedConfig)
+
+	err := deleteContext("http://localhost:8585", configPath)
+	require.NoError(t, err)
+
+	_, err = os.Stat(configPath)
+	require.NoError(t, err, "config must be retained while a local instance still exists")
+
+	localCfg, err := config.ReadLocalConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, localCfg)
+	assert.Empty(t, localCfg.Contexts)
+	assert.Empty(t, localCfg.Servers)
+	assert.Empty(t, localCfg.Users)
+	assert.Empty(t, localCfg.Auths)
+	require.Len(t, localCfg.Instances, 1)
+	assert.Equal(t, "abc123", localCfg.Instances[0].ContainerID)
 }
