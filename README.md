@@ -228,6 +228,29 @@ jobs:
             --output=github-actions
 ```
 
+## Environment variables
+
+Global flags can be supplied via environment variables when running in CI/CD pipelines or avoiding secrets on the command line. Explicit CLI flags always take precedence over environment variables:
+
+| Environment Variable | Equivalent Flag | Description |
+| --- | --- | --- |
+| `MICROCKS_URL` | `--microcksURL` | Microcks API URL |
+| `MICROCKS_KEYCLOAK_CLIENT_ID` | `--keycloakClientId` | Keycloak Realm Service Account ClientId |
+| `MICROCKS_KEYCLOAK_CLIENT_SECRET` | `--keycloakClientSecret` | Keycloak Realm Service Account ClientSecret |
+| `MICROCKS_CONTEXT` | `--microcks-context` | Name of the Microcks context to use |
+| `MICROCKS_CONFIG` | `--config` | Path to Microcks config |
+| `MICROCKS_CA_CERTS` | `--caCerts` | Comma-separated paths of CA certificate files |
+| `MICROCKS_INSECURE_TLS` | `--insecure-tls` | Accept insecure HTTPS connections (`true`/`false`) |
+| `MICROCKS_VERBOSE` | `--verbose` | Produce dumps of HTTP exchanges (`true`/`false`) |
+
+```bash
+export MICROCKS_URL=https://microcks.example.com
+export MICROCKS_KEYCLOAK_CLIENT_ID=microcks-serviceaccount
+export MICROCKS_KEYCLOAK_CLIENT_SECRET=my-secret
+
+microcks test "Pastry API:1.0.0" http://localhost:8080/api OPEN_API_SCHEMA
+```
+
 ## Tekton tasks
 
 This repository also contains different [Tekton](https://tekton.dev/) tasks definitions and sample pipelines. You'll find under the `/tekton` folder the resource for current `v1beta1` Tekton API version and the older `v1alpha1` under `tekton/v1alpha1`.
