@@ -1,0 +1,29 @@
+# Unit tests for the triage bot in hack/triage. They only use Node's built-in
+# test runner, so no dependencies are installed.
+
+name: triage-tests
+
+on:
+  push:
+    paths:
+      - 'hack/triage/**'
+      - '.github/workflows/triage-tests.yml'
+  pull_request:
+    paths:
+      - 'hack/triage/**'
+      - '.github/workflows/triage-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run triage tests
+        run: node --test hack/triage/test/*.test.js

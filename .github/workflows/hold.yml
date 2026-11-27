@@ -1,0 +1,29 @@
+# Fails while a pull request has the do-not-merge/hold label (set with /hold).
+# Labels set by the triage bot don't start workflows, so after /hold or /unhold
+# the bot re-runs this workflow (see hack/triage/run.js); that is why the label
+# is read from the API rather than from the event payload.
+
+name: hold
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  hold:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Fail while the pull request is on hold
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          labels=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/labels" --jq '.[].name')
+          if grep -qx 'do-not-merge/hold' <<<"$labels"; then
+            echo "::error::This pull request is on hold. Comment /unhold to release it."
+            exit 1
+          fi
