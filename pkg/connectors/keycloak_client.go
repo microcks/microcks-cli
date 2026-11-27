@@ -63,6 +63,13 @@ func NewKeycloakClientWithContext(ctx context.Context, realmURL string, username
 	if err != nil {
 		return nil, errors.Wrap(errors.KindUsage, fmt.Errorf("invalid Keycloak URL %q: %w", realmURL, err))
 	}
+	// Ensure trailing slash on BaseURL for ResolveReference to work correctly
+	if !strings.HasSuffix(u.Path, "/") {
+		u.Path += "/"
+	}
+	if u.RawPath != "" && !strings.HasSuffix(u.RawPath, "/") {
+		u.RawPath += "/"
+	}
 	kc.BaseURL = u
 	kc.Username = username
 	kc.Password = password

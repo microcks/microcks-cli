@@ -67,3 +67,106 @@ func TestConnectAndGetTokenReturnsErrorOnNon200(t *testing.T) {
 		})
 	}
 }
+
+func TestNewKeycloakClient_NormalizesTrailingSlash(t *testing.T) {
+	cases := []struct {
+		name     string
+		inputURL string
+		wantPath string
+	}{
+		{
+			name:     "subpath without trailing slash",
+			inputURL: "http://keycloak.example.com/realms/microcks",
+			wantPath: "/realms/microcks/",
+		},
+		{
+			name:     "subpath with trailing slash",
+			inputURL: "http://keycloak.example.com/realms/microcks/",
+			wantPath: "/realms/microcks/",
+		},
+		{
+			name:     "root URL without slash",
+			inputURL: "http://keycloak.example.com",
+			wantPath: "/",
+		},
+		{
+			name:     "nested subpath without trailing slash",
+			inputURL: "http://keycloak.example.com/auth/realms/microcks",
+			wantPath: "/auth/realms/microcks/",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kc, err := NewKeycloakClient(tc.inputURL, "client", "secret")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			client, ok := kc.(*keycloakClient)
+			if !ok {
+				t.Fatal("expected *keycloakClient implementation")
+			}
+			if client.BaseURL.Path != tc.wantPath {
+				t.Errorf("Path = %q, want %q", client.BaseURL.Path, tc.wantPath)
+			}
+		})
+	}
+}
+
+func TestKeycloakClient_EndpointsPreserveRealmPath(t *testing.T) {
+	var requestedPaths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedPaths = append(requestedPaths, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/realms/microcks/protocol/openid-connect/token":
+			fmt.Fprint(w, `{"access_token":"dummy-token","refresh_token":"dummy-refresh"}`)
+		case "/realms/microcks/.well-known/openid-configuration":
+			fmt.Fprint(w, `{"authorization_endpoint":"http://auth","token_endpoint":"http://token"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	// Provide realmURL without trailing slash
+	realmURL := server.URL + "/realms/microcks"
+	kc, err := NewKeycloakClient(realmURL, "client-id", "client-secret")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// 1. ConnectAndGetToken
+	token, err := kc.ConnectAndGetToken()
+	if err != nil {
+		t.Fatalf("ConnectAndGetToken failed: %v", err)
+	}
+	if token != "dummy-token" {
+		t.Errorf("expected dummy-token, got %q", token)
+	}
+
+	// 2. GetOIDCConfig
+	oidcConfig, err := kc.GetOIDCConfig()
+	if err != nil {
+		t.Fatalf("GetOIDCConfig failed: %v", err)
+	}
+	if oidcConfig.Endpoint.AuthURL != "http://auth" {
+		t.Errorf("unexpected auth URL: %s", oidcConfig.Endpoint.AuthURL)
+	}
+
+	// 3. ConnectAndGetTokenAndRefreshToken
+	tok, refTok, err := kc.ConnectAndGetTokenAndRefreshToken("user", "pass")
+	if err != nil {
+		t.Fatalf("ConnectAndGetTokenAndRefreshToken failed: %v", err)
+	}
+	if tok != "dummy-token" || refTok != "dummy-refresh" {
+		t.Errorf("unexpected tokens: %q, %q", tok, refTok)
+	}
+
+	// Verify all requests preserved the /realms/microcks realm path
+	for _, p := range requestedPaths {
+		if !strings.HasPrefix(p, "/realms/microcks/") {
+			t.Errorf("request path %q stripped the realm segment", p)
+		}
+	}
+}
