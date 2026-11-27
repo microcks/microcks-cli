@@ -130,3 +130,107 @@ func TestDeleteContextEmpty(t *testing.T) {
 	err := deleteContext("http://localhost:8080", "./testdata/non-existent-file.config")
 	require.EqualError(t, err, "nothing to delete")
 }
+
+const orphanedContextConfig = `current-context: prod
+contexts:
+- name: prod
+  server: https://microcks-prod.example.com
+  user: prod-user
+  instance: ""
+- name: broken-ctx
+  server: https://missing-server.example.com
+  user: missing-user
+  instance: ""
+servers:
+- name: ""
+  server: https://microcks-prod.example.com
+  insecureTLS: true
+  keycloakEnable: false
+users:
+- name: prod-user
+  auth-token: valid-token
+  refresh-token: valid-refresh`
+
+func TestContextListWithOrphanedContext(t *testing.T) {
+	configPath := t.TempDir() + "/config.yaml"
+	require.NoError(t, os.WriteFile(configPath, []byte(orphanedContextConfig), 0o600))
+
+	// Test JSON output
+	out, err := executeCLIForTest(t, "context", "--output", "json", "--config", configPath)
+	require.NoError(t, err)
+
+	var contexts []contextSummary
+	require.NoError(t, json.Unmarshal([]byte(out), &contexts))
+	require.Len(t, contexts, 2)
+	assert.Equal(t, "prod", contexts[0].Name)
+	assert.Equal(t, "https://microcks-prod.example.com", contexts[0].Server)
+	assert.True(t, contexts[0].Current)
+
+	assert.Equal(t, "broken-ctx", contexts[1].Name)
+	assert.Equal(t, "https://missing-server.example.com", contexts[1].Server)
+	assert.False(t, contexts[1].Current)
+
+	// Test Text output
+	textOut, err := executeCLIForTest(t, "context", "--output", "text", "--config", configPath)
+	require.NoError(t, err)
+	assert.Contains(t, textOut, "prod")
+	assert.Contains(t, textOut, "broken-ctx")
+	assert.Contains(t, textOut, "https://missing-server.example.com")
+}
+
+func TestDeleteOrphanedContext(t *testing.T) {
+	configPath := t.TempDir() + "/config.yaml"
+	require.NoError(t, os.WriteFile(configPath, []byte(orphanedContextConfig), 0o600))
+
+	// Deleting the orphaned context should succeed
+	err := deleteContext("broken-ctx", configPath)
+	require.NoError(t, err)
+
+	// Verify the context was removed and valid context remains
+	reloaded, err := config.ReadLocalConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded)
+	require.Len(t, reloaded.Contexts, 1)
+	assert.Equal(t, "prod", reloaded.Contexts[0].Name)
+	assert.Equal(t, "prod", reloaded.CurrentContext)
+
+	// Verify server and user for remaining context still exist
+	assert.Len(t, reloaded.Servers, 1)
+	assert.Equal(t, "https://microcks-prod.example.com", reloaded.Servers[0].Server)
+	assert.Len(t, reloaded.Users, 1)
+	assert.Equal(t, "prod-user", reloaded.Users[0].Name)
+}
+
+func TestDeleteOrphanedContextViaCLI(t *testing.T) {
+	configPath := t.TempDir() + "/config.yaml"
+	require.NoError(t, os.WriteFile(configPath, []byte(orphanedContextConfig), 0o600))
+
+	out, err := executeCLIForTest(t, "context", "broken-ctx", "--delete", "--config", configPath)
+	require.NoError(t, err)
+	assert.Contains(t, out, "Context 'broken-ctx' deleted")
+
+	reloaded, err := config.ReadLocalConfig(configPath)
+	require.NoError(t, err)
+	require.Len(t, reloaded.Contexts, 1)
+}
+
+func TestDeleteOrphanedContextWhenOnlyContext(t *testing.T) {
+	onlyBrokenConfig := `current-context: ""
+contexts:
+- name: only-broken
+  server: https://missing-server.example.com
+  user: missing-user
+  instance: ""
+servers: []
+users: []`
+
+	configPath := t.TempDir() + "/config.yaml"
+	require.NoError(t, os.WriteFile(configPath, []byte(onlyBrokenConfig), 0o600))
+
+	err := deleteContext("only-broken", configPath)
+	require.NoError(t, err)
+
+	// Config should be deleted as it becomes empty
+	_, err = os.Stat(configPath)
+	assert.True(t, os.IsNotExist(err))
+}

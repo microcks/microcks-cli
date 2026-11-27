@@ -123,28 +123,29 @@ func deleteContext(context, configPath string) error {
 	if contextIndex < 0 {
 		return errors.Wrapf(errors.KindNotFound, "context %q does not exist", context)
 	}
-	resolved, err := localCfg.ResolveContext(context)
-	if err != nil {
-		return errors.Wrap(errors.KindEnvironment, err)
-	}
+	targetContext := localCfg.Contexts[contextIndex]
 	serverName, ok := localCfg.RemoveContext(context)
 	if !ok {
 		return errors.Wrapf(errors.KindAPI, "context %q disappeared while deleting it", context)
 	}
-	userStillReferenced := slices.ContainsFunc(localCfg.Contexts, func(ref config.ContextRef) bool {
-		return ref.User == resolved.User.Name
-	})
-	if !userStillReferenced && !localCfg.RemoveUser(resolved.User.Name) {
-		return errors.Wrapf(errors.KindAPI, "user %q referenced by context %q does not exist", resolved.User.Name, context)
+	if targetContext.User != "" {
+		userStillReferenced := slices.ContainsFunc(localCfg.Contexts, func(ref config.ContextRef) bool {
+			return ref.User == targetContext.User
+		})
+		if !userStillReferenced {
+			localCfg.RemoveUser(targetContext.User)
+		}
 	}
-	serverStillReferenced := slices.ContainsFunc(localCfg.Contexts, func(ref config.ContextRef) bool {
-		return ref.Server == serverName
-	})
-	if !serverStillReferenced && !localCfg.RemoveServer(serverName) {
-		return errors.Wrapf(errors.KindAPI, "server %q referenced by context %q does not exist", serverName, context)
+	if serverName != "" {
+		serverStillReferenced := slices.ContainsFunc(localCfg.Contexts, func(ref config.ContextRef) bool {
+			return ref.Server == serverName
+		})
+		if !serverStillReferenced {
+			localCfg.RemoveServer(serverName)
+		}
 	}
 
-	if localCfg.IsEmpty() {
+	if localCfg.IsEmpty() && len(localCfg.Contexts) == 0 {
 		if err := localCfg.DeleteLocalConfig(configPath); err != nil {
 			return errors.Wrap(errors.KindEnvironment, err)
 		}
@@ -184,14 +185,14 @@ func listMicrocksContexts(configPath string) ([]contextSummary, error) {
 	}
 	contexts := make([]contextSummary, 0, len(localCfg.Contexts))
 	for _, contextRef := range localCfg.Contexts {
-		resolved, err := localCfg.ResolveContext(contextRef.Name)
-		if err != nil {
-			return nil, errors.Wrap(errors.KindEnvironment, fmt.Errorf("resolving context %q: %w", contextRef.Name, err))
+		serverAddr := contextRef.Server
+		if server, err := localCfg.GetServer(contextRef.Server); err == nil && server.Server != "" {
+			serverAddr = server.Server
 		}
 		contexts = append(contexts, contextSummary{
-			Name:    resolved.Name,
-			Server:  resolved.Server.Server,
-			Current: localCfg.CurrentContext == resolved.Name,
+			Name:    contextRef.Name,
+			Server:  serverAddr,
+			Current: localCfg.CurrentContext == contextRef.Name,
 		})
 	}
 	return contexts, nil
